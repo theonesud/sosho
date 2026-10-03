@@ -41,5 +41,4 @@ echo "Starting Claude Code connected to local Gemma..."
 # Start Claude Code
 # The --model must match the MODEL_ALIAS we set in run.sh (Gemma-2B)
 claude \
-    --model Sosho \
-    --tools "Agent"
+    --model Sosho
