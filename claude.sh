@@ -11,6 +11,10 @@ export ANTHROPIC_BASE_URL="http://localhost:8080"
 export ANTHROPIC_API_KEY="local"
 export ANTHROPIC_AUTH_TOKEN="local"
 
+# Inform Claude Code of the context window to optimize auto-compaction
+export CLAUDE_CODE_MAX_CONTEXT_TOKENS="131072"
+export ENABLE_TOOL_SEARCH="true"
+
 # Check if claude is installed
 if ! command -v claude &> /dev/null; then
     echo "Claude Code not found. Installing..."
@@ -38,5 +42,4 @@ echo "Starting Claude Code connected to local Gemma..."
 # The --model must match the MODEL_ALIAS we set in run.sh (Gemma-2B)
 claude \
     --model Sosho \
-    --bare \
-    --exclude-dynamic-system-prompt-sections
+    --tools "Agent"

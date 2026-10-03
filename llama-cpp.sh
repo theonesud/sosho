@@ -45,9 +45,11 @@ echo "Starting server via docker run..."
 SERVER_ARGS=(
     "--host" "0.0.0.0"
     "--port" "8080"
-    "-c" "32768"
+    "-c" "131072"
     "-ngl" "99"
     "-fa" "on"
+    "-ctk" "q8_0"
+    "-ctv" "q8_0"
     "-m" "/models/$MODEL_FILE"
     "-a" "Sosho"
 )
