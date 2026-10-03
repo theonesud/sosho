@@ -69,6 +69,7 @@ yarn-lock.json
 scraper_output/
 catboost_info
 .next-build/
+models
 models/
 openwebui-data/
 open-terminal/
