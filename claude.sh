@@ -17,6 +17,21 @@ if ! command -v claude &> /dev/null; then
     curl -fsSL https://claude.ai/install.sh | bash
 fi
 
+echo "Setting up LSPs for code intelligence..."
+# Python setup
+if ! command -v pyright &> /dev/null; then
+    echo "Installing pyright globally..."
+    npm install -g pyright
+fi
+claude plugin install pyright-lsp@claude-plugins-official -y --scope project
+
+# JS/TS setup
+if ! command -v typescript-language-server &> /dev/null; then
+    echo "Installing typescript-language-server globally..."
+    npm install -g typescript typescript-language-server
+fi
+claude plugin install typescript-lsp@claude-plugins-official -y --scope project
+
 echo "Starting Claude Code connected to local Gemma..."
 
 # Start Claude Code
