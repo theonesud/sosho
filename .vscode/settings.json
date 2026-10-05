@@ -68,7 +68,7 @@
   "python.testing.pytestEnabled": true,
   "python.testing.pytestArgs": ["tests"],
   "editor.wordWrap": "on",
-  "workbench.colorTheme": "Tokyo Night Light",
+  "workbench.colorTheme": "Abyss",
   "explorer.confirmDelete": false,
   "editor.minimap.enabled": false,
   "git.autofetch": true,

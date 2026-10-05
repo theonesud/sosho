@@ -1,14 +1,16 @@
 ## Install
 
 
-Download the model and start the llamacpp server
+Install Pi
 ```bash
-./llama-cpp.sh
+curl -fsSL https://pi.dev/install.sh | sh
+pi install npm:pi-subagents
+pi install npm:pi-lens
 ```
 
-Install and start Claude Code
+Start pi
 ```bash
-./claude.sh
+pi
 ```
 
 
