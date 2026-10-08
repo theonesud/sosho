@@ -1,0 +1,23 @@
+{
+  "extensions": [
+    "pi-lens",
+    "pi-subagents",
+    "pi-web-access",
+    "@langfuse/pi-observability-plugin",
+    "@juicesharp/rpiv-todo"
+  ],
+  "defaultTools": [
+    "read",
+    "write",
+    "edit",
+    "bash",
+    "codemode",
+    "tool_search"
+  ],
+  "compaction.enabled": true,
+  "compaction.reserveTokens": 32000,
+  "cacheWarming": "streaming",
+  "tuiMode": "fullscreen",
+  "defaultProvider": "google",
+  "defaultModel": "gemini-flash-lite-latest"
+}
