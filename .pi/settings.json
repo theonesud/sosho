@@ -1,23 +1,16 @@
 {
-  "extensions": [
-    "pi-lens",
-    "pi-subagents",
-    "pi-web-access",
-    "@langfuse/pi-observability-plugin",
-    "@juicesharp/rpiv-todo"
+  "defaultProvider": "llama.cpp",
+  "defaultModel": "gemma-4-E4B-it-Q4_K_M",
+  "packages": [
+    "npm:pi-subagents",
+    "npm:pi-lens"
   ],
   "defaultTools": [
     "read",
     "write",
     "edit",
     "bash",
-    "codemode",
-    "tool_search"
-  ],
-  "compaction.enabled": true,
-  "compaction.reserveTokens": 32000,
-  "cacheWarming": "streaming",
-  "tuiMode": "fullscreen",
-  "defaultProvider": "google",
-  "defaultModel": "gemini-flash-lite-latest"
+    "+codemode",
+    "+tool_search"
+  ]
 }

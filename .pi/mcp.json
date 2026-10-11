@@ -1,20 +1,3 @@
 {
-  "mcpServers": {
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" },
-      "exposure": "deferred"
-    },
-    "postgres": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-postgres", "${DATABASE_URL}"],
-      "exposure": "codemode"
-    },
-    "playwright": {
-      "command": "npx",
-      "args": ["-y", "@executeautomation/playwright-mcp-server"],
-      "exposure": "deferred"
-    }
-  }
+  "mcpServers": {}
 }

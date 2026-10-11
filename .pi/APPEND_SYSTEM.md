@@ -19,7 +19,3 @@ When delegating work to specialized agents using the `subagent` tool:
    - `politics`: Geopolitical risk, regulatory shifts, public policy strategy
    - `economist`: Macroeconomic analysis, monetary policy, inflation, econometric modeling
    - `trader`: Algorithmic trading strategies, market microstructure, backtesting, risk management
-
-## Tool & MCP Ecosystem
-- **MCP Servers:** `postgres` (via codemode), `github` (via tool_search), and `playwright` (via tool_search/deferred).
-- **Skills:** `monid` (web search, data extraction, scraping) is available via `/skill:monid`.

@@ -77,3 +77,4 @@ open-terminal/
 .galactus/
 !backend/models/
 .backup/
+pi-codebase/
