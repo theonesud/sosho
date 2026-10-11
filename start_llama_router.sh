@@ -4,13 +4,15 @@
 # 1. Configuration & Paths
 # ==========================================
 MODEL_DIR="$(pwd)/models"
-mkdir -p "$MODEL_DIR"
+MODEL_NAME="gemma-4-E4B-it-Q4_K_M"
+MODEL_SUBDIR="$MODEL_DIR/$MODEL_NAME"
+mkdir -p "$MODEL_SUBDIR"
 
 MODEL_FILE="gemma-4-E4B-it-Q4_K_M.gguf"
 MMPROJ_FILE="mmproj-F16.gguf"
 
-MODEL_PATH_LOCAL="$MODEL_DIR/$MODEL_FILE"
-MMPROJ_PATH_LOCAL="$MODEL_DIR/$MMPROJ_FILE"
+MODEL_PATH_LOCAL="$MODEL_SUBDIR/$MODEL_FILE"
+MMPROJ_PATH_LOCAL="$MODEL_SUBDIR/$MMPROJ_FILE"
 
 # ==========================================
 # 2. Download Models
@@ -18,13 +20,13 @@ MMPROJ_PATH_LOCAL="$MODEL_DIR/$MMPROJ_FILE"
 if [ ! -e "$MODEL_PATH_LOCAL" ] || [ ! -e "$MMPROJ_PATH_LOCAL" ]; then
     echo "Models not found or incomplete. Downloading..."
     if [ ! -e "$MODEL_PATH_LOCAL" ]; then
-        HF_HUB_ENABLE_HF_TRANSFER=1 hf download unsloth/gemma-4-E4B-it-GGUF "$MODEL_FILE" --local-dir "$MODEL_DIR"
+        HF_HUB_ENABLE_HF_TRANSFER=1 hf download unsloth/gemma-4-E4B-it-GGUF "$MODEL_FILE" --local-dir "$MODEL_SUBDIR"
     fi
     if [ ! -e "$MMPROJ_PATH_LOCAL" ]; then
-        HF_HUB_ENABLE_HF_TRANSFER=1 hf download unsloth/gemma-4-E4B-it-GGUF "$MMPROJ_FILE" --local-dir "$MODEL_DIR"
+        HF_HUB_ENABLE_HF_TRANSFER=1 hf download unsloth/gemma-4-E4B-it-GGUF "$MMPROJ_FILE" --local-dir "$MODEL_SUBDIR"
     fi
 else
-    echo "Models found. Proceeding to start server..."
+    echo "Models found in $MODEL_SUBDIR. Proceeding to start server..."
 fi
 
 # ==========================================
@@ -42,6 +44,7 @@ docker rm -f llama-cpp 2>/dev/null
 echo "Starting server via docker run..."
 
 # Build llama-server arguments
+# Added --jinja for tool calling and chat template support in Pi
 # Added --models-autoload to enable router mode!
 SERVER_ARGS=(
     "--host" "0.0.0.0"
@@ -51,18 +54,10 @@ SERVER_ARGS=(
     "-fa" "on"
     "-ctk" "q8_0"
     "-ctv" "q8_0"
+    "--jinja"
     "--models-autoload"
     "--models-dir" "/models"
 )
-
-# We intentionally DO NOT pass `-m` here because statically loaded models 
-# won't have the `status` metadata required by the router mode check.
-# The agent will dynamically load models using the router API instead.
-# SERVER_ARGS+=("-m" "/models/$MODEL_FILE" "-a" "Sosho")
-
-if [ -e "$MMPROJ_PATH_LOCAL" ]; then
-    SERVER_ARGS+=("--mmproj" "/models/$MMPROJ_FILE")
-fi
 
 # Run docker container
 docker run -d \

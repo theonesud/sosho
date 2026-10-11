@@ -1,10 +1,7 @@
 ---
 name: designer
 description: Lead Designer focusing on UI/UX, aesthetics, and HTML/CSS prototypes.
-model: google/gemini-flash-lite-latest
-thinking: medium
-fallbackModels:
-  - google/gemini-2.5-pro
+model: gemma-4-E4B-it-Q4_K_M
 tools:
   - read
   - write

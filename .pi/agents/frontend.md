@@ -1,10 +1,7 @@
 ---
 name: frontend
 description: Senior Frontend Engineer focusing on Next.js, Shadcn UI, and TailwindCSS.
-model: google/gemini-flash-lite-latest
-thinking: high
-fallbackModels:
-  - google/gemini-2.5-pro
+model: gemma-4-E4B-it-Q4_K_M
 tools:
   - read
   - write
@@ -12,6 +9,8 @@ tools:
   - bash
   - tool_search
   - codemode
+  - 'mcp__github__*'
+  - 'mcp__playwright__*'
 ---
 You are the Senior Frontend Engineer. 
 Your primary domain is building highly interactive, performant web applications using TypeScript and Next.js. 
