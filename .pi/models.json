@@ -8,8 +8,17 @@
         {
           "id": "gemma-4-E4B-it-Q4_K_M",
           "name": "gemma-4-E4B-it-Q4_K_M",
-          "contextWindow": 131072,
-          "maxTokens": 8192
+          "contextWindow": 32768,
+          "maxTokens": 4096,
+          "input": [
+            "text",
+            "image"
+          ],
+          "samplingParams": {
+            "temperature": 0.1,
+            "top_p": 0.95,
+            "min_p": 0.05
+          }
         }
       ]
     }
