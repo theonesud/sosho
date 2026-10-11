@@ -12,5 +12,8 @@
     "bash",
     "+codemode",
     "+tool_search"
+  ],
+  "extensions": [
+    "-builtin:llama.cpp"
   ]
 }

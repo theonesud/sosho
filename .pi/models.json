@@ -1,0 +1,17 @@
+{
+  "providers": {
+    "llama.cpp": {
+      "baseUrl": "http://llama-cpp:8080/v1",
+      "api": "openai-completions",
+      "apiKey": "local",
+      "models": [
+        {
+          "id": "gemma-4-E4B-it-Q4_K_M",
+          "name": "gemma-4-E4B-it-Q4_K_M",
+          "contextWindow": 131072,
+          "maxTokens": 8192
+        }
+      ]
+    }
+  }
+}
