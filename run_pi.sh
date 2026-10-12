@@ -45,12 +45,17 @@ fi
 # Resolve physical directories (handles symlinks as well as normal folders)
 REAL_WORKSPACE="$(realpath "$WORKSPACE_DIR")"
 REAL_PI_DIR="$(realpath "$WORKSPACE_DIR/.pi")"
-mkdir -p "$REAL_PI_DIR"
+mkdir -p "$REAL_PI_DIR/.cache" "$REAL_PI_DIR/.config" "$REAL_PI_DIR/memory"
 
 exec docker run "${DOCKER_FLAGS[@]}" --rm \
     --name pi-agent \
     --network "$NETWORK_NAME" \
     -e "LLAMA_BASE_URL=$LLAMA_SERVER_URL" \
+    -e "PI_MEMORY_DIR=/root/.pi/agent/memory" \
+    -e "XDG_CACHE_HOME=/root/.pi/agent/.cache" \
+    -e "XDG_CONFIG_HOME=/root/.pi/agent/.config" \
+    -e "PI_MEMORY_SNAPSHOT=stable" \
+    -e "PI_MEMORY_EXIT_SUMMARY=1" \
     -v "$REAL_WORKSPACE:/workspace" \
     -v "$REAL_PI_DIR:/root/.pi/agent" \
     "$IMAGE_NAME" \
