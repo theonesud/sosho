@@ -1,22 +1,19 @@
-## Install
+# Sosho
 
+## How to run
 
-Install Pi
+Start llama cpp server
 ```bash
-curl -fsSL https://pi.dev/install.sh | sh
-pi install npm:pi-subagents
-pi install npm:pi-lens
+./run_llamacpp.sh
 ```
 
 Start pi
 ```bash
-pi
+./run_pi.sh
 ```
 
 
-subagents
-forks
-permissions
+
 memory
 
 lsp

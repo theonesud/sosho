@@ -42,13 +42,17 @@ if [ -t 0 ] && [ -t 1 ]; then
     DOCKER_FLAGS+=("-it")
 fi
 
+# Resolve physical directories (handles symlinks as well as normal folders)
+REAL_WORKSPACE="$(realpath "$WORKSPACE_DIR")"
+REAL_PI_DIR="$(realpath "$WORKSPACE_DIR/.pi")"
+mkdir -p "$REAL_PI_DIR"
+
 exec docker run "${DOCKER_FLAGS[@]}" --rm \
     --name pi-agent \
     --network "$NETWORK_NAME" \
     -e "LLAMA_BASE_URL=$LLAMA_SERVER_URL" \
-    -v "$WORKSPACE_DIR:/workspace" \
-    -v "$WORKSPACE_DIR/.pi/models.json:/root/.pi/agent/models.json" \
-    -v pi-agent-home:/root/.pi/agent \
+    -v "$REAL_WORKSPACE:/workspace" \
+    -v "$REAL_PI_DIR:/root/.pi/agent" \
     "$IMAGE_NAME" \
     --approve \
     "$@"

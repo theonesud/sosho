@@ -20,5 +20,6 @@
   ],
   "extensions": [
     "-builtin:llama.cpp"
-  ]
+  ],
+  "lastChangelogVersion": "1.1.0"
 }

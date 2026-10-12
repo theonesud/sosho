@@ -78,3 +78,11 @@ open-terminal/
 !backend/models/
 .backup/
 pi-codebase/
+
+# Pi Agent local runtime & secrets
+.pi/auth.json
+.pi/sessions/
+.pi/bin/
+.pi/models-store.json
+.pi/pi-subagents/
+.pi/npm/node_modules/
