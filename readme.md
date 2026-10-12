@@ -13,3 +13,6 @@ Start pi
 ```
 
 Add skills and mcps to your liking
+
+### TODO:
+Add Dokobot for websearch: https://dokobot.ai/
