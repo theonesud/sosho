@@ -45,7 +45,8 @@ fi
 # Resolve physical directories (handles symlinks as well as normal folders)
 REAL_WORKSPACE="$(realpath "$WORKSPACE_DIR")"
 REAL_PI_DIR="$(realpath "$WORKSPACE_DIR/.pi")"
-mkdir -p "$REAL_PI_DIR/.cache" "$REAL_PI_DIR/.config" "$REAL_PI_DIR/memory"
+REAL_WORKTREES_DIR="$(realpath "$WORKSPACE_DIR/../worktrees" 2>/dev/null || echo "$(dirname "$REAL_WORKSPACE")/worktrees")"
+mkdir -p "$REAL_PI_DIR/.cache" "$REAL_PI_DIR/.config" "$REAL_PI_DIR/memory" "$REAL_WORKTREES_DIR"
 
 exec docker run "${DOCKER_FLAGS[@]}" --rm \
     --name pi-agent \
@@ -58,6 +59,7 @@ exec docker run "${DOCKER_FLAGS[@]}" --rm \
     -e "PI_MEMORY_EXIT_SUMMARY=1" \
     -v "$REAL_WORKSPACE:/workspace" \
     -v "$REAL_PI_DIR:/root/.pi/agent" \
+    -v "$REAL_WORKTREES_DIR:/worktrees" \
     "$IMAGE_NAME" \
     --approve \
     "$@"

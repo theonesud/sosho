@@ -65,18 +65,8 @@ uv.lock
 package-lock.json
 yarn-lock.json
 
-!.env.example
-scraper_output/
-catboost_info
-.next-build/
 models
 models/
-openwebui-data/
-open-terminal/
-.cptr/
-.galactus/
-!backend/models/
-.backup/
 pi-codebase/
 
 # Pi Agent local runtime & secrets
