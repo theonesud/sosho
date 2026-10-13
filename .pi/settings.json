@@ -9,7 +9,8 @@
   "packages": [
     "npm:pi-subagents",
     "npm:pi-lens",
-    "npm:pi-memory"
+    "npm:pi-memory",
+    "npm:pi-tldraw"
   ],
   "defaultTools": [
     "read",
@@ -22,5 +23,5 @@
   "extensions": [
     "-builtin:llama.cpp"
   ],
-  "lastChangelogVersion": "1.1.0"
+  "lastChangelogVersion": "1.2.0"
 }

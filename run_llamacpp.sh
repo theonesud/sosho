@@ -20,10 +20,10 @@ MMPROJ_PATH_LOCAL="$MODEL_SUBDIR/$MMPROJ_FILE"
 if [ ! -e "$MODEL_PATH_LOCAL" ] || [ ! -e "$MMPROJ_PATH_LOCAL" ]; then
     echo "Models not found or incomplete. Downloading..."
     if [ ! -e "$MODEL_PATH_LOCAL" ]; then
-        HF_HUB_ENABLE_HF_TRANSFER=1 hf download unsloth/gemma-4-E4B-it-GGUF "$MODEL_FILE" --local-dir "$MODEL_SUBDIR"
+        HF_XET_HIGH_PERFORMANCE=1 hf download unsloth/gemma-4-E4B-it-GGUF "$MODEL_FILE" --local-dir "$MODEL_SUBDIR"
     fi
     if [ ! -e "$MMPROJ_PATH_LOCAL" ]; then
-        HF_HUB_ENABLE_HF_TRANSFER=1 hf download unsloth/gemma-4-E4B-it-GGUF "$MMPROJ_FILE" --local-dir "$MODEL_SUBDIR"
+        HF_XET_HIGH_PERFORMANCE=1 hf download unsloth/gemma-4-E4B-it-GGUF "$MMPROJ_FILE" --local-dir "$MODEL_SUBDIR"
     fi
 else
     echo "Models found in $MODEL_SUBDIR. Proceeding to start server..."

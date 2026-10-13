@@ -7,7 +7,14 @@ set -e
 IMAGE_NAME="pi-sandbox:latest"
 NETWORK_NAME="webui-net"
 SERVER_CONTAINER="llama-cpp"
-LLAMA_SERVER_URL="${LLAMA_BASE_URL:-http://$SERVER_CONTAINER:8080}"
+# pi runs on the host network so it can reach services that bind 127.0.0.1 only
+# (notably the tldraw desktop agent API on :7236). Your llama.cpp server is
+# published on the host, so the container name is no longer needed.
+LLAMA_SERVER_URL="${LLAMA_BASE_URL:-http://127.0.0.1:8080}"
+# Host paths mounted read-only so the in-container tldraw skill finds its
+# server.json (port + bearer token) and its tq helper.
+TLDRAW_CONFIG_DIR="${TLDRAW_CONFIG_DIR:-$HOME/.config/tldraw}"
+PI_SKILLS_DIR="${PI_SKILLS_DIR:-$HOME/skills}"
 WORKSPACE_DIR="$(pwd)"
 
 # ==========================================
@@ -50,7 +57,7 @@ mkdir -p "$REAL_PI_DIR/.cache" "$REAL_PI_DIR/.config" "$REAL_PI_DIR/memory" "$RE
 
 exec docker run "${DOCKER_FLAGS[@]}" --rm \
     --name pi-agent \
-    --network "$NETWORK_NAME" \
+    --network host \
     -e "LLAMA_BASE_URL=$LLAMA_SERVER_URL" \
     -e "PI_MEMORY_DIR=/root/.pi/agent/memory" \
     -e "XDG_CACHE_HOME=/root/.pi/agent/.cache" \
@@ -60,6 +67,8 @@ exec docker run "${DOCKER_FLAGS[@]}" --rm \
     -v "$REAL_WORKSPACE:/workspace" \
     -v "$REAL_PI_DIR:/root/.pi/agent" \
     -v "$REAL_WORKTREES_DIR:/worktrees" \
+    -v "$TLDRAW_CONFIG_DIR:/home/vegeta/.config/tldraw:ro" \
+    -v "$PI_SKILLS_DIR:/root/skills:ro" \
     "$IMAGE_NAME" \
     --approve \
     "$@"
