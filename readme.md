@@ -29,8 +29,8 @@ Add skills and mcps to your liking
   provider `llama.cpp` pointing at `http://127.0.0.1:8080/v1`.
 - **pi runs on the host network** (`run_pi.sh` uses `--network host`) so it can
   reach services bound to `127.0.0.1`, especially the tldraw agent API on `:7236`.
-- **tldraw agent skill for pi**: copied to `.pi/skills/tldraw-offline/`
-  (mounted into the container at `/root/.pi/agent/skills/tldraw-offline`).
+- **tldraw agent skill for pi**: copied to `.agents/skills/tldraw-offline/`
+  (resolves in the container at `/workspace/.agents/skills/tldraw-offline`).
   `run_pi.sh` also mounts `~/.config/tldraw` read-only and `~/skills` read-only
   so the skill's `server.json` lookup and `tq` helper resolve inside the container.
 - **pi-tldraw**: installed as a pi package in `.pi/settings.json`

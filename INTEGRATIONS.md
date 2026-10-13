@@ -19,7 +19,7 @@ Prebuilt things first; custom glue is called out separately.
 | pi → llama.cpp | ✅ configured: `.pi/models.json` custom provider `llama.cpp` → `http://127.0.0.1:8080/v1` (pi runs `--network host`) |
 | pi skills | `pi-subagents`, `pi-lens`, `pi-memory` installed |
 | tldraw app | ✅ running, API on `127.0.0.1:7236`, token in `~/.config/tldraw/server.json` |
-| tldraw → Pi agent skill | ✅ installed to repo `.pi/skills/tldraw-offline/` (container: `/root/.pi/agent/skills`) + `~/skills` and `~/.config/tldraw` mounted read-only |
+| tldraw → Pi agent skill | ✅ installed to repo `.agents/skills/tldraw-offline/` (container: `/workspace/.agents/skills/tldraw-offline`) + `~/skills` and `~/.config/tldraw` mounted read-only |
 | pi-tldraw package | ✅ installed v0.2.0 (`npm:pi-tldraw` in `.pi/settings.json`, npm tree includes `ai@^6`/`agents`; the 0.1.1 missing-`ai` bug does not apply). Canvases persist to `.pi/tldraw-canvases/<id>.json` |
 | Jan MCP | ⏳ intentionally left manual — see `readme.md` |
 | Docker from this shell | ⚠️ `permission denied` on the socket, but `vegeta` **is** in the `docker` group — the running shell predates the group add. New login / `newgrp docker` fixes it |
@@ -87,7 +87,7 @@ Recommended: **C3**, optionally fronted by **C2** if you want to reuse an existi
 ### Edge D — pi ↔ tldraw
 | Option | What it is | Effort | Reach |
 |---|---|---|---|
-| **D1. tldraw's own agent skill (prebuilt)** | `~/.pi/agent/skills/tldraw-offline/` — teaches pi the `curl`/`tq` recipes against `:7236` | **Very low** | The real desktop app. Needs network reachability (see blocker below) |
+| **D1. tldraw's own agent skill (prebuilt)** | repo `.agents/skills/tldraw-offline/` — teaches pi the `curl`/`tq` recipes against `:7236` | **Very low** | The real desktop app. Needs network reachability (see blocker below) |
 | **D2. `pi-tldraw` (prebuilt pi package)** | `pi install npm:pi-tldraw` — tldraw MCP app + semantic scene tools + snapshots + PNG/SVG export at `127.0.0.1:8787/mcp` | **Very low** | A *separate* agent canvas host, not the desktop app |
 | **D3. `er1chi/tldraw-mcp` (prebuilt, best Jan/tldraw bridge)** | Bun+Hono Streamable HTTP MCP wrapping tldraw Desktop: search/exec/lint/screenshot + durable `script/**` workspace | Low | Full desktop control, designed for remote/HTTP clients |
 | **D4. `@talhaorak/tldraw-mcp` (prebuilt)** | stdio MCP over `.tldr` files on disk | Low | File-level only; no live editor, no `.tldraw` scripts |
@@ -134,10 +134,11 @@ curl -s http://127.0.0.1:8080/v1/models   # should list gemma-4-E4B-it-Q4_K_M
 ```
 
 ### 3.2 Install the tldraw skill for pi (D1)
-In the tldraw app: **Develop → Install Agent Skills**. It now detects `~/.pi` and writes
-`~/.pi/agent/skills/tldraw-offline/SKILL.md` (v1.12+ supports Pi as a target).
-Because pi runs in Docker with `$WORKSPACE/.pi` mounted at `/root/.pi/agent`, the skill must
-live in the **repo's** `.pi/agent/skills/` (or be copied there) to be visible in the container.
+In the tldraw app: **Develop → Install Agent Skills**. It now detects `~/.pi` and writes the
+skill files (v1.12+ supports Pi as a target).
+Because pi runs in Docker with the repo mounted at `/workspace`, the skill must live in the
+**repo's** `.agents/skills/tldraw-offline/` to be visible in the container as
+`/workspace/.agents/skills/tldraw-offline`.
 
 ### 3.3 Add pi-tldraw (D2)  ✅ installed
 Already in `.pi/settings.json` (`npm:pi-tldraw`). Inside the pi session:
@@ -225,8 +226,8 @@ each `.tldraw` file becomes "a little app" that runs its script on load.
    (`ask_pi`, `pi_reply`) is the highest-value build.
 2. **Reachability.** tldraw and any host service must be visible from both the Jan flatpak
    (ok — shares host net) and the pi container (needs `--network host` or a host TCP proxy).
-3. **tldraw agent skill into the container.** ✅ done — repo `.pi/skills/tldraw-offline/`
-   (container: `/root/.pi/agent/skills/`), with `~/skills` and `~/.config/tldraw` mounted
+3. **tldraw agent skill into the container.** ✅ done — repo `.agents/skills/tldraw-offline/`
+   (container: `/workspace/.agents/skills/tldraw-offline`), with `~/skills` and `~/.config/tldraw` mounted
    read-only by `run_pi.sh` and pi running on `--network host`.
 4. **One shared router.** Decide whether Jan and pi both use the Docker router (`:8080`) or
    Jan keeps its own managed server; avoid loading the same GGUF twice on an 8 GB GPU.
@@ -236,7 +237,7 @@ each `.tldraw` file becomes "a little app" that runs its script on load.
 ## 6. Suggested order
 
 1. `newgrp docker` + `./run_llamacpp.sh` → one shared model on `:8080` (unblocks A & B).
-2. `Develop → Install Agent Skills` → copy skill into repo `.pi/agent/skills/` (unblocks D1).
+2. `Develop → Install Agent Skills` → copy skill into repo `.agents/skills/tldraw-offline/` (unblocks D1).
 3. `pi install npm:pi-tldraw` → instant "agent draws" with zero network surgery (D2).
 4. Run `er1chi/tldraw-mcp` → add to Jan (E1) → Jan drives the real desktop canvas directly.
 5. Build the host HTTP MCP `ask_pi` bridge (C3) → **Jan → pi → tldraw** complete.
