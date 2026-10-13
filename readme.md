@@ -18,7 +18,7 @@ Add skills and mcps to your liking
 - Add Dokobot for websearch: https://dokobot.ai/
 - ~~Connect tldraw and Jan to this~~ — tldraw is wired in (agent skill + `pi-tldraw`);
   Jan is intentionally manual (see "Jan ↔ everything" below)
-
+- https://deepinfra.com/XiaomiMiMo/MiMo-V2.6-Pro/api?example=openai-http
 ---
 
 ## What's already wired

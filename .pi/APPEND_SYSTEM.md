@@ -22,3 +22,9 @@ When delegating work to specialized agents using the `subagent` tool:
    - `politics`: Geopolitical risk, regulatory shifts, public policy strategy
    - `economist`: Macroeconomic analysis, monetary policy, inflation, econometric modeling
    - `trader`: Algorithmic trading strategies, market microstructure, backtesting, risk management
+
+## Canvas work (tldraw offline) — do it yourself, do NOT delegate
+Canvas requests ("draw X in tldraw", "add a box", "edit my canvas", "diagram this") are **not** subagent tasks. `tldraw-offline` is a **skill, not an agent** — there is no `tldraw-offline` agent to delegate to.
+1. `read` the skill at `.agents/skills/tldraw-offline/SKILL.md` and follow it.
+2. Run its commands yourself with `bash` — the bundled `tq` helper talks to the tldraw desktop app on `127.0.0.1:7236`.
+3. Never call `subagent` for canvas work. (If you ever do call `subagent`, the single-child shape is `{agent, task}` — never `{agent, args:{...}}`.)

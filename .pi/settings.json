@@ -9,8 +9,7 @@
   "packages": [
     "npm:pi-subagents",
     "npm:pi-lens",
-    "npm:pi-memory",
-    "npm:pi-tldraw"
+    "npm:pi-memory"
   ],
   "defaultTools": [
     "read",
