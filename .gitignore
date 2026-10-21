@@ -65,7 +65,6 @@ uv.lock
 package-lock.json
 yarn-lock.json
 
-models
 models/
 pi-codebase/
 

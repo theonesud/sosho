@@ -4,12 +4,12 @@
 # 1. Configuration & Paths
 # ==========================================
 MODEL_DIR="$(pwd)/models"
-MODEL_NAME="gemma-4-E4B-it-Q4_K_M"
+MODEL_NAME="Qwen3.6-35B-A3B"
 MODEL_SUBDIR="$MODEL_DIR/$MODEL_NAME"
 mkdir -p "$MODEL_SUBDIR"
 
-MODEL_FILE="gemma-4-E4B-it-Q4_K_M.gguf"
-MMPROJ_FILE="mmproj-F16.gguf"
+MODEL_FILE="Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf"
+MMPROJ_FILE="mmproj-Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-f16.gguf"
 
 MODEL_PATH_LOCAL="$MODEL_SUBDIR/$MODEL_FILE"
 MMPROJ_PATH_LOCAL="$MODEL_SUBDIR/$MMPROJ_FILE"
@@ -20,10 +20,10 @@ MMPROJ_PATH_LOCAL="$MODEL_SUBDIR/$MMPROJ_FILE"
 if [ ! -e "$MODEL_PATH_LOCAL" ] || [ ! -e "$MMPROJ_PATH_LOCAL" ]; then
     echo "Models not found or incomplete. Downloading..."
     if [ ! -e "$MODEL_PATH_LOCAL" ]; then
-        HF_XET_HIGH_PERFORMANCE=1 hf download unsloth/gemma-4-E4B-it-GGUF "$MODEL_FILE" --local-dir "$MODEL_SUBDIR"
+        HF_XET_HIGH_PERFORMANCE=1 hf download HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive "$MODEL_FILE" --local-dir "$MODEL_SUBDIR"
     fi
     if [ ! -e "$MMPROJ_PATH_LOCAL" ]; then
-        HF_XET_HIGH_PERFORMANCE=1 hf download unsloth/gemma-4-E4B-it-GGUF "$MMPROJ_FILE" --local-dir "$MODEL_SUBDIR"
+        HF_XET_HIGH_PERFORMANCE=1 hf download HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive "$MMPROJ_FILE" --local-dir "$MODEL_SUBDIR"
     fi
 else
     echo "Models found in $MODEL_SUBDIR. Proceeding to start server..."
@@ -47,20 +47,14 @@ echo "Starting server via docker run..."
 # Added --jinja for tool calling and chat template support in Pi
 # Added --models-autoload to enable router mode!
 SERVER_ARGS=(
+    "--models-dir" "/models"
+    "--models-max" "1"
     "--host" "0.0.0.0"
-    "--port" "8080"
     "-c" "32768"
     "-np" "1"
-    "-ngl" "99"
-    "-fa" "on"
+    "-t" "4"
     "-ctk" "q8_0"
     "-ctv" "q8_0"
-    "-b" "2048"
-    "--ubatch-size" "512"
-    "--cache-reuse" "256"
-    "--jinja"
-    "--models-autoload"
-    "--models-dir" "/models"
 )
 
 # Run docker container
@@ -68,10 +62,12 @@ docker run -d \
     --name llama-cpp \
     --restart always \
     --gpus all \
+    --ipc=host \
+    --ulimit memlock=-1:-1 \
+    --cpuset-cpus="4,6,8,10" \
     -p "8080:8080" \
     --network webui-net \
-    -v "$MODEL_DIR:/models" \
-    --entrypoint /app/llama-server \
+    -v "$MODEL_DIR:/models:ro" \
     ghcr.io/ggml-org/llama.cpp:server-cuda \
     "${SERVER_ARGS[@]}"
 
