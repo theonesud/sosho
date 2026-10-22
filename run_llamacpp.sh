@@ -45,6 +45,8 @@ SERVER_ARGS=(
     "-t" "$LLM_THREADS"
     "-ctk" "q8_0"
     "-ctv" "q8_0"
+    "--cache-reuse" "256"
+    "--chat-template-kwargs" "{\"preserve_thinking\":true}"
 )
 
 docker run -d \
