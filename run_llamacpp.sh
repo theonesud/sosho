@@ -28,16 +28,21 @@ docker network inspect webui-net >/dev/null 2>&1 || docker network create webui-
 echo "Stopping and removing existing llama-cpp container if running..."
 docker rm -f llama-cpp 2>/dev/null
 
-echo "Starting server via docker run..."
+# Detect physical cores and reserve 2 for smooth desktop usage
+PHYSICAL_CORES=$(lscpu -b -p=Core,Socket | grep -v '^#' | sort -u | wc -l)
+LLM_THREADS=$(( PHYSICAL_CORES > 4 ? PHYSICAL_CORES - 2 : PHYSICAL_CORES ))
+
+echo "Starting server via docker run ($LLM_THREADS of $PHYSICAL_CORES physical cores)..."
 
 SERVER_ARGS=(
     "--models-dir" "/models"
     "--models-max" "1"
     "--host" "0.0.0.0"
-    "-c" "262144"
+    "-cmoe"
+    "-c" "131072"
     "-n" "-1"
     "-np" "1"
-    "-t" "4"
+    "-t" "$LLM_THREADS"
     "-ctk" "q8_0"
     "-ctv" "q8_0"
 )
@@ -48,7 +53,7 @@ docker run -d \
     --gpus all \
     --ipc=host \
     --ulimit memlock=-1:-1 \
-    --cpuset-cpus="4,6,8,10" \
+    --cpu-shares=256 \
     -p "8080:8080" \
     --network webui-net \
     -v "$MODEL_DIR:/models:ro" \
