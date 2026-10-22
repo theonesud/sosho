@@ -22,7 +22,7 @@ Prebuilt things first; custom glue is called out separately.
 | tldraw → Pi agent skill | ✅ installed to repo `.agents/skills/tldraw-offline/` (container: `/workspace/.agents/skills/tldraw-offline`) + `~/skills` and `~/.config/tldraw` mounted read-only |
 | pi-tldraw package | ✅ installed v0.2.0 (`npm:pi-tldraw` in `.pi/settings.json`, npm tree includes `ai@^6`/`agents`; the 0.1.1 missing-`ai` bug does not apply). Canvases persist to `.pi/tldraw-canvases/<id>.json` |
 | Jan MCP | ⏳ intentionally left manual — see `readme.md` |
-| Docker from this shell | ⚠️ `permission denied` on the socket, but `vegeta` **is** in the `docker` group — the running shell predates the group add. New login / `newgrp docker` fixes it |
+| Docker from this shell | ⚠️ `permission denied` on the socket, but your user **is** in the `docker` group — the running shell predates the group add. New login / `newgrp docker` fixes it |
 
 > Everything below assumes you first fix Docker access and restart the llama.cpp router
 > (`./run_llamacpp.sh`), so the shared model answers on `:8080`.
@@ -129,7 +129,7 @@ with no other runtime. Effort: **Low**. (stdio only; `--cors-origins` auto-locks
 ### 3.1 Restart the shared brain
 ```bash
 newgrp docker            # or log out/in once, to pick up docker-group membership
-cd /home/vegeta/sosho && ./run_llamacpp.sh
+cd $HOME/sosho && ./run_llamacpp.sh
 curl -s http://127.0.0.1:8080/v1/models   # should list Qwen3.6-35B-A3B
 ```
 

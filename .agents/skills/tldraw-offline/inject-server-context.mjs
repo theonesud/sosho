@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
 
-const serverJsonPath = expandLeadingEnvVar("/home/vegeta/.config/tldraw/server.json")
+const serverJsonPath = expandLeadingEnvVar("$HOME/.config/tldraw/server.json")
 
 // The embedded path can be one of the env-var defaults ($HOME/…, $APPDATA/…)
 // rather than a concrete path, and node does no shell expansion — without this

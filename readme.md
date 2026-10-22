@@ -128,7 +128,7 @@ delegate work to pi and have pi edit the canvas. Other routes give the same resu
   `bin/`, `auth.json`, `models-store.json`, `pi-subagents/`). They are git-ignored,
   but your host user cannot rewrite them. Fix once with:
   ```bash
-  sudo chown -R "$USER:$USER" /home/vegeta/sosho/.pi
+  sudo chown -R "$USER:$USER" $HOME/sosho/.pi
   ```
   Docker may **not** be usable from a shell that predates the `docker` group add;
   use `sg docker -c './run_pi.sh'` or log out/in.

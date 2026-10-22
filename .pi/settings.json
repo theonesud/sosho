@@ -8,8 +8,7 @@
   },
   "packages": [
     "npm:pi-subagents",
-    "npm:pi-lens",
-    "npm:pi-memory"
+    "npm:pi-lens"
   ],
   "defaultTools": [
     "read",
