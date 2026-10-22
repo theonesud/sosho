@@ -8,7 +8,7 @@
         {
           "id": "Qwen3.6-35B-A3B",
           "name": "Qwen3.6-35B-A3B",
-          "contextWindow": 262144,
+          "contextWindow": 131072,
           "maxTokens": 32768,
           "input": [
             "text",

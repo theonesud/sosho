@@ -18,8 +18,8 @@
             "output": ["text"]
           },
           "limit": {
-            "context": 262144,
-            "output": 262144
+            "context": 131072,
+            "output": 131072
           }
         }
       }

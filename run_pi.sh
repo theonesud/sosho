@@ -8,7 +8,7 @@ IMAGE_NAME="pi-sandbox:latest"
 NETWORK_NAME="webui-net"
 SERVER_CONTAINER="llama-cpp"
 LLAMA_SERVER_URL="${LLAMA_BASE_URL:-http://127.0.0.1:8080}"
-TLDRAW_CONFIG_DIR="${TLDRAW_CONFIG_DIR:-$HOME/.config/tldraw}"
+DOKOBOT_DIR="${DOKOBOT_DIR:-$HOME/.dokobot}"
 PI_SKILLS_DIR="${PI_SKILLS_DIR:-$HOME/skills}"
 WORKSPACE_DIR="$(pwd)"
 
@@ -90,12 +90,13 @@ ENV_FLAGS=()
 for e in "${PI_ENV[@]}"; do ENV_FLAGS+=(-e "$e"); done
 
 OPT_MOUNTS=()
-[ -d "$TLDRAW_CONFIG_DIR" ] && OPT_MOUNTS+=(-v "$TLDRAW_CONFIG_DIR:$TLDRAW_CONFIG_DIR:ro")
+[ -d "$DOKOBOT_DIR" ] && OPT_MOUNTS+=(-v "$DOKOBOT_DIR:$DOKOBOT_DIR")
 [ -d "$PI_SKILLS_DIR" ] && OPT_MOUNTS+=(-v "$PI_SKILLS_DIR:$PI_SKILLS_DIR:ro")
 
 exec docker run "${DOCKER_FLAGS[@]}" --rm \
     --name pi-agent \
     --network host \
+    --pid host \
     --user "$(id -u):$(id -g)" \
     -e "HOME=$HOME" \
     --tmpfs "$HOME:uid=$(id -u),gid=$(id -g),mode=0755" \

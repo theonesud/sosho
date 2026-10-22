@@ -47,6 +47,7 @@ SERVER_ARGS=(
     "-ctv" "q8_0"
     "--cache-reuse" "256"
     "--chat-template-kwargs" "{\"preserve_thinking\":true}"
+    "--sleep-idle-seconds" "900"
 )
 
 docker run -d \
