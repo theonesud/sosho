@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: Lead Research Analyst focusing on deep academic research, technical benchmarking, literature synthesis, and competitive intelligence.
-model: gemma-4-E4B-it-Q4_K_M
+model: Qwen3.6-35B-A3B
 tools:
   - read
   - write

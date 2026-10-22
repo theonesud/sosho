@@ -12,8 +12,8 @@ Prebuilt things first; custom glue is called out separately.
 
 | Component | State |
 |---|---|
-| llama.cpp model files | ✅ present: `/mnt/Asteroid/sosho-models/gemma-4-E4B-it-Q4_K_M/` (`gemma-4-E4B-it-Q4_K_M.gguf` 5.0 GB + `mmproj-F16.gguf` 990 MB) |
-| llama.cpp server (`:8080`) | ✅ running (container `llama-cpp`), `gemma-4-E4B-it-Q4_K_M` loaded, health `ok` |
+| llama.cpp model files | ✅ present: `/mnt/Asteroid/sosho-models/Qwen3.6-35B-A3B/` (`Qwen3.6-35B-A3B.gguf` 5.0 GB + `mmproj-F16.gguf` 990 MB) |
+| llama.cpp server (`:8080`) | ✅ running (container `llama-cpp`), `Qwen3.6-35B-A3B` loaded, health `ok` |
 | Jan → external llama.cpp | ✅ configured: provider `localllamacpp`, base URL `http://0.0.0.0:8080` |
 | Jan built-in llama.cpp | ✅ running separately as pid 19261 on `127.0.0.1:54190` |
 | pi → llama.cpp | ✅ configured: `.pi/models.json` custom provider `llama.cpp` → `http://127.0.0.1:8080/v1` (pi runs `--network host`) |
@@ -69,7 +69,7 @@ Jan's `localllamacpp` provider points at `http://0.0.0.0:8080`.
 
 ### Edge B — pi ↔ llama.cpp  ✅ already wired
 `.pi/models.json` registers a custom OpenAI-compatible provider `llama.cpp` →
-`http://127.0.0.1:8080/v1`, model `gemma-4-E4B-it-Q4_K_M`, with vision (`image`) enabled.
+`http://127.0.0.1:8080/v1`, model `Qwen3.6-35B-A3B`, with vision (`image`) enabled.
 - `settings.json` disables the *builtin* llama.cpp extension (`-builtin:llama.cpp`), which is
   fine — the custom provider supplies the model; only the `/llama` router-discovery UI is gone.
 - Effort: **none**. Blocked only by the container being down.
@@ -130,7 +130,7 @@ with no other runtime. Effort: **Low**. (stdio only; `--cors-origins` auto-locks
 ```bash
 newgrp docker            # or log out/in once, to pick up docker-group membership
 cd /home/vegeta/sosho && ./run_llamacpp.sh
-curl -s http://127.0.0.1:8080/v1/models   # should list gemma-4-E4B-it-Q4_K_M
+curl -s http://127.0.0.1:8080/v1/models   # should list Qwen3.6-35B-A3B
 ```
 
 ### 3.2 Install the tldraw skill for pi (D1)
@@ -177,7 +177,7 @@ Add a stdio MCP entry to Jan's `mcp_config.json`. For the prebuilt server Jan mu
     "pi": {
       "command": "/app/bin/bun",
       "args": ["x", "pi-mcp-server"],
-      "env": { "PI_MCP_PROVIDER": "openai", "PI_MCP_MODEL": "gemma-4-E4B-it-Q4_K_M" },
+      "env": { "PI_MCP_PROVIDER": "openai", "PI_MCP_MODEL": "Qwen3.6-35B-A3B" },
       "active": true
     }
   }

@@ -1,7 +1,7 @@
 ---
 name: legal
 description: Corporate Legal Counsel focusing on regulatory compliance, IP protection, contracts, and privacy policies.
-model: gemma-4-E4B-it-Q4_K_M
+model: Qwen3.6-35B-A3B
 tools:
   - read
   - write

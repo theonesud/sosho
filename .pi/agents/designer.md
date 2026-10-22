@@ -1,7 +1,7 @@
 ---
 name: designer
 description: Lead Designer focusing on UI/UX, aesthetics, and HTML/CSS prototypes.
-model: gemma-4-E4B-it-Q4_K_M
+model: Qwen3.6-35B-A3B
 tools:
   - read
   - write

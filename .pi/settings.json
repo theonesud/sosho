@@ -1,10 +1,10 @@
 {
   "defaultProvider": "llama.cpp",
-  "defaultModel": "gemma-4-E4B-it-Q4_K_M",
+  "defaultModel": "Qwen3.6-35B-A3B",
   "compaction": {
     "enabled": true,
-    "reserveTokens": 4096,
-    "keepRecentTokens": 8192
+    "reserveTokens": 32768,
+    "keepRecentTokens": 40000
   },
   "packages": [
     "npm:pi-subagents",
@@ -22,5 +22,5 @@
   "extensions": [
     "-builtin:llama.cpp"
   ],
-  "lastChangelogVersion": "1.2.0"
+  "lastChangelogVersion": "1.4.0"
 }

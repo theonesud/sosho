@@ -1,7 +1,7 @@
 ---
 name: frontend
 description: Senior Frontend Engineer focusing on Next.js, Shadcn UI, and TailwindCSS.
-model: gemma-4-E4B-it-Q4_K_M
+model: Qwen3.6-35B-A3B
 tools:
   - read
   - write

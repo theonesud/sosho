@@ -1,7 +1,7 @@
 ---
 name: backend
 description: Senior Backend Engineer focusing on Python FastAPI, TDD, and databases.
-model: gemma-4-E4B-it-Q4_K_M
+model: Qwen3.6-35B-A3B
 tools:
   - read
   - write

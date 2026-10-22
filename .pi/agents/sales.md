@@ -1,7 +1,7 @@
 ---
 name: sales
 description: Head of Sales focusing on B2B outreach and email sequences.
-model: gemma-4-E4B-it-Q4_K_M
+model: Qwen3.6-35B-A3B
 tools:
   - read
   - write

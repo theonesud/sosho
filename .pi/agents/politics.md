@@ -1,7 +1,7 @@
 ---
 name: politics
 description: Geopolitics & Public Policy Strategist focusing on international relations, regulatory shifts, legislative analysis, and political risk.
-model: gemma-4-E4B-it-Q4_K_M
+model: Qwen3.6-35B-A3B
 tools:
   - read
   - write

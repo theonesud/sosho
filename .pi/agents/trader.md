@@ -1,7 +1,7 @@
 ---
 name: trader
 description: Quantitative & Market Trader focusing on market microstructure, technical strategies, execution algorithms, risk-reward ratios, and backtesting.
-model: gemma-4-E4B-it-Q4_K_M
+model: Qwen3.6-35B-A3B
 tools:
   - read
   - write

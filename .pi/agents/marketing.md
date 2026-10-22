@@ -1,7 +1,7 @@
 ---
 name: marketing
 description: Chief Marketing Officer focusing on viral B2C campaigns and landing pages.
-model: gemma-4-E4B-it-Q4_K_M
+model: Qwen3.6-35B-A3B
 tools:
   - read
   - write

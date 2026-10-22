@@ -1,7 +1,7 @@
 ---
 name: finance
 description: Head of Finance focusing on unit economics, budget modeling, cash flow forecasting, and pricing strategy.
-model: gemma-4-E4B-it-Q4_K_M
+model: Qwen3.6-35B-A3B
 tools:
   - read
   - write

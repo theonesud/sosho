@@ -25,7 +25,7 @@ Add skills and mcps to your liking
 ## What's already wired
 
 - **llama.cpp** is the shared model server on `http://127.0.0.1:8080`
-  (OpenAI-compatible, model `gemma-4-E4B-it-Q4_K_M`, vision via the mmproj).
+  (OpenAI-compatible, model `Qwen3.6-35B-A3B`, vision via the mmproj).
 - **pi → llama.cpp**: `.pi/models.json` registers a custom OpenAI-compatible
   provider `llama.cpp` pointing at `http://127.0.0.1:8080/v1`.
 - **pi runs on the host network** (`run_pi.sh` uses `--network host`) so it can

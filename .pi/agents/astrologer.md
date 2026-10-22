@@ -1,7 +1,7 @@
 ---
 name: astrologer
 description: Astrological Domain Expert focusing on astrological systems, planetary ephemeris, natal chart synthesis, and forecasting.
-model: gemma-4-E4B-it-Q4_K_M
+model: Qwen3.6-35B-A3B
 tools:
   - read
   - write

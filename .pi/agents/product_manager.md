@@ -1,7 +1,7 @@
 ---
 name: product_manager
 description: Lead Product Manager orchestrating roadmap, requirements, and engineering/design execution.
-model: gemma-4-E4B-it-Q4_K_M
+model: Qwen3.6-35B-A3B
 tools:
   - read
   - write
