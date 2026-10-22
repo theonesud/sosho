@@ -1,0 +1,112 @@
+# Usage:
+#   docker compose up -d                 # download models (once) + start llama-cpp
+#   docker compose run --rm pi           # interactive pi agent in this workspace
+#   docker compose logs -f llama-cpp
+#
+# Host-specific values (UID/GID/HOME/threads) live in .env
+
+name: sosho
+
+x-model: &model
+  HF_REPO: HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive
+  MODEL_SUBDIR: Qwen3.6-35B-A3B
+  MODEL_FILE: Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf
+  MMPROJ_FILE: mmproj-Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-f16.gguf
+
+services:
+  # One-shot init job: fetches the GGUFs if missing, then exits.
+  model-download:
+    image: python:3.12-slim
+    environment:
+      <<: *model
+      HF_XET_HIGH_PERFORMANCE: "1"
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - ./models:/models
+      - hf-cache:/root/.cache/huggingface
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        dir=/models/$$MODEL_SUBDIR
+        if [ -e "$$dir/$$MODEL_FILE" ] && [ -e "$$dir/$$MMPROJ_FILE" ]; then
+          echo "Models present in $$dir"; exit 0
+        fi
+        pip install -q --root-user-action=ignore "huggingface_hub[cli,hf_xet]"
+        hf download "$$HF_REPO" "$$MODEL_FILE" "$$MMPROJ_FILE" --local-dir "$$dir"
+    restart: "no"
+
+  llama-cpp:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: llama-cpp
+    restart: always
+    depends_on:
+      model-download:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    networks: [webui-net]
+    ipc: host
+    cpu_shares: 256
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+    volumes:
+      - ./models:/models:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command:
+      - --models-dir=/models
+      - --models-max=1
+      - --host=0.0.0.0
+      - -cmoe
+      - -c=131072
+      - -n=-1
+      - -np=1
+      - -t=${LLM_THREADS:-8}
+      - -ctk=q8_0
+      - -ctv=q8_0
+      - --cache-reuse=256
+      - '--chat-template-kwargs={"preserve_thinking":true}'
+      - --sleep-idle-seconds=900
+
+  # Interactive agent; not started by `up` (profile), use `docker compose run --rm pi`.
+  pi:
+    profiles: [agent]
+    build:
+      context: .
+      dockerfile: Dockerfile.pi
+    image: pi-sandbox:latest
+    container_name: pi-agent
+    network_mode: host
+    pid: host
+    user: "${UID:-1000}:${GID:-1000}"
+    stdin_open: true
+    tty: true
+    working_dir: ${PWD}
+    environment:
+      HOME: ${HOME}
+      LLAMA_BASE_URL: ${LLAMA_BASE_URL:-http://127.0.0.1:8080}
+      PI_CODING_AGENT_DIR: ${PWD}/.pi
+      XDG_CACHE_HOME: ${PWD}/.pi/.cache
+      XDG_CONFIG_HOME: ${PWD}/.pi/.config
+    tmpfs:
+      - ${HOME}:uid=${UID:-1000},gid=${GID:-1000},mode=0755
+    volumes:
+      - ${PWD}:${PWD}
+      - ${PWD}/../worktrees:${PWD}/../worktrees
+      - ${HOME}/.dokobot:${HOME}/.dokobot
+      - ${HOME}/skills:${HOME}/skills:ro
+    command: ["--approve"]
+
+networks:
+  webui-net:
+    name: webui-net
+
+volumes:
+  hf-cache:
