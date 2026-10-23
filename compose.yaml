@@ -61,19 +61,31 @@ services:
               count: all
               capabilities: [gpu]
     command:
-      - --models-dir=/models
-      - --models-max=1
-      - --host=0.0.0.0
+      - --models-dir
+      - /models
+      - --models-max
+      - "1"
+      - --host
+      - 0.0.0.0
       - -cmoe
-      - -c=131072
-      - -n=-1
-      - -np=1
-      - -t=${LLM_THREADS:-8}
-      - -ctk=q8_0
-      - -ctv=q8_0
-      - --cache-reuse=256
-      - '--chat-template-kwargs={"preserve_thinking":true}'
-      - --sleep-idle-seconds=900
+      - -c
+      - "131072"
+      - -n
+      - "-1"
+      - -np
+      - "1"
+      - -t
+      - ${LLM_THREADS:-8}
+      - -ctk
+      - q8_0
+      - -ctv
+      - q8_0
+      - --cache-reuse
+      - "256"
+      - --chat-template-kwargs
+      - '{"preserve_thinking":true}'
+      - --sleep-idle-seconds
+      - "900"
 
   # Interactive agent; not started by `up` (profile), use `docker compose run --rm pi`.
   pi:
@@ -107,6 +119,7 @@ services:
 networks:
   webui-net:
     name: webui-net
+    external: true
 
 volumes:
   hf-cache:
