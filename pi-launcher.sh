@@ -63,6 +63,9 @@ exec docker run "${DOCKER_INTERACTIVE_FLAGS[@]}" --rm \
     -e "PI_CODING_AGENT_DIR=$TARGET_PI" \
     -e "XDG_CACHE_HOME=$TARGET_PI/.cache" \
     -e "XDG_CONFIG_HOME=$TARGET_PI/.config" \
+    -e "LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL:-http://127.0.0.1:3000}" \
+    -e "LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}" \
+    -e "LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}" \
     --tmpfs "$HOME:uid=$(id -u),gid=$(id -g),mode=0755" \
     "${ENV_ARGS[@]}" \
     "${MOUNTS[@]}" \

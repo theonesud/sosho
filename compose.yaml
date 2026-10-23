@@ -1,11 +1,15 @@
 # Usage:
-#   docker compose up -d                 # download models (once) + start llama-cpp
+#   docker compose up -d                 # starts llama-cpp + langfuse stack
 #   docker compose run --rm pi           # interactive pi agent in this workspace
 #   docker compose logs -f llama-cpp
 #
 # Host-specific values (UID/GID/HOME/threads) live in .env
 
 name: sosho
+
+include:
+  - path: compose.langfuse.yaml
+
 
 x-model: &model
   HF_REPO: HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive
@@ -107,6 +111,9 @@ services:
       PI_CODING_AGENT_DIR: ${PWD}/.pi
       XDG_CACHE_HOME: ${PWD}/.pi/.cache
       XDG_CONFIG_HOME: ${PWD}/.pi/.config
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://127.0.0.1:3000}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}
     tmpfs:
       - ${HOME}:uid=${UID:-1000},gid=${GID:-1000},mode=0755
     volumes:
