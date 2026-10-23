@@ -8,8 +8,7 @@
   },
   "packages": [
     "npm:pi-subagents",
-    "npm:pi-lens",
-    "npm:@langfuse/pi-observability-plugin"
+    "npm:pi-lens"
   ],
   "defaultTools": [
     "read",
@@ -20,7 +19,8 @@
     "+tool_search"
   ],
   "extensions": [
-    "-builtin:llama.cpp"
+    "-builtin:llama.cpp",
+    "./extensions/langfuse/src/index.ts"
   ],
   "lastChangelogVersion": "1.4.0"
 }
