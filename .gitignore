@@ -80,3 +80,5 @@ pi-codebase/
 .pi/.config/
 .pi/memory/
 .pi/npm/
+.pi/venv-*/
+graphify-out/

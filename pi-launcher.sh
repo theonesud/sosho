@@ -32,7 +32,93 @@ if [ ! -f "$TARGET_PI/models.json" ] && [ -f "$SOSHO_PI/models.json" ]; then
     cp "$SOSHO_PI/models.json" "$TARGET_PI/models.json"
 fi
 
-# 3. Mount list
+# 2b. Auto-install and configure Graphify locally for Pi
+GRAPHIFY_VENV="$TARGET_PI/venv-graphify"
+if [ ! -x "$GRAPHIFY_VENV/bin/python" ]; then
+    echo "Initializing Graphify local environment in $GRAPHIFY_VENV..."
+    python3 -m venv "$GRAPHIFY_VENV"
+    "$GRAPHIFY_VENV/bin/pip" install -q -U pip
+    "$GRAPHIFY_VENV/bin/pip" install -q "graphifyy[mcp]"
+fi
+
+# Ensure graphify skill is copied to workspace .pi/skills
+if [ ! -d "$TARGET_PI/skills/graphify" ] && [ -d "$SOSHO_PI/skills/graphify" ]; then
+    mkdir -p "$TARGET_PI/skills"
+    cp -r "$SOSHO_PI/skills/graphify" "$TARGET_PI/skills/"
+fi
+
+# Ensure .pi/mcp.json has local graphify server registered
+if [ ! -f "$TARGET_PI/mcp.json" ] || ! grep -q '"graphify"' "$TARGET_PI/mcp.json" 2>/dev/null; then
+    python3 - "$TARGET_PI/mcp.json" "$WORKSPACE" <<'PY'
+import json, sys, os
+mcp_path, ws = sys.argv[1], sys.argv[2]
+data = {"mcpServers": {}}
+if os.path.exists(mcp_path):
+    try:
+        with open(mcp_path) as f:
+            data = json.load(f)
+    except Exception:
+        pass
+servers = data.setdefault("mcpServers", {})
+servers["graphify"] = {
+    "command": f"{ws}/.pi/venv-graphify/bin/python",
+    "args": [
+        "-m",
+        "graphify.serve",
+        f"{ws}/graphify-out/graph.json"
+    ]
+}
+with open(mcp_path, "w") as f:
+    json.dump(data, f, indent=2)
+PY
+fi
+
+# Ensure graphify-out/graph.json exists for the workspace (index codebase if missing)
+if [ ! -f "$WORKSPACE/graphify-out/graph.json" ] && [ -x "$GRAPHIFY_VENV/bin/python" ]; then
+    echo "Generating initial codebase knowledge graph with Graphify..."
+    "$GRAPHIFY_VENV/bin/python" -m graphify extract "$WORKSPACE" --code-only --no-cluster >/dev/null 2>&1 || true
+fi
+
+# 3. Pre-warm the local model (if configured). llama.cpp loads the GGUF lazily and,
+#    when the model does not fully fit in RAM, the very first prompt is served from
+#    disk and can take many minutes. Absorb that cost here so pi's first turn is fast.
+if [ -f "$TARGET_PI/models.json" ] && command -v curl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    read -r BASE_URL MODEL_ID < <(python3 - "$TARGET_PI/models.json" <<'PY' 2>/dev/null
+import json, sys
+try:
+    cfg = json.load(open(sys.argv[1]))
+    p = next(iter(cfg.get("providers", {}).values()), {})
+    print(p.get("baseUrl", "").rstrip("/"), (p.get("models") or [{}])[0].get("id", ""))
+except Exception:
+    print("")
+PY
+)
+    case "$BASE_URL" in
+        http://127.0.0.1:*|http://localhost:*|http://0.0.0.0:*)
+            if [ -n "$MODEL_ID" ]; then
+                echo "Pre-warming local model $MODEL_ID (first load can take a few minutes)..."
+                WARM_PAYLOAD="$(python3 - "$MODEL_ID" <<'PY'
+import json, sys
+print(json.dumps({
+    "model": sys.argv[1],
+    "messages": [{"role": "user", "content": ("The quick brown fox jumps over the lazy dog. " * 300) + "\nReply with OK."}],
+    "max_tokens": 1,
+    "temperature": 0,
+}))
+PY
+)"
+                if curl -s -m 900 -o /dev/null -H 'Content-Type: application/json' \
+                    -X POST "$BASE_URL/chat/completions" --data-binary "$WARM_PAYLOAD"; then
+                    echo "Model ready."
+                else
+                    echo "Warning: model warm-up failed (is llama-cpp running?); continuing anyway."
+                fi
+            fi
+            ;;
+    esac
+fi
+
+# 4. Mount list
 MOUNTS=(
     -v "$WORKSPACE:$WORKSPACE"
     -v "$TARGET_PI:$TARGET_PI"
@@ -59,7 +145,7 @@ if [ -t 0 ] && [ -t 1 ]; then
     DOCKER_INTERACTIVE_FLAGS+=("-it")
 fi
 
-# 4. Run Pi container attached to current working directory
+# 5. Run Pi container attached to current working directory
 exec docker run "${DOCKER_INTERACTIVE_FLAGS[@]}" --rm \
     --network host \
     --pid host \

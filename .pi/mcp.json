@@ -1,3 +1,12 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "graphify": {
+      "command": "/workspace/.pi/venv-graphify/bin/python",
+      "args": [
+        "-m",
+        "graphify.serve",
+        "/workspace/graphify-out/graph.json"
+      ]
+    }
+  }
 }
