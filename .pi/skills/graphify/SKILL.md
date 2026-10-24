@@ -1,79 +1,124 @@
 ---
 name: graphify
-description: "Query and explore codebase architecture, relationships, and knowledge graphs using local Graphify tools."
+description: "Use whenever asked about codebase architecture, file/symbol relationships, dependency paths, or impact analysis. Interacts with the local knowledge graph at graphify-out/graph.json."
 ---
 
-# Graphify Cheat Sheet for Pi
+# Graphify Skill Guide
 
-Use Graphify to understand codebase architecture, find symbol relationships, query call paths, or update the graph. The graph is stored locally in `graphify-out/graph.json`.
+Graphify provides a structured AST & semantic knowledge graph of the codebase with community detection, god-node detection, call paths, and honesty tags (`EXTRACTED`, `INFERRED`, `AMBIGUOUS`).
 
-Python runner for all commands:
+Target runner:
 ```bash
 PYTHON="$(pwd)/.pi/venv-graphify/bin/python"
 ```
 
 ---
 
-## 1. Querying the Codebase (Fast Path)
-Always use these when answering architecture or relationship questions:
+## 1. When to Use (Agent Decision Rules)
+- **Codebase Questions**: If `graphify-out/graph.json` exists, run a graph query **before** reading entire files or doing recursive greps.
+- **Impact Analysis / Refactoring**: Use `path` or `explain` to find upstream callers and downstream dependents before modifying functions or contracts.
+- **Architecture Overview**: Query community clusters, call-flows, and god-nodes (central symbols with high degree centrality).
 
-- **Ask a broad question (BFS traversal)**:
+---
+
+## 2. CLI Workflows
+
+### Fast-Path: Querying Existing Graph
+- **Broad contextual exploration (BFS)**:
   ```bash
-  $PYTHON -m graphify query "<question>"
+  $PYTHON -m graphify query "<question>" [--budget 1500]
   ```
-- **Trace a deep execution path (DFS)**:
+- **Deep execution trace / data flow (DFS)**:
   ```bash
   $PYTHON -m graphify query "<question>" --dfs
   ```
-- **Find the shortest path between two modules/symbols**:
+- **Shortest relationship path between two concepts or files**:
   ```bash
-  $PYTHON -m graphify path "<SymbolA>" "<SymbolB>"
+  $PYTHON -m graphify path "<SymbolA>" "<SymbolB>" [--directed|--undirected]
   ```
-- **Explain a specific node/class/function and its connections**:
+- **Explain a node and its neighborhood (top connections & callers)**:
   ```bash
-  $PYTHON -m graphify explain "<SymbolOrFile>"
+  $PYTHON -m graphify explain "<SymbolOrFile>" [--all]
   ```
 
----
-
-## 2. Updating & Building the Graph
-
-- **Incremental update (only re-index modified files)**:
+### Building & Updating the Graph
+- **Code-only AST extraction (Fast, no API key required)**:
   ```bash
   $PYTHON -m graphify extract . --code-only --no-cluster
   ```
-- **Full re-scan from scratch**:
+- **Semantic / Deep extraction with local LLM (llama.cpp)**:
   ```bash
-  $PYTHON -m graphify extract . --code-only --no-cluster --force
+  OPENAI_BASE_URL=http://127.0.0.1:8080/v1 OPENAI_MODEL=Qwen3.6-35B-A3B \
+  $PYTHON -m graphify extract . --backend openai --mode deep
+  ```
+- **Force full re-scan**:
+  ```bash
+  $PYTHON -m graphify extract . --code-only --force
+  ```
+- **Re-run community detection & clustering only**:
+  ```bash
+  $PYTHON -m graphify extract . --cluster-only
+  ```
+
+### Live Watch Mode & Web Additions
+- **Continuous auto-rebuild on file changes (background task)**:
+  ```bash
+  $PYTHON -m graphify . --watch
+  ```
+- **Ingest external URL/documentation into corpus**:
+  ```bash
+  $PYTHON -m graphify add <url> [--author "AuthorName"]
   ```
 
 ---
 
-## 3. Generating Visualizations & Reports
-
-- **Interactive 2D/3D Force Graph (`graph.html`)**:
+## 3. Visualizations & Artifact Exports
+All exports read from `graphify-out/graph.json`:
+- **Interactive Force Graph UI**:
   ```bash
   $PYTHON -m graphify export html --graph graphify-out/graph.json --out graphify-out/graph.html
   ```
-- **Collapsible Hierarchy Tree (`GRAPH_TREE.html`)**:
+- **Collapsible Hierarchy Tree UI**:
   ```bash
   $PYTHON -m graphify tree --graph graphify-out/graph.json --output graphify-out/GRAPH_TREE.html
   ```
-- **Mermaid Architecture / Call-Flow Summary**:
+- **Mermaid Call-Flow Architecture Diagrams**:
   ```bash
   $PYTHON -m graphify export callflow-html --graph graphify-out/graph.json
   ```
-- **Export to Obsidian / Gephi**:
+- **Obsidian Markdown Vault with Canvas**:
   ```bash
-  $PYTHON -m graphify export obsidian --dir ~/vaults/codebase
+  $PYTHON -m graphify export obsidian --dir ~/vaults/project-graph
+  ```
+- **Knowledge Wiki (one article per detected community)**:
+  ```bash
+  $PYTHON -m graphify export wiki
+  ```
+- **Standard Graph Formats (Gephi, Neo4j, FalkorDB)**:
+  ```bash
   $PYTHON -m graphify export graphml
+  $PYTHON -m graphify export neo4j-push bolt://localhost:7687
+  $PYTHON -m graphify export falkordb-push falkordb://localhost:6379
   ```
 
 ---
 
-## 4. MCP Tools Reference (Stdio)
-If calling via Pi MCP tools (`graphify_*`), use:
-- `graph_stats`: Overview of node count, communities, and density.
-- `query_graph`: Natural language search with `{"question": "...", "token_budget": 1500}`.
-- `find_path`: Trace relations with `{"source": "...", "target": "..."}`.
-- `explain_node`: Inspect node neighbors with `{"node_id": "..."}`.
+## 4. MCP Tools Reference (`.pi/mcp.json`)
+When Pi connects through MCP (`graphify_*`), prefer structured tool calls:
+
+| Tool | Purpose | Key Arguments |
+| :--- | :--- | :--- |
+| `query_graph` | Graph-augmented semantic search | `{"question": "...", "token_budget": 1500, "search_type": "bfs"\|"dfs"}` |
+| `find_path` | Trace relationships between 2 nodes | `{"source": "...", "target": "...", "directed": true}` |
+| `explain_node` | Inspect inward/outward edges of symbol | `{"node_id": "...", "limit": 20}` |
+| `graph_stats` | Overview of node counts, communities & density | `{}` |
+| `list_communities` | Inspect high-level architectural clusters | `{}` |
+| `community_summary` | Summary of a specific architecture cluster | `{"community_id": ...}` |
+
+---
+
+## 5. Output Files & Layout
+- `graphify-out/graph.json`: Full serialized knowledge graph (nodes, edges, clusters, centralities).
+- `graphify-out/GRAPH_REPORT.md`: Auto-generated executive architecture summary, god nodes, and community map.
+- `graphify-out/manifest.json`: Incremental state cache tracking hashed file signatures.
+- `graphify-out/graph.html`: Standalone browser visualization (open with browser or `xdg-open`).
