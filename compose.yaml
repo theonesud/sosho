@@ -126,7 +126,6 @@ services:
 networks:
   webui-net:
     name: webui-net
-    external: true
 
 volumes:
   hf-cache:
