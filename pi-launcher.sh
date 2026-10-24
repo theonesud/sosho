@@ -11,9 +11,15 @@ while [ -h "$SCRIPT_SOURCE" ]; do
     SCRIPT_SOURCE="$(readlink "$SCRIPT_SOURCE")"
     [[ $SCRIPT_SOURCE != /* ]] && SCRIPT_SOURCE="$SCRIPT_DIR/$SCRIPT_SOURCE"
 done
-SOSHO_ROOT="${SOSHO_ROOT:-$(cd -P "$(dirname "$SCRIPT_SOURCE")/.." 2>/dev/null && pwd)}"
-[ ! -d "$SOSHO_ROOT/.pi" ] && SOSHO_ROOT="/home/sud/sosho"
+SOSHO_ROOT="${SOSHO_ROOT:-$(cd -P "$(dirname "$SCRIPT_SOURCE")" 2>/dev/null && pwd)}"
+[ ! -d "$SOSHO_ROOT/.pi" ] && SOSHO_ROOT="/home/vegeta/sosho"
 SOSHO_PI="$SOSHO_ROOT/.pi"
+# 0. Ensure Docker image exists; build if missing
+if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+    echo "Image $IMAGE_NAME not found locally. Building from $SOSHO_ROOT..."
+    docker build -t "$IMAGE_NAME" -f "$SOSHO_ROOT/Dockerfile.pi" "$SOSHO_ROOT"
+fi
+
 WORKSPACE="$(pwd)"
 
 # 1. Ensure target workspace has a local .pi directory for caching/config

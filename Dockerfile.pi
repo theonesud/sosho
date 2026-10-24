@@ -6,5 +6,7 @@ RUN apt-get update \
 
 RUN npm install -g @earendil-works/pi-coding-agent @dokobot/cli@latest @langfuse/pi-observability-plugin@latest
 
+ENV NODE_PATH=/usr/local/lib/node_modules/@langfuse/pi-observability-plugin/node_modules:/usr/local/lib/node_modules
+
 WORKDIR /workspace
 ENTRYPOINT ["pi"]
