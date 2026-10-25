@@ -11,13 +11,29 @@ while [ -h "$SCRIPT_SOURCE" ]; do
     SCRIPT_SOURCE="$(readlink "$SCRIPT_SOURCE")"
     [[ $SCRIPT_SOURCE != /* ]] && SCRIPT_SOURCE="$SCRIPT_DIR/$SCRIPT_SOURCE"
 done
-SOSHO_ROOT="${SOSHO_ROOT:-$(cd -P "$(dirname "$SCRIPT_SOURCE")" 2>/dev/null && pwd)}"
-[ ! -d "$SOSHO_ROOT/.pi" ] && SOSHO_ROOT="/home/vegeta/sosho"
+RESOLVED_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" 2>/dev/null && pwd)"
+SOSHO_ROOT="${SOSHO_ROOT:-$RESOLVED_DIR}"
+[ ! -d "$SOSHO_ROOT/.pi" ] && SOSHO_ROOT="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || echo "$HOME/sosho")"
 SOSHO_PI="$SOSHO_ROOT/.pi"
+
+# Filter out our custom launcher flags from arguments
+FORWARD_ARGS=()
+SKIP_WARMUP="${PI_SKIP_WARMUP:-0}"
+for arg in "$@"; do
+    case "$arg" in
+        --no-warmup)
+            SKIP_WARMUP=1
+            ;;
+        *)
+            FORWARD_ARGS+=("$arg")
+            ;;
+    esac
+done
+
 # 0. Ensure Docker image exists; build if missing
 if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     echo "Image $IMAGE_NAME not found locally. Building from $SOSHO_ROOT..."
-    docker build -t "$IMAGE_NAME" -f "$SOSHO_ROOT/Dockerfile.pi" "$SOSHO_ROOT"
+    docker build -t "$IMAGE_NAME" -f "$SOSHO_ROOT/docker/Dockerfile.pi" "$SOSHO_ROOT"
 fi
 
 WORKSPACE="$(pwd)"
@@ -32,10 +48,13 @@ if [ ! -f "$TARGET_PI/models.json" ] && [ -f "$SOSHO_PI/models.json" ]; then
     cp "$SOSHO_PI/models.json" "$TARGET_PI/models.json"
 fi
 
-# 2b. Auto-install and configure Graphify locally for Pi
-GRAPHIFY_VENV="$TARGET_PI/venv-graphify"
+# 2b. Centralize Graphify venv in user-level cache (~/.local/share/sosho/venv-graphify)
+#     Avoids re-downloading and duplicating ~250MB virtualenvs across every repository
+SHARED_GRAPHIFY_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/sosho"
+GRAPHIFY_VENV="$SHARED_GRAPHIFY_DIR/venv-graphify"
 if [ ! -x "$GRAPHIFY_VENV/bin/python" ]; then
-    echo "Initializing Graphify local environment in $GRAPHIFY_VENV..."
+    echo "Initializing shared Graphify environment in $GRAPHIFY_VENV..."
+    mkdir -p "$SHARED_GRAPHIFY_DIR"
     python3 -m venv "$GRAPHIFY_VENV"
     "$GRAPHIFY_VENV/bin/pip" install -q -U pip
     "$GRAPHIFY_VENV/bin/pip" install -q "graphifyy[mcp]"
@@ -47,11 +66,11 @@ if [ ! -d "$TARGET_PI/skills/graphify" ] && [ -d "$SOSHO_PI/skills/graphify" ]; 
     cp -r "$SOSHO_PI/skills/graphify" "$TARGET_PI/skills/"
 fi
 
-# Ensure .pi/mcp.json has local graphify server registered
+# Ensure .pi/mcp.json has local graphify server registered using shared venv
 if [ ! -f "$TARGET_PI/mcp.json" ] || ! grep -q '"graphify"' "$TARGET_PI/mcp.json" 2>/dev/null; then
-    python3 - "$TARGET_PI/mcp.json" "$WORKSPACE" <<'PY'
+    python3 - "$TARGET_PI/mcp.json" "$WORKSPACE" "$GRAPHIFY_VENV/bin/python" <<'PY'
 import json, sys, os
-mcp_path, ws = sys.argv[1], sys.argv[2]
+mcp_path, ws, py_bin = sys.argv[1], sys.argv[2], sys.argv[3]
 data = {"mcpServers": {}}
 if os.path.exists(mcp_path):
     try:
@@ -61,7 +80,7 @@ if os.path.exists(mcp_path):
         pass
 servers = data.setdefault("mcpServers", {})
 servers["graphify"] = {
-    "command": f"{ws}/.pi/venv-graphify/bin/python",
+    "command": py_bin,
     "args": [
         "-m",
         "graphify.serve",
@@ -73,16 +92,8 @@ with open(mcp_path, "w") as f:
 PY
 fi
 
-# Ensure graphify-out/graph.json exists for the workspace (index codebase if missing)
-if [ ! -f "$WORKSPACE/graphify-out/graph.json" ] && [ -x "$GRAPHIFY_VENV/bin/python" ]; then
-    echo "Generating initial codebase knowledge graph with Graphify..."
-    "$GRAPHIFY_VENV/bin/python" -m graphify extract "$WORKSPACE" --code-only --no-cluster >/dev/null 2>&1 || true
-fi
-
-# 3. Pre-warm the local model (if configured). llama.cpp loads the GGUF lazily and,
-#    when the model does not fully fit in RAM, the very first prompt is served from
-#    disk and can take many minutes. Absorb that cost here so pi's first turn is fast.
-if [ -f "$TARGET_PI/models.json" ] && command -v curl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+# 3. Pre-warm the local model (unless skipped).
+if [ "$SKIP_WARMUP" != "1" ] && [ -f "$TARGET_PI/models.json" ] && command -v curl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
     read -r BASE_URL MODEL_ID < <(python3 - "$TARGET_PI/models.json" <<'PY' 2>/dev/null
 import json, sys
 try:
@@ -96,8 +107,10 @@ PY
     case "$BASE_URL" in
         http://127.0.0.1:*|http://localhost:*|http://0.0.0.0:*)
             if [ -n "$MODEL_ID" ]; then
-                echo "Pre-warming local model $MODEL_ID (first load can take a few minutes)..."
-                WARM_PAYLOAD="$(python3 - "$MODEL_ID" <<'PY'
+                # Check if model server is reachable first
+                if curl -fsS -m 2 "$BASE_URL/health" >/dev/null 2>&1; then
+                    echo "Pre-warming local model $MODEL_ID (press Ctrl+C to skip, or use --no-warmup)..."
+                    WARM_PAYLOAD="$(python3 - "$MODEL_ID" <<'PY'
 import json, sys
 print(json.dumps({
     "model": sys.argv[1],
@@ -107,11 +120,12 @@ print(json.dumps({
 }))
 PY
 )"
-                if curl -s -m 900 -o /dev/null -H 'Content-Type: application/json' \
-                    -X POST "$BASE_URL/chat/completions" --data-binary "$WARM_PAYLOAD"; then
-                    echo "Model ready."
-                else
-                    echo "Warning: model warm-up failed (is llama-cpp running?); continuing anyway."
+                    if curl -s -m 180 -o /dev/null -H 'Content-Type: application/json' \
+                        -X POST "$BASE_URL/chat/completions" --data-binary "$WARM_PAYLOAD"; then
+                        echo "Model ready."
+                    else
+                        echo "Warning: model warm-up timed out or returned error; continuing anyway."
+                    fi
                 fi
             fi
             ;;
@@ -122,7 +136,11 @@ fi
 MOUNTS=(
     -v "$WORKSPACE:$WORKSPACE"
     -v "$TARGET_PI:$TARGET_PI"
+    -v "$SHARED_GRAPHIFY_DIR:$SHARED_GRAPHIFY_DIR"
 )
+
+# Mount user git config if present (so commits have author name/email)
+[ -f "$HOME/.gitconfig" ] && MOUNTS+=(-v "$HOME/.gitconfig:$HOME/.gitconfig:ro")
 
 # Optional worktrees dir
 WORKTREES_DIR="$(realpath "$WORKSPACE/../worktrees" 2>/dev/null || echo "$(dirname "$WORKSPACE")/worktrees")"
@@ -164,4 +182,4 @@ exec docker run "${DOCKER_INTERACTIVE_FLAGS[@]}" --rm \
     -w "$WORKSPACE" \
     "$IMAGE_NAME" \
     --approve \
-    "$@"
+    "${FORWARD_ARGS[@]}"

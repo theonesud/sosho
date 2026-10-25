@@ -14,9 +14,10 @@ set -euo pipefail
 # container. That needs ~7 GB free VRAM, so stop llama-cpp first.
 # ==============================================================================
 
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 GATEWAY_URL="${YUE2_GATEWAY_URL:-http://127.0.0.1:8021}"
 YUE2_API_KEY="${YUE2_API_KEY:-}"
-MODELS_DIR="${YUE2_MODELS_DIR:-/mnt/Asteroid/sosho-models/yue2-3b}"
+MODELS_DIR="${YUE2_MODELS_DIR:-$SCRIPT_DIR/models/yue2-3b}"
 IMAGE="${YUE2_ENGINE_IMAGE:-ghcr.io/0xshug0/audio.cpp:full-cuda12}"
 MODEL_GGUF="${YUE2_MODEL_GGUF:-yue2-3b-q4_0.gguf}"
 

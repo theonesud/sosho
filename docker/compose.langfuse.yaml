@@ -30,7 +30,7 @@ services:
       redis: { condition: service_healthy }
       clickhouse: { condition: service_healthy }
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment: &langfuse-env
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
       NEXTAUTH_SECRET: local-dev-secret-change-me

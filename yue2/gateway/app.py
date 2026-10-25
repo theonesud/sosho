@@ -76,9 +76,10 @@ def db() -> sqlite3.Connection:
 def init_db() -> None:
     global _db
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    _db = sqlite3.connect(DATA_DIR / "jobs.db", check_same_thread=False)
+    _db = sqlite3.connect(DATA_DIR / "jobs.db", timeout=30.0, check_same_thread=False)
     _db.row_factory = sqlite3.Row
     _db.execute("PRAGMA journal_mode=WAL")
+    _db.execute("PRAGMA busy_timeout=30000")
     _db.executescript(
         """
         CREATE TABLE IF NOT EXISTS jobs (
@@ -264,13 +265,19 @@ class DockerCtl:
                 async with self._client() as client:
                     r = await client.get(f"/containers/{LLAMA_CONTAINER}/json")
                     state = r.json().get("State", {})
-                health = (state.get("Health") or {}).get("Status")
-                if state.get("Running") and health in (None, "healthy"):
-                    LOG.info("%s is back up (health=%s)", LLAMA_CONTAINER, health)
-                    return
+                health_obj = state.get("Health")
+                if state.get("Running"):
+                    if health_obj is not None:
+                        if health_obj.get("Status") == "healthy":
+                            LOG.info("%s is back up and healthy", LLAMA_CONTAINER)
+                            return
+                    else:
+                        # Fallback for unmonitored containers
+                        LOG.info("%s is running (no container healthcheck configured)", LLAMA_CONTAINER)
+                        return
             except Exception:  # noqa: BLE001
                 pass
-            await asyncio.sleep(3)
+            await asyncio.sleep(2)
         LOG.warning("%s did not report healthy within %.0fs", LLAMA_CONTAINER, LLAMA_READY_TIMEOUT)
 
 
@@ -494,6 +501,15 @@ async def lifespan(app: FastAPI):
         "WHERE status IN ('running')",
         (time.time(),),
     )
+    # If gateway crashed while llama-cpp was stopped, ensure it is resumed
+    if STOP_LLAMA:
+        try:
+            state = await docker_ctl.state()
+            if state == "stopped":
+                LOG.info("Reconciling stopped LLM container on startup; resuming %s...", LLAMA_CONTAINER)
+                await docker_ctl.resume()
+        except Exception as exc:  # noqa: BLE001
+            LOG.warning("Failed to check/resume LLM container on startup: %s", exc)
     _queue = asyncio.Queue()
     _worker = asyncio.create_task(worker_loop())
     for row in db_all("SELECT id FROM jobs WHERE status='queued' ORDER BY created_at"):
