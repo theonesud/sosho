@@ -110,11 +110,22 @@ PY
                 # Check if model server is reachable first
                 if curl -fsS -m 2 "$BASE_URL/health" >/dev/null 2>&1; then
                     echo "Pre-warming local model $MODEL_ID (press Ctrl+C to skip, or use --no-warmup)..."
-                    WARM_PAYLOAD="$(python3 - "$MODEL_ID" <<'PY'
-import json, sys
+WARM_PAYLOAD="$(python3 - "$MODEL_ID" "$SOSHO_PI/APPEND_SYSTEM.md" <<'PY'
+import json, sys, os
+model_id, sys_prompt_path = sys.argv[1], sys.argv[2]
+content = "You are an autonomous AI coding assistant."
+if os.path.isfile(sys_prompt_path):
+    try:
+        with open(sys_prompt_path) as f:
+            content = f.read()
+    except Exception:
+        pass
 print(json.dumps({
-    "model": sys.argv[1],
-    "messages": [{"role": "user", "content": ("The quick brown fox jumps over the lazy dog. " * 300) + "\nReply with OK."}],
+    "model": model_id,
+    "messages": [
+        {"role": "system", "content": content},
+        {"role": "user", "content": "Ready. Acknowledge with OK."}
+    ],
     "max_tokens": 1,
     "temperature": 0,
 }))

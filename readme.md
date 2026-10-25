@@ -86,10 +86,10 @@ git clone https://github.com/theonesud/sosho.git && cd sosho
 make doctor
 ```
 
-### 2. Configure Environment & Install CLI
+### 2. Auto-Tune Hardware & Install CLI
 ```bash
-cp .env.example .env
-make install-cli
+make autotune      # Benchmarks CPU/GPU/RAM and auto-generates optimal .env
+make install-cli   # Links global CLI launchers into ~/.local/bin
 ```
 > **Tip**: This links `pi` and `yue2-music` into your `~/.local/bin` so you can call them from anywhere.
 
@@ -201,6 +201,7 @@ make music-up      # Boot YuE2 async gateway & audio engine
 make music-down    # Teardown music services to reclaim RAM
 
 # Diagnostics & Logs
+make autotune      # Auto-benchmark & generate max-performance .env
 make doctor        # Run hardware, GPU, driver & port diagnostics
 make test          # Execute automated integration & unit tests
 make logs-llm      # Stream llama.cpp logs
@@ -220,9 +221,10 @@ Configure options via `.env` without modifying compose files:
 
 | Variable | Default | Description |
 |---|---|---|
-| `LLM_THREADS` | `8` | Dedicated CPU threads for MoE matrix operations |
-| `LLM_CTX_SIZE` | `65536` | Inference context window (tokens) |
-| `LLM_KV_CACHE_TYPE` | `q8_0` | KV cache precision (`q8_0`, `q4_0`, `f16`) |
+| `LLM_THREADS` | `14` | Dedicated CPU threads for MoE matrix operations |
+| `LLM_THREADS_BATCH` | `14` | Dedicated CPU threads for prompt ingestion & KV cache generation |
+| `LLM_CTX_SIZE` | `32768` | Optimized context window to keep KV cache compact & fast |
+| `LLM_KV_CACHE_TYPE` | `q4_0` | KV cache precision (`q4_0`, `q8_0`, `f16`) for 2x memory throughput |
 | `YUE2_STOP_LLAMA` | `true` | Automatically pause LLM during music generation to prevent OOM |
 | `LANGFUSE_BASE_URL`| `http://127.0.0.1:3000` | Target telemetry endpoint for agent traces |
 

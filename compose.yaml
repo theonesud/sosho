@@ -91,11 +91,22 @@ services:
       - -ctv
       - "${LLM_KV_CACHE_TYPE:-q8_0}"
       - --cache-reuse
-      - "256"
+      - "64"
+      - -b
+      - "${LLM_BATCH:-2048}"
+      - -ub
+      - "${LLM_UBATCH:-1024}"
+      - -tb
+      - ${LLM_THREADS_BATCH:-14}
+      - --cache-prompt
       - --chat-template-kwargs
       - '{"preserve_thinking":true}'
       - --sleep-idle-seconds
       - "900"
+      - -fa
+      - "on"
+
+
 
   # YuE2 model fetch: GGUF weights + sidecars from Hugging Face, once.
   # Skips entirely when the files are already present.

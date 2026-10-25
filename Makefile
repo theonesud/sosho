@@ -1,8 +1,9 @@
-.PHONY: help up down restart status logs logs-llm logs-langfuse logs-music music-up music-down clean install-cli
+.PHONY: help autotune up down restart status logs logs-llm logs-langfuse logs-music music-up music-down clean install-cli
 
 # Default target: display help
 help:
 	@echo "Sosho Management Commands:"
+	@echo "  make autotune      - Auto-tune config to max out any CPU/GPU/RAM"
 	@echo "  make up            - Start llama.cpp and Langfuse stack"
 	@echo "  make down          - Stop all running Sosho services"
 	@echo "  make restart       - Restart core services"
@@ -43,6 +44,9 @@ music-down:
 
 logs-music:
 	docker compose logs -f yue2-gateway yue2-engine
+
+autotune:
+	./bin/autotune.sh
 
 doctor:
 	./bin/doctor.sh
