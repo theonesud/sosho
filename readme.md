@@ -1,245 +1,214 @@
+<div align="center">
+
+<img src="./assets/logo.png" alt="Sosho Logo" width="160" style="border-radius: 24px; margin-bottom: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);" />
+
 # Sosho (祖書)
 
-> **High-performance, containerized local AI workspace powered by llama.cpp, Pi Coding Agent, YuE2 Audio Generation, and Langfuse Observability.**
+**The unified, privacy-first local AI studio & autonomous agent workspace.**
 
-Sosho provides a production-grade local AI engineering environment with automated VRAM orchestration, hardware self-diagnostics, centralized agent caching, and zero-configuration telemetry.
-
----
-
-## 📑 Table of Contents
-- [Architecture Overview](#-architecture-overview)
-- [Quick Start](#-quick-start)
-  - [Prerequisites](#1-prerequisites)
-  - [Hardware Diagnostic (`make doctor`)](#2-run-system-diagnostics)
-  - [Environment Setup](#3-configure-environment)
-  - [Install Global CLI Launchers](#4-install-global-cli-launchers)
-- [Daily Workflows](#-daily-workflows)
-  - [1. Starting the Core LLM & Telemetry Stack](#1-start-the-core-llm--telemetry-stack)
-  - [2. Running the Pi Coding Agent](#2-run-pi-agent-from-anywhere)
-  - [3. Local Music Generation (YuE2-3B)](#3-music-generation-yue2-3b)
-  - [4. Observability & Tracing (Langfuse)](#4-observability--tracing-langfuse)
-- [Testing & Quality Assurance](#-testing--quality-assurance)
-- [Make Commands Cheatsheet](#-make-commands-cheatsheet)
-- [Repository Structure](#-repository-structure)
-- [Configuration Reference](#-configuration-reference)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Docker Compose v2](https://img.shields.io/badge/Docker%20Compose-v2.0+-2496ED?logo=docker&logoColor=white)](compose.yaml)
+[![CUDA Accelerated](https://img.shields.io/badge/CUDA-NVIDIA%20GPU-76B900?logo=nvidia&logoColor=white)](bin/doctor.sh)
+[![llama.cpp Powered](https://img.shields.io/badge/Inference-llama.cpp-orange)](compose.yaml)
+[![Observability: Langfuse](https://img.shields.io/badge/Telemetry-Langfuse%20v4-black)](docker/compose.langfuse.yaml)
 
 ---
 
-## 🏛 Architecture Overview
+</div>
 
-```
-                      +---------------------------------------+
-                      |         Host Machine / Terminal       |
-                      |  • pi (bin/pi-launcher.sh)            |
-                      |  • yue2-music (bin/yue2-generate.sh)  |
-                      |  • make doctor / make test            |
-                      +-------------------+-------------------+
-                                          |
-        +---------------------------------+---------------------------------+
-        |                                 |                                 |
-        v                                 v                                 v
-+------------------+             +------------------+             +------------------+
-|    Pi Agent      |             |    llama.cpp     |             |   YuE2 Gateway   |
-|   (pi-sandbox)   |             | (Qwen3.6-35B-A3B)|             |  (CUDA / Audio)  |
-|                  |             |                  |             |                  |
-| • Sandboxed node |  HTTP :8080 | • GPU / CPU MoE  | Handshake   | • Async Job API  |
-| • Shared venv    +------------>+ • 127.0.0.1 bound|  via socket | • VRAM Manager   |
-| • Host gitconfig |             | • Healthchecked  |<............+ • Pauses LLM     |
-+--------+---------+             +------------------+             +--------+---------+
-         |                                                                 |
-         | Telemetry :3000                                                 v
-         v                                                        +------------------+
-+-------------------------------------------------------+         |   YuE2 Engine    |
-| Langfuse v4 Stack (docker/compose.langfuse.yaml)      |         |   (audio.cpp)    |
-| • Web UI (127.0.0.1:3000)   • Worker                  |         +------------------+
-| • PostgreSQL • ClickHouse • MinIO • Redis             |
-+-------------------------------------------------------+
-```
+## 💡 What Can You Do with Sosho?
+
+Sosho turns consumer or workstation GPUs into a full-fledged local AI lab without cloud lock-in, recurring API bills, or data leakage.
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 💻 1. Autonomous Coding from Any Terminal
+Run state-of-the-art coding agents in any project directory with a single word: `pi`.
+- **Works Everywhere**: Navigate to any git repository and run `pi`—it mounts cleanly into a sandboxed container.
+- **Git & Tool Aware**: Automatically carries your host git identity, bash environment, and shared MCP tools.
+- **Zero API Bills**: Offloads reasoning and code editing to local MoE LLMs (`Qwen3.6-35B-A3B`) with zero telemetry leakage.
+
+</td>
+<td width="50%" valign="top">
+
+### 🎵 2. Full-Track Local AI Music Synthesis
+Compose studio-quality music with lyrics, vocals, and musical accompaniment locally via **YuE2-3B**:
+- **Natural Language Styles**: Generate tracks in any genre (lo-fi, indie acoustic, synthwave, metal).
+- **Vocal & Instrumental Fusion**: Synthesize rich vocals matched with complete instrumentation.
+- **Score & FLAC Output**: Emits lossless audio plus musical lead sheets (`.abc`) for live editing and playback.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🎛 3. Smart VRAM Orchestration (Zero OOM)
+Run both a massive coding LLM and an audio generation pipeline on a single GPU.
+- **Dynamic Handshake**: Submitting a music job seamlessly pauses the `llama.cpp` container to reclaim GPU memory.
+- **Auto-Resume**: As soon as audio rendering finishes, your LLM wakes up and resumes instant responses.
+
+</td>
+<td width="50%" valign="top">
+
+### 📊 4. Deep Agent Tracing & Observability
+Self-hosted, production-grade telemetry for every model generation and agent task.
+- **Langfuse v4 Dashboard**: Trace agent tool calls, prompt iterations, latency, and token throughput at `localhost:3000`.
+- **Zero Configuration**: Comes pre-wired with Postgres, ClickHouse, and MinIO out of the box.
+
+</td>
+</tr>
+</table>
 
 ---
 
-## 🚀 Quick Start
+## ⚡ Quick Start (30 Seconds)
 
-### 1. Prerequisites
-- **Linux (x86_64)**
-- **Docker & Docker Compose (v2)**
-- **NVIDIA GPU** with **NVIDIA Container Toolkit** (`--gpus all` working)
-- **Bash**, **Git**, and `~/.local/bin` added to your `$PATH`
-
-### 2. Run System Diagnostics
-Before booting containers, verify your GPU drivers, container runtime, available ports, and disk space:
+### 1. Check Hardware & Dependencies
+Sosho includes a built-in diagnostic suite that tests GPU capabilities, drivers, port availability, and container runtimes:
 ```bash
+git clone https://github.com/theonesud/sosho.git && cd sosho
 make doctor
 ```
 
-### 3. Configure Environment
-Copy and customize `.env`:
+### 2. Configure Environment & Install CLI
 ```bash
 cp .env.example .env
-```
-*(Tip: Set `LLM_THREADS` to physical CPU cores minus 2, and tune `LLM_CTX_SIZE` / `LLM_KV_CACHE_TYPE` based on available GPU VRAM).*
-
-### 4. Install Global CLI Launchers
-Install `pi` and `yue2-music` directly into `~/.local/bin`:
-```bash
 make install-cli
 ```
+> **Tip**: This links `pi` and `yue2-music` into your `~/.local/bin` so you can call them from anywhere.
 
----
-
-## 💻 Daily Workflows
-
-### 1. Start the Core LLM & Telemetry Stack
-From the `sosho` directory:
+### 3. Launch Services
 ```bash
 make up
 ```
-- **Automated GGUF Download**: On first launch, the `model-download` job fetches weights into `./models` and exits.
-- **llama.cpp Server**: Starts GPU-accelerated inference at `http://127.0.0.1:8080/v1`.
-- **Langfuse Stack**: Starts the full telemetry stack at `http://127.0.0.1:3000`.
-- **Logs**:
-  ```bash
-  make logs-llm        # Stream llama.cpp logs
-  make logs-langfuse   # Stream Langfuse logs
-  ```
+*✨ Done! The model downloader auto-provisions weights on first boot, spinning up `llama.cpp` (`:8080`) and Langfuse (`:3000`).*
 
 ---
 
-### 2. Run Pi Agent (From Anywhere)
-Run `pi` in **any directory or Git repository** on your system:
+## 🚀 Interactive Workflows
+
+<details open>
+<summary><b>🛠️ Workflow A: Terminal Coding Agent (<code>pi</code>)</b></summary>
+<br>
+
+Invoke `pi` inside **any directory or code repository**:
 ```bash
-cd /path/to/any-project
+cd ~/projects/my-app
 pi
 ```
+- **Skip warmup**: `pi --no-warmup` (bypasses initial server probe)
+- **Hybrid APIs**: Drop a `.env` with `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in any folder to temporarily route queries to cloud models.
+</details>
 
-#### Key Capabilities:
-- **Zero Duplication**: Shared tools and Python environments (e.g., Graphify MCP) are cached centrally in `~/.local/share/sosho/`, preventing disk bloat.
-- **Host Git Integration**: Automatically mounts host `~/.gitconfig` into the sandbox so commits retain your name and email.
-- **Warmup Control**:
-  ```bash
-  # Skip the model pre-warm test if the server is already active:
-  pi --no-warmup
+<details>
+<summary><b>🎼 Workflow B: Music & Vocal Generation (<code>YuE2</code>)</b></summary>
+<br>
 
-  # Or via environment variable:
-  PI_SKIP_WARMUP=1 pi
-  ```
-- **Online / API Key Models**: Place a `.pi/models.json` or `.env` (with `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) in any project to automatically override the local LLM.
+1. **Activate the music engine**:
+   ```bash
+   make music-up
+   ```
+2. **Synthesize a track**:
+   ```bash
+   bin/yue2-generate.sh \
+     --style "acoustic indie folk, emotive female vocals, warm acoustic guitar" \
+     --lyrics "[Verse]\nMorning sun hits the glass...\n[Chorus]\nFly away..." \
+     --out "song.flac" \
+     --score-out "score.abc"
+   ```
+3. **Monitor progress**: `make logs-music`
+</details>
 
----
+<details>
+<summary><b>📈 Workflow C: Real-Time Tracing (Langfuse)</b></summary>
+<br>
 
-### 3. Music Generation (YuE2-3B)
-YuE2 generates complete songs (vocals + instrumentals) from lyrics and musical styles.
-
-#### 1. Start the Music Stack
-```bash
-make music-up
-```
-*(Uses Docker Compose profile `music`. The gateway manages VRAM by automatically pausing `llama-cpp` during synthesis and resuming it once finished).*
-
-#### 2. Submit a Generation Job
-```bash
-bin/yue2-generate.sh \
-  --style "acoustic indie folk, emotive female vocals, warm acoustic guitar" \
-  --lyrics "[Verse]\nMorning sun hits the glass...\n[Chorus]\nFly away..." \
-  --out "song.flac" \
-  --score-out "score.abc"
-```
-
-#### 3. Monitor Music Engine
-```bash
-make logs-music
-```
+Open **[http://127.0.0.1:3000](http://127.0.0.1:3000)** in your browser:
+- **Default Login**: `admin@local.dev` / `password123`
+- **Pre-configured Project**: `Pi-Agent`
+- *To run a session without tracing*: `LANGFUSE_TRACING_ENABLED=false pi`
+</details>
 
 ---
 
-### 4. Observability & Tracing (Langfuse)
-Every prompt, tool execution, reasoning step, and token count from `pi` automatically logs to Langfuse.
-
-- **Web Dashboard**: [http://127.0.0.1:3000](http://127.0.0.1:3000)
-- **Pre-seeded Admin**: `admin@local.dev` / `password123`
-- **Pre-seeded Project**: `Pi-Agent` (`pk-lf-local-pi` / `sk-lf-local-pi`)
-
-To temporarily disable tracing for a session:
-```bash
-LANGFUSE_TRACING_ENABLED=false pi
-```
-
----
-
-## 🧪 Testing & Quality Assurance
-
-Run the comprehensive test suite:
-```bash
-make test
-```
-The test runner validates:
-1. **Shell Script Integrity**: Syntax checking across all `bin/*.sh` scripts.
-2. **Container Security & Networking**: Verifies `127.0.0.1` localhost binding for `llama.cpp` and `langfuse-web`.
-3. **Healthcheck Contracts**: Validates `llama-cpp` service healthcheck definitions.
-4. **Gateway Unit Tests**: Verifies SQLite WAL mode, `busy_timeout` handling, and ABC musical score decoding.
-5. **Launcher Argument Parsing**: Tests flag filtering (`--no-warmup`).
-
----
-
-## 🛠 Make Commands Cheatsheet
-
-| Command | Action |
-|---|---|
-| `make up` | Start core stack (`llama-cpp` + Langfuse) |
-| `make down` | Stop all running containers across all profiles |
-| `make status` | View container status and healthcheck states |
-| `make restart` | Restart the `llama-cpp` inference service |
-| `make doctor` | Run hardware and environment self-diagnostics |
-| `make test` | Run the full test suite |
-| `make music-up` | Start YuE2 music generation engine and async gateway |
-| `make music-down` | Stop YuE2 music containers |
-| `make logs-llm` | Tail streaming logs from `llama-cpp` |
-| `make logs-music` | Tail streaming logs from `yue2-gateway` and `yue2-engine` |
-| `make logs-langfuse`| Tail streaming logs from Langfuse services |
-| `make install-cli` | Install `pi` and `yue2-music` into `~/.local/bin` |
-| `make clean-cache` | Clear temporary cache and session history in `.pi` |
-| `make prune` | Remove unused Docker containers and images |
-
----
-
-## 📂 Repository Structure
+## 🏛️ Tech Stack & Architecture
 
 ```
-sosho/
-├── bin/                          # CLI scripts and launchers
-│   ├── doctor.sh                 # Hardware and environment healthcheck
-│   ├── pi-launcher.sh            # Global Pi CLI launcher (Docker-backed)
-│   └── yue2-generate.sh          # Music generation CLI
-├── docker/                       # Subsystem configurations & Dockerfiles
-│   ├── compose.langfuse.yaml     # Self-hosted Langfuse v4 stack
-│   ├── Dockerfile.pi             # Pi coding agent container sandbox
-│   └── Dockerfile.yue2-gateway   # YuE2 async job gateway
-├── tests/                        # Automated test suite
-│   ├── run_tests.sh              # Test runner
-│   └── test_gateway.py           # Unit tests for gateway logic
-├── yue2/                         # Audio engine assets & gateway application
-│   ├── gateway/                  # FastAPI async job server
-│   │   ├── app.py                # Job queue, SQLite persistence & VRAM handshake
-│   │   └── requirements.txt
-│   └── server.json               # audio.cpp CUDA engine configuration
-├── compose.yaml                  # Root Docker Compose entrypoint
-├── Makefile                      # Standardized project task runner
-├── readme.md                     # Project documentation
-└── .env.example                  # Environment configuration template
+                          Host Terminal & Global CLI
+                    ┌─────────────────┴─────────────────┐
+                    ▼                                   ▼
+             pi (pi-sandbox)                  yue2-music (CLI)
+                    │                                   │
+       OpenAI API   │                                   │  Async Jobs
+       :8080        ▼                                   ▼  :8021
+             ┌──────────────┐   VRAM Handshake    ┌────────────────┐
+             │  llama.cpp   │◄................... │  YuE2 Gateway  │
+             │ (MoE / GGUF) │  (Pause / Resume)   │  (FastAPI/WAL) │
+             └──────┬───────┘                     └───────┬────────┘
+                    │                                     │
+          Telemetry │ :3000                               ▼
+                    ▼                             ┌────────────────┐
+             ┌──────────────┐                     │  YuE2 Engine   │
+             │   Langfuse   │                     │  (audio.cpp)   │
+             │  (ClickHouse)│                     └────────────────┘
+             └──────────────┘
 ```
 
----
-
-## ⚙️ Configuration Reference
-
-Key variables configurable in `.env`:
-
-| Variable | Default | Purpose |
+| Layer | Technology | Key Capabilities |
 |---|---|---|
-| `LLM_THREADS` | `8` | Number of CPU threads dedicated to MoE computation |
-| `LLM_CTX_SIZE` | `65536` | Context window size (tokens) for `llama.cpp` |
-| `LLM_KV_CACHE_TYPE` | `q8_0` | Quantization for KV cache (`q8_0`, `q4_0`, `f16`) |
-| `PI_SKIP_WARMUP` | `0` | Set to `1` to bypass model pre-warm on agent boot |
-| `LANGFUSE_BASE_URL` | `http://127.0.0.1:3000` | Target telemetry endpoint |
-| `YUE2_GATEWAY_PORT` | `8021` | Host port for YuE2 async job gateway |
-| `YUE2_STOP_LLAMA` | `true` | Automatically pause `llama.cpp` during music generation to free VRAM |
+| **Inference Engine** | [llama.cpp](https://github.com/ggerganov/llama.cpp) | CUDA-accelerated MoE GGUF execution, KV cache quantization (`q8_0`/`q4_0`), low-latency C++ server |
+| **Agent Environment** | [Pi Agent](docker/Dockerfile.pi) | Ephemeral Docker sandbox, host git pass-through, centralized cache (`~/.local/share/sosho`) |
+| **Audio Engine** | [YuE2](yue2/server.json) + `audio.cpp` | Full-song vocal/instrumental synthesis, ABC notation generation, asynchronous queue |
+| **Observability** | [Langfuse v4](docker/compose.langfuse.yaml) | ClickHouse analytical store, token tracking, tool latency tracing, session replay |
+| **Orchestration** | Docker Compose v2 + Make | Localhost (`127.0.0.1`) security isolation, VRAM coordination handshake |
+
+---
+
+## 🧰 Make Commands
+
+Sosho uses a streamlined `Makefile` for zero-friction control:
+
+```bash
+# Core Lifecycle
+make up            # Start llama.cpp inference + Langfuse stack
+make down          # Stop all containers across all profiles
+make status        # Inspect health status and ports
+make restart       # Quick restart of LLM inference service
+
+# Music Engine (YuE2)
+make music-up      # Boot YuE2 async gateway & audio engine
+make music-down    # Teardown music services to reclaim RAM
+
+# Diagnostics & Logs
+make doctor        # Run hardware, GPU, driver & port diagnostics
+make test          # Execute automated integration & unit tests
+make logs-llm      # Stream llama.cpp logs
+make logs-music    # Stream YuE2 generation logs
+make logs-langfuse # Stream telemetry logs
+
+# Tooling
+make install-cli   # Symlink global CLI launchers into ~/.local/bin
+make clean-cache   # Flush stale agent cache & sessions
+```
+
+---
+
+## ⚙️ Key Configuration Options
+
+Configure options via `.env` without modifying compose files:
+
+| Variable | Default | Description |
+|---|---|---|
+| `LLM_THREADS` | `8` | Dedicated CPU threads for MoE matrix operations |
+| `LLM_CTX_SIZE` | `65536` | Inference context window (tokens) |
+| `LLM_KV_CACHE_TYPE` | `q8_0` | KV cache precision (`q8_0`, `q4_0`, `f16`) |
+| `YUE2_STOP_LLAMA` | `true` | Automatically pause LLM during music generation to prevent OOM |
+| `LANGFUSE_BASE_URL`| `http://127.0.0.1:3000` | Target telemetry endpoint for agent traces |
+
+---
+
+<div align="center">
+  <sub>Built for private, high-performance local AI engineering.</sub>
+</div>
