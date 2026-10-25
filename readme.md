@@ -2,6 +2,7 @@
 
 <img src="./assets/logo.png" alt="Sosho Logo" width="160" style="border-radius: 24px; margin-bottom: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);" />
 
+
 # Sosho (祖書)
 
 **The unified, privacy-first local AI studio & autonomous agent workspace.**
@@ -10,6 +11,7 @@
 [![Docker Compose v2](https://img.shields.io/badge/Docker%20Compose-v2.0+-2496ED?logo=docker&logoColor=white)](compose.yaml)
 [![CUDA Accelerated](https://img.shields.io/badge/CUDA-NVIDIA%20GPU-76B900?logo=nvidia&logoColor=white)](bin/doctor.sh)
 [![llama.cpp Powered](https://img.shields.io/badge/Inference-llama.cpp-orange)](compose.yaml)
+[![Model: Refusal--Free](https://img.shields.io/badge/Model-Refusal--Free%20MoE-red)](compose.yaml)
 [![Observability: Langfuse](https://img.shields.io/badge/Telemetry-Langfuse%20v4-black)](docker/compose.langfuse.yaml)
 
 ---
@@ -18,7 +20,7 @@
 
 ## 💡 What Can You Do with Sosho?
 
-Sosho turns consumer or workstation GPUs into a full-fledged local AI lab without cloud lock-in, recurring API bills, or data leakage.
+Sosho turns consumer or workstation GPUs into a full-fledged local AI lab without cloud lock-in, artificial censorship, recurring API bills, or data leakage.
 
 <table>
 <tr>
@@ -26,14 +28,34 @@ Sosho turns consumer or workstation GPUs into a full-fledged local AI lab withou
 
 ### 💻 1. Autonomous Coding from Any Terminal
 Run state-of-the-art coding agents in any project directory with a single word: `pi`.
-- **Works Everywhere**: Navigate to any git repository and run `pi`—it mounts cleanly into a sandboxed container.
-- **Git & Tool Aware**: Automatically carries your host git identity, bash environment, and shared MCP tools.
+- **Works Everywhere**: Navigate to any git repository and run `pi`—mounts cleanly into a sandboxed container.
+- **Git & Tool Aware**: Inherits host git identity, shell environment, and project context without manual setup.
 - **Zero API Bills**: Offloads reasoning and code editing to local MoE LLMs (`Qwen3.6-35B-A3B`) with zero telemetry leakage.
 
 </td>
 <td width="50%" valign="top">
 
-### 🎵 2. Full-Track Local AI Music Synthesis
+### 🔓 2. Refusal-Free AI & Security Research
+Powered by an aggressively uncensored MoE model (`Qwen3.6-35B-A3B`) that never refuses prompts:
+- **Zero Preachy Refusals**: Never declines, hedges, or lectures—executes all complex technical and creative instructions directly.
+- **Red-Teaming & SecOps**: Unrestricted exploit analysis, malware reversing, vulnerability reproduction, and pentest payload synthesis.
+- **Raw Analysis & Forensics**: Deep system diagnostics, memory inspection, and unfiltered creative/lyric writing.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🛠️ 3. Uncensored Agent Skills & MCP Ecosystem
+Combines raw, unconstrained intelligence with Pi's extensible tooling stack:
+- **MCP Servers Out of the Box**: Connects to Model Context Protocol servers (e.g., `graphify` knowledge graphs, filesystem tools, custom APIs).
+- **Custom Skills & Subagents**: Leverage on-demand skills (live web browsing via `dokobot`, multi-file refactoring, autonomous subagent delegation).
+- **Unrestricted Tool Execution**: Because the model has zero refusals, your agent runs scripts, tests security vectors, and solves edge-case bugs without false-positive safety halts.
+
+</td>
+<td width="50%" valign="top">
+
+### 🎵 4. Full-Track Local AI Music Synthesis
 Compose studio-quality music with lyrics, vocals, and musical accompaniment locally via **YuE2-3B**:
 - **Natural Language Styles**: Generate tracks in any genre (lo-fi, indie acoustic, synthwave, metal).
 - **Vocal & Instrumental Fusion**: Synthesize rich vocals matched with complete instrumentation.
@@ -42,20 +64,12 @@ Compose studio-quality music with lyrics, vocals, and musical accompaniment loca
 </td>
 </tr>
 <tr>
-<td width="50%" valign="top">
+<td colspan="2" valign="top">
 
-### 🎛 3. Smart VRAM Orchestration (Zero OOM)
-Run both a massive coding LLM and an audio generation pipeline on a single GPU.
-- **Dynamic Handshake**: Submitting a music job seamlessly pauses the `llama.cpp` container to reclaim GPU memory.
-- **Auto-Resume**: As soon as audio rendering finishes, your LLM wakes up and resumes instant responses.
-
-</td>
-<td width="50%" valign="top">
-
-### 📊 4. Deep Agent Tracing & Observability
-Self-hosted, production-grade telemetry for every model generation and agent task.
-- **Langfuse v4 Dashboard**: Trace agent tool calls, prompt iterations, latency, and token throughput at `localhost:3000`.
-- **Zero Configuration**: Comes pre-wired with Postgres, ClickHouse, and MinIO out of the box.
+### 🎛 5. Smart VRAM Orchestration & Observability (Zero OOM)
+Run both a massive 35B MoE LLM and an audio generation engine on a single GPU.
+- **Dynamic Handshake**: Submitting a music job seamlessly pauses `llama.cpp` to free GPU memory, auto-resuming once audio generation finishes.
+- **Full Langfuse v4 Tracing**: Production-grade local telemetry at `localhost:3000` recording every agent thought, tool execution, latency, and token throughput.
 
 </td>
 </tr>
@@ -98,9 +112,14 @@ Invoke `pi` inside **any directory or code repository**:
 cd ~/projects/my-app
 pi
 ```
-- **Skip warmup**: `pi --no-warmup` (bypasses initial server probe)
+- **MCP Servers & Tool Extensions**: Built-in integration with Model Context Protocol servers (such as `graphify` for automated code knowledge graph extraction) and project tools.
+- **Agent Skills & Subagents**: Automatic discovery of modular skills (`dokobot` for local headless/interactive browser lookups, code refactoring recipes, autonomous subagent delegation).
+- **Uncensored Execution**: Zero refusal friction—the agent faithfully investigates low-level system internals, security bugs, and sensitive edge-case behaviors without hallucinating policy warnings.
+- **Skip Warmup**: `pi --no-warmup` (bypasses initial server probe).
 - **Hybrid APIs**: Drop a `.env` with `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in any folder to temporarily route queries to cloud models.
 </details>
+
+
 
 <details>
 <summary><b>🎼 Workflow B: Music & Vocal Generation (<code>YuE2</code>)</b></summary>
