@@ -91,6 +91,108 @@ services:
       - --sleep-idle-seconds
       - "900"
 
+  # YuE2 model fetch: GGUF weights + sidecars from Hugging Face, once.
+  # Skips entirely when the files are already present.
+  yue2-model-download:
+    profiles: [music]
+    image: python:3.12-slim
+    environment:
+      HF_REPO: audio-cpp/Yue2-3B-GGUF
+      HF_XET_HIGH_PERFORMANCE: "1"
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - ${YUE2_MODELS_DIR:-./models/yue2-3b}:/models
+      - hf-cache:/root/.cache/huggingface
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        need="yue2-3b-q4_0.gguf yue2-vae-f16.gguf \
+              sidecars/yue2-model-config.json sidecars/yue2-generation-config.json \
+              sidecars/yue2-vae-config.json sidecars/yue2-qwen.tiktoken"
+        missing=0
+        for f in $$need; do [ -e "/models/$$f" ] || missing=1; done
+        if [ $$missing -eq 0 ]; then
+          echo "YuE2 models present in /models"; exit 0
+        fi
+        pip install -q --root-user-action=ignore "huggingface_hub[cli,hf_xet]"
+        hf download "$$HF_REPO" $$need --local-dir /models
+    restart: "no"
+
+  # YuE2 engine: one resident model, offline generation only.
+  # Not started by `up` (profile `music`) because it needs ~6 GB free VRAM.
+  #   docker compose --profile music up -d
+  yue2-engine:
+    profiles: [music]
+    image: ghcr.io/0xshug0/audio.cpp:full-cuda12
+    container_name: yue2-engine
+    restart: "no"
+    depends_on:
+      yue2-model-download:
+        condition: service_completed_successfully
+    networks: [webui-net]
+    ipc: host
+    cpu_shares: 512
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+    volumes:
+      - ${YUE2_MODELS_DIR:-./models/yue2-3b}:/models:ro
+      - ./yue2/server.json:/app/server.json:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command:
+      - server
+      - --config
+      - /app/server.json
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8020"
+      - --backend
+      - cuda
+      - --log
+
+  # Async job API in front of the engine (202 + id, poll, FLAC/ABC download).
+  yue2-gateway:
+    profiles: [music]
+    build:
+      context: .
+      dockerfile: Dockerfile.yue2-gateway
+    image: yue2-gateway:latest
+    container_name: yue2-gateway
+    restart: unless-stopped
+    depends_on:
+      - yue2-engine
+    ports:
+      - "127.0.0.1:${YUE2_GATEWAY_PORT:-8021}:8000"
+    networks: [webui-net]
+    environment:
+      YUE2_ENGINE_URL: http://yue2-engine:8020
+      YUE2_MODEL_ID: yue2
+      YUE2_DATA_DIR: /data
+      YUE2_API_KEY: ${YUE2_API_KEY:-}
+      YUE2_MAX_PENDING: ${YUE2_MAX_PENDING:-4}
+      YUE2_UNLOAD_AFTER_JOB: ${YUE2_UNLOAD_AFTER_JOB:-true}
+      YUE2_RETENTION_SECONDS: ${YUE2_RETENTION_SECONDS:-86400}
+      YUE2_MAX_GIB: ${YUE2_MAX_GIB:-5}
+      # VRAM handshake: the gateway pauses llama-cpp for the duration of a job
+      # and starts it again afterwards. Requires the Docker socket below.
+      YUE2_STOP_LLAMA: ${YUE2_STOP_LLAMA:-true}
+      YUE2_LLAMA_CONTAINER: ${YUE2_LLAMA_CONTAINER:-llama-cpp}
+      YUE2_DOCKER_SOCKET: /var/run/docker.sock
+    volumes:
+      - ./yue2-data:/data
+      # Lets the gateway stop/start llama-cpp. Mounting the socket grants
+      # control of the Docker daemon; remove it and set YUE2_STOP_LLAMA=false
+      # if you prefer to coordinate VRAM by hand.
+      - /var/run/docker.sock:/var/run/docker.sock
+
   # Interactive agent; not started by `up` (profile), use `docker compose run --rm pi`.
   pi:
     profiles: [agent]
@@ -114,6 +216,8 @@ services:
       LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://127.0.0.1:3000}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}
+      YUE2_GATEWAY_URL: ${YUE2_GATEWAY_URL:-http://127.0.0.1:8021}
+      YUE2_API_KEY: ${YUE2_API_KEY:-}
     tmpfs:
       - ${HOME}:uid=${UID:-1000},gid=${GID:-1000},mode=0755
     volumes:

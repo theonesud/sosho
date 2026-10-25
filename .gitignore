@@ -68,6 +68,8 @@ yarn-lock.json
 
 models/
 pi-codebase/
+yue2-data/
+yue2-test/
 
 # Pi Agent local runtime & secrets
 .pi/auth.json
