@@ -1,7 +1,7 @@
 FROM node:24-bookworm-slim
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates git ripgrep curl python3 python3-pip \
+  && apt-get install -y --no-install-recommends bash ca-certificates git ripgrep curl python3 python3-pip python3-venv \
   && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g @earendil-works/pi-coding-agent @dokobot/cli@latest @langfuse/pi-observability-plugin@latest

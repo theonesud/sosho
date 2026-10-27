@@ -38,15 +38,18 @@ fi
 
 WORKSPACE="$(pwd)"
 
-# 1. Automatic background extension updater (checks once every 24h or when requested)
-AUTO_UPDATE_STAMP="$TARGET_PI/.cache/.last_ext_update"
+# 1. Ensure target workspace has a local .pi directory for caching/config
+TARGET_PI="$WORKSPACE/.pi"
 mkdir -p "$TARGET_PI/.cache" "$TARGET_PI/.config"
+
+# 2. Automatic background extension/package updater (checks once every 24h or when requested)
+AUTO_UPDATE_STAMP="$TARGET_PI/.cache/.last_ext_update"
 NOW=$(date +%s)
 LAST_UPDATE=0
 [ -f "$AUTO_UPDATE_STAMP" ] && LAST_UPDATE=$(cat "$AUTO_UPDATE_STAMP" 2>/dev/null || echo 0)
 # Update if older than 24 hours (86400s) and not running a sub-command
 if [ $((NOW - LAST_UPDATE)) -gt 86400 ] && [ "$SKIP_WARMUP" != "1" ]; then
-    echo "Checking and updating Pi extensions..."
+    echo "Checking and updating Pi packages & extensions..."
     docker run --rm \
         --network host \
         --user "$(id -u):$(id -g)" \
@@ -57,13 +60,9 @@ if [ $((NOW - LAST_UPDATE)) -gt 86400 ] && [ "$SKIP_WARMUP" != "1" ]; then
         -v "$WORKSPACE:$WORKSPACE" \
         -w "$WORKSPACE" \
         "$IMAGE_NAME" \
-        update --extensions -a >/dev/null 2>&1 || true
+        update --all >/dev/null 2>&1 || true
     echo "$NOW" > "$AUTO_UPDATE_STAMP" 2>/dev/null || true
 fi
-
-# 1. Ensure target workspace has a local .pi directory for caching/config
-TARGET_PI="$WORKSPACE/.pi"
-mkdir -p "$TARGET_PI/.cache" "$TARGET_PI/.config"
 
 # 2. If target workspace does NOT have its own models.json, provide the default
 #    pointing to local llama.cpp from sosho without mutating online configs if present.
@@ -78,9 +77,12 @@ GRAPHIFY_VENV="$SHARED_GRAPHIFY_DIR/venv-graphify"
 if [ ! -x "$GRAPHIFY_VENV/bin/python" ]; then
     echo "Initializing shared Graphify environment in $GRAPHIFY_VENV..."
     mkdir -p "$SHARED_GRAPHIFY_DIR"
-    python3 -m venv "$GRAPHIFY_VENV"
-    "$GRAPHIFY_VENV/bin/pip" install -q -U pip
-    "$GRAPHIFY_VENV/bin/pip" install -q "graphifyy[mcp]"
+    docker run --rm \
+        --entrypoint /bin/bash \
+        --user "$(id -u):$(id -g)" \
+        -v "$SHARED_GRAPHIFY_DIR:$SHARED_GRAPHIFY_DIR" \
+        "$IMAGE_NAME" \
+        -c "python3 -m venv '$GRAPHIFY_VENV' && '$GRAPHIFY_VENV/bin/pip' install -q -U pip && '$GRAPHIFY_VENV/bin/pip' install -q 'graphifyy[mcp]'"
 fi
 
 # Ensure graphify skill is copied to workspace .pi/skills

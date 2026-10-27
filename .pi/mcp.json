@@ -1,11 +1,11 @@
 {
   "mcpServers": {
     "graphify": {
-      "command": "/workspace/.pi/venv-graphify/bin/python",
+      "command": "/home/sud/.local/share/sosho/venv-graphify/bin/python",
       "args": [
         "-m",
         "graphify.serve",
-        "/workspace/graphify-out/graph.json"
+        "/home/sud/sosho/graphify-out/graph.json"
       ]
     }
   }
