@@ -1,6 +1,6 @@
 ---
 name: graphify
-description: "Use whenever asked about codebase architecture, file/symbol relationships, dependency paths, or impact analysis. Interacts with the local knowledge graph at graphify-out/graph.json."
+description: Use whenever asked about codebase architecture, file/symbol relationships, dependency paths, or impact analysis. Interacts with the local knowledge graph at graphify-out/graph.json.
 ---
 
 # Graphify Skill Guide

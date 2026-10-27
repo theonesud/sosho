@@ -1,6 +1,6 @@
 ---
 name: dokobot
-description: Web search, page reading, and multi-source research through the user's real Chrome browser (`dokobot read --local`). Use for any web lookup, JS-heavy/logged-in pages, or in-depth research with citations.
+description: Web search, page reading, and multi-source research through the user's real Chrome browser. Use for any web lookup, JS-heavy/logged-in pages, or in-depth research with citations.
 ---
 
 # Dokobot — web search, reading & research
