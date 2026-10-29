@@ -2,8 +2,7 @@
 
 <img src="./assets/logo.png" alt="Sosho Logo" width="160" style="border-radius: 24px; margin-bottom: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);" />
 
-
-# Sosho (祖書)
+# Sosho
 
 **The unified, privacy-first local AI studio & autonomous agent workspace.**
 
@@ -38,28 +37,28 @@ Run state-of-the-art coding agents in any project directory with a single word: 
 ### 🔓 2. Refusal-Free AI & Security Research
 Powered by an aggressively uncensored MoE model (`Qwen3.6-35B-A3B`) that never refuses prompts:
 - **Zero Preachy Refusals**: Never declines, hedges, or lectures—executes all complex technical and creative instructions directly.
-- **Red-Teaming & SecOps**: Unrestricted exploit analysis, malware reversing, vulnerability reproduction, and pentest payload synthesis.
-- **Raw Analysis & Forensics**: Deep system diagnostics, memory inspection, and unfiltered creative/lyric writing.
+- **Red-Teaming & SecOps**: Unrestricted exploit analysis, local device pentesting, and binary reverse engineering.
+- **Raw Analysis & Forensics**: Deep system diagnostics, memory inspection, and unfiltered creative writing.
 
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 
-### 🛠️ 3. Context-Lean Tooling & Disk-First Workflows
-Combines raw, unconstrained intelligence with a token-efficient UNIX and scripting harness:
-- **Lean Tool Architecture**: Pre-filtered streaming pipelines (`jq`, `grep`, `awk`) and bounded slice inspection (`chunk-read.sh`) to eliminate context blowup.
-- **Targeted Skills**: Focused, on-demand skills (e.g. headless web retrieval via `dokobot`) that fetch only essential data.
-- **Unrestricted Execution**: Because the model has zero refusals, your agent runs scripts, tests security vectors, and solves edge cases directly.
+### 🛠️ 3. Capability-First Skills & Logged-In Web
+Integrates your real authenticated Chrome session and deterministic helper scripts:
+- **Authenticated Chrome Access**: Live access to your real X.com timeline/likes, GitHub stars, and YouTube playlists via Dokobot.
+- **Sub-Second Media Ingestion**: Direct YouTube transcript extraction with timestamps via caption APIs.
+- **Version-Pinned Docs**: Pulls modern `llms.txt` documentation for Three.js, Next.js, and FastAPI to eliminate API hallucinations.
 
 </td>
 <td width="50%" valign="top">
 
-### 📊 4. Full Observability & State Persistence
-Production-grade local telemetry and compaction resilience:
-- **Full Langfuse v4 Tracing**: Local telemetry at `localhost:3000` recording token usage, latency, tool calls, and session trajectories.
-- **Automatic Compaction Recovery**: Disk-backed state snapshots (`.pi/work/checkpoint_last.json`) survive context truncation and compaction seamlessly.
-- **Zero Cloud Leakage**: Completely self-contained within your local environment.
+### 📊 4. Disk-First Persistence & Observability
+Engineered to operate reliably within bounded local context windows (32K–64K):
+- **Structured Persistent Workspaces**: Dedicated subdirectories in `.pi/work/` for memory, research, transcripts, and docs.
+- **Full Langfuse v4 Tracing**: Local telemetry at `localhost:3000` recording token usage, latency, tool calls, and trajectories.
+- **Automatic Compaction Recovery**: Checkpoint snapshots survive context truncation and compaction seamlessly.
 
 </td>
 </tr>
@@ -93,6 +92,45 @@ make up
 
 ---
 
+## 🧰 Modular Capabilities & Skills (`.pi/skills/`)
+
+Every capability is self-contained with its own deterministic helper scripts in `scripts/`, preventing token bloat on small context windows:
+
+| Capability Skill | Embedded Scripts | What It Does |
+|---|---|---|
+| **`social-x`** | `scripts/x-harvest.sh` | Extracts X.com timeline, likes, bookmarks, and search feeds using your logged-in Chrome session. |
+| **`github-scout`** | `scripts/gh-stars.sh`, `scripts/gh-analyze.sh` | Browses your starred repositories and produces feasibility & architecture briefs. |
+| **`youtube-digest`**| `scripts/yt-feed.sh`, `scripts/yt-transcribe.py` | Extracts video queues and pulls full timestamped transcripts sub-second without downloading media. |
+| **`libdocs`** | `scripts/pull-llms-txt.sh`, `scripts/find-doc.sh` | Downloads standardized `llms.txt` and searches API signatures to prevent version hallucinations. |
+| **`data-lab`** | `scripts/eda.py`, `scripts/quick-plot.py` | Fast exploratory data analysis (<35 lines) and zero-boilerplate plotting saved to `.pi/work/plots/`. |
+| **`creative-canvas`**| `scripts/preview.sh`, `scripts/kill-preview.sh` | Builds and serves Three.js 3D scenes, generative canvas art, and HTML5/Pygame simulations locally. |
+| **`web-craft`** | `scripts/dev.sh`, `scripts/stop.sh`, `scripts/test-api.sh` | Background dev servers for Next.js, FastAPI, and interactive website presentations (Reveal.js). |
+| **`security-lab`** | `scripts/net-probe.sh`, `scripts/bin-triage.sh` | Safe local subnet device probes, binary reverse engineering triage, and steganography scans. |
+| **`lean-proofs`** | `scripts/verify.sh` | Formal theorem verification in Lean 4 with concise error reporting. |
+| **`sys-admin`** | `scripts/host-status.sh` | Single-command health snapshot of CPU, RAM, disk, RTX GPU thermals, and failed systemd units. |
+| **`personal-memory`**| `scripts/recall.sh` | Organic long-term memory stored in `.pi/work/memory/` for personal assistant conversations. |
+| **`dokobot`** | `scripts/doko-fetch.sh` | Core web browser bridge using host Chrome with output redirection to disk. |
+
+---
+
+## 📁 Persistent Working Space (`.pi/work/`)
+
+To keep the agent's context clean and prevent memory loss during auto-compaction, all outputs are written directly to structured disk directories:
+
+```
+.pi/work/
+├── memory/          # Permanent user memory (life history, goals, preferences, personality)
+├── research/        # Research dossiers, trend analyses, myth checks, X.com & GitHub scouts
+├── transcripts/     # Full YouTube transcripts with timestamp markers & queue indices
+├── docs/            # Version-pinned library references & llms.txt cheatsheets
+├── plots/           # Output charts and visualizations from data-lab
+├── security/        # Network probe logs and binary triage reports
+├── scratch/         # One-off execution scripts and temporary tool dumps
+└── state.json       # Task queue tracking & auto-compaction checkpoint recovery
+```
+
+---
+
 ## 🚀 Interactive Workflows
 
 <details open>
@@ -104,9 +142,9 @@ Invoke `pi` inside **any directory or code repository**:
 cd ~/projects/my-app
 pi
 ```
-- **Context-Lean Execution**: Built-in sliding-chunk inspection and UNIX pipelines to prevent context bloat on small local context windows.
-- **Targeted Skills**: Modular on-demand capabilities (such as `dokobot` for lightweight web retrieval) without context-heavy agent swarms.
-- **Uncensored Execution**: Zero refusal friction—the agent faithfully investigates low-level system internals, security bugs, and sensitive edge-case behaviors without hallucinating policy warnings.
+- **Context-Lean Execution**: Built-in sliding-chunk inspection (`bin/chunk-read.sh`) and UNIX pipelines prevent context bloat.
+- **Targeted Skills**: Modular on-demand capabilities without context-heavy agent swarms.
+- **Uncensored Execution**: Zero refusal friction—the agent faithfully investigates low-level system internals, security bugs, and sensitive edge cases without hallucinating policy warnings.
 - **Skip Warmup**: `pi --no-warmup` (bypasses initial server probe).
 - **Hybrid APIs**: Drop a `.env` with `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in any folder to temporarily route queries to cloud models.
 </details>
@@ -176,15 +214,21 @@ make clean-cache   # Flush stale agent cache & sessions
 
 ## ⚙️ Key Configuration Options
 
-Configure options via `.env` without modifying compose files:
+All inference, runtime, and agent settings are configurable via `.env` (generated automatically with `make autotune`):
 
-| Variable | Default | Description |
-|---|---|---|
-| `LLM_THREADS` | `14` | Dedicated CPU threads for MoE matrix operations |
-| `LLM_THREADS_BATCH` | `14` | Dedicated CPU threads for prompt ingestion & KV cache generation |
-| `LLM_CTX_SIZE` | `32768` | Optimized context window to keep KV cache compact & fast |
-| `LLM_KV_CACHE_TYPE` | `q4_0` | KV cache precision (`q4_0`, `q8_0`, `f16`) for 2x memory throughput |
-| `LANGFUSE_BASE_URL`| `http://127.0.0.1:3000` | Target telemetry endpoint for agent traces |
+| Category | Variable | Default | Description |
+|---|---|---|---|
+| **Context & Memory** | `LLM_CTX_SIZE` | `32768` | Active context window (32K/64K). Automatically synced with `.pi` compaction settings. |
+| | `LLM_KV_CACHE_TYPE` | `q4_0` | KV cache quantization (`q4_0`, `q8_0`, `f16`). `q4_0` halves VRAM consumption. |
+| **Compute & Batching**| `LLM_THREADS` | `Auto` | Dedicated CPU threads for MoE matrix evaluation (tuned to physical core count). |
+| | `LLM_THREADS_BATCH` | `Auto` | Dedicated CPU threads for prompt ingestion & KV cache generation. |
+| | `LLM_BATCH` | `2048` | Logical batch size for prompt evaluation and token prefill. |
+| | `LLM_UBATCH` | `512` | Physical compute micro-batch size to keep GPU utilization saturated. |
+| **Observability** | `LANGFUSE_BASE_URL` | `http://127.0.0.1:3000` | Local telemetry endpoint recording agent thoughts, tool calls, and latencies. |
+| | `LANGFUSE_TRACING_ENABLED` | `true` | Set to `false` (e.g. `LANGFUSE_TRACING_ENABLED=false pi`) to bypass telemetry. |
+| **Cloud & Downloads** | `HF_TOKEN` | *(optional)* | Hugging Face user access token for high-bandwidth model weights downloading. |
+| | `OPENAI_API_KEY` | *(optional)* | Drop in `.env` inside any project folder to temporarily route queries to OpenAI models. |
+| | `ANTHROPIC_API_KEY` | *(optional)* | Drop in `.env` inside any project folder to route queries to Claude models. |
 
 ---
 
