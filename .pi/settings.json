@@ -3,8 +3,8 @@
   "defaultModel": "Qwen3.6-35B-A3B",
   "compaction": {
     "enabled": true,
-    "reserveTokens": 4096,
-    "keepRecentTokens": 16384
+    "reserveTokens": 8192,
+    "keepRecentTokens": 32768
   },
   "packages": [
     "npm:pi-subagents",

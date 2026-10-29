@@ -90,28 +90,39 @@ else
 fi
 
 # 5. Calculate Optimal Context Window & KV Cache
-# Rules:
-# - Under 8GB VRAM: CTX=16384, KV=q4_0 (leaves VRAM for model layers)
-# - 8GB - 12GB VRAM (e.g. 3060Ti, 3070Ti): CTX=32768, KV=q4_0
-# - 16GB - 24GB VRAM (e.g. 3090, 4090): CTX=65536, KV=q8_0
-# - 24GB+ VRAM: CTX=65536, KV=f16
+# Rules for maximizing context window without compromising performance:
+# - >= 24GB VRAM (3090, 4090, A5000, A6000): CTX=131072 (128k), KV=q8_0, full model & context fits easily
+# - >= 15GB VRAM (3080 16GB, 4080, 4070Ti Super): CTX=131072 (128k), KV=q4_0
+# - >= 7.5GB VRAM (3060Ti 8GB, 3070 8GB, 4060 8GB, 4060Ti 8GB/16GB): CTX=65536 (65k), KV=q4_0 (leaves ~1.5GB headroom for OS/desktop)
+# - 4GB - 7.5GB VRAM: CTX=32768, KV=q4_0, ubatch=512
+# - Pure CPU / < 4GB VRAM: CTX=32768, KV=q4_0 (or fallback to RAM-based context budget)
 if [ "$TOTAL_VRAM_MB" -ge 22000 ]; then
-    OPTIMAL_CTX=65536
+    OPTIMAL_CTX=131072
     OPTIMAL_KV="q8_0"
     UBATCH=2048
     BATCH=4096
 elif [ "$TOTAL_VRAM_MB" -ge 15000 ]; then
-    OPTIMAL_CTX=65536
-    OPTIMAL_KV="q8_0"
-    UBATCH=1024
-    BATCH=2048
-elif [ "$TOTAL_VRAM_MB" -ge 7500 ]; then
-    OPTIMAL_CTX=32768
+    OPTIMAL_CTX=131072
     OPTIMAL_KV="q4_0"
     UBATCH=1024
     BATCH=2048
+elif [ "$TOTAL_VRAM_MB" -ge 7500 ]; then
+    OPTIMAL_CTX=65536
+    OPTIMAL_KV="q4_0"
+    UBATCH=512
+    BATCH=2048
+elif [ "$TOTAL_VRAM_MB" -ge 3800 ]; then
+    OPTIMAL_CTX=32768
+    OPTIMAL_KV="q4_0"
+    UBATCH=512
+    BATCH=1024
 else
-    OPTIMAL_CTX=16384
+    # CPU or ultra-low VRAM: depend on system RAM
+    if [ "$TOTAL_RAM_GB" -ge 32 ]; then
+        OPTIMAL_CTX=32768
+    else
+        OPTIMAL_CTX=16384
+    fi
     OPTIMAL_KV="q4_0"
     UBATCH=512
     BATCH=1024
