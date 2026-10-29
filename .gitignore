@@ -81,6 +81,7 @@ yue2-test/
 .pi/.cache/
 .pi/.config/
 .pi/memory/
+.pi/missions/
 .pi/npm/
 .pi/venv-*/
 graphify-out/
