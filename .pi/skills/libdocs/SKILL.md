@@ -22,8 +22,8 @@ Prevents outdated API hallucinations by pulling accurate, version-specific docum
 .pi/skills/libdocs/scripts/find-doc.sh fastapi "Depends"
 ```
 
-## Protocol
-1. Before writing code for frameworks with rapid API shifts (Three.js, Next.js App Router, FastAPI/Pydantic v2), check if docs exist in `.pi/work/docs/<library>/`.
-2. If missing, pull via `pull-llms-txt.sh` or `scrape-docs.sh`.
-3. Search for the exact class, function, or pattern using `find-doc.sh`.
-4. Implement using verified modern syntax.
+## Protocol & Rules
+1. **User Target Destination**: If the user requests documentation saved in a specific project file (e.g. `./threejs_docs.md`), write/copy directly to that file.
+2. **Strict Pacing & Tab Limits**: When crawling documentation pages with Dokobot, never spawn parallel background subshells. Scrape sequentially or max **2 at a time** with `sleep 1`.
+3. **Honest Accounting**: Report exactly which pages or versions were fetched. Do not guess API signatures if doc pages failed to load.
+4. **Context Safety**: Use `find-doc.sh` to search for exact functions or symbols, retrieving only the relevant ~10 lines into chat context.

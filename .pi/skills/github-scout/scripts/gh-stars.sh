@@ -5,16 +5,37 @@
 # ==============================================================================
 set -euo pipefail
 
-PAGE="${1:-1}"
+PAGE="1"
+OUT_FILE=""
+EXTRA_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --out)
+            OUT_FILE="$2"
+            shift 2
+            ;;
+        [0-9]*)
+            PAGE="$1"
+            shift
+            ;;
+        *)
+            EXTRA_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
 RESEARCH_DIR="${SOSHO_RESEARCH_DIR:-.pi/work/research}"
 SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-.pi/work/scratch}"
 mkdir -p "$RESEARCH_DIR" "$SCRATCH_DIR"
 
 URL="https://github.com/stars?page=${PAGE}"
 RAW_FILE="${SCRATCH_DIR}/gh_stars_raw.md"
-OUT_FILE="${RESEARCH_DIR}/gh_stars.md"
+[ -z "$OUT_FILE" ] && OUT_FILE="${RESEARCH_DIR}/gh_stars.md"
 
 echo "⭐ Fetching GitHub Stars (page $PAGE) via host Chrome..."
+sleep 1
 dokobot read --local "$URL" --timeout 60 > "$RAW_FILE" 2>/tmp/gh_err.log || {
     echo "❌ Dokobot failed to read GitHub stars:" >&2
     cat /tmp/gh_err.log >&2

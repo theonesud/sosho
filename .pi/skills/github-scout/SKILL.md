@@ -24,5 +24,6 @@ dokobot read --local "https://github.com/search?q=local+voice+agent&type=reposit
 ## Protocol
 1. Run `gh-stars.sh` or `gh-analyze.sh`.
 2. Review the brief from stdout (<25 lines).
-3. If inspecting source code files directly, clone or inspect via `bin/chunk-read.sh`.
-4. Synthesize capabilities, architecture, and feasibility for the user's hardware.
+3. **Sequential & Paced Execution**: When analyzing multiple repos or orgs, follow the user's exact sequencing (e.g. page-by-page, repo-by-repo). Never launch unbounded parallel reads (max 2 concurrent; pace with `sleep 1`).
+4. **Honest Accounting**: Record exact progress in `.pi/work/state.json`. Never claim all items are analyzed when only a subset was checked.
+5. If the user requested output in a specific file (e.g. `./growtharc-repos.md`), write/copy directly to that file.

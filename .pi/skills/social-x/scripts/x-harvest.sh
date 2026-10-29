@@ -5,8 +5,33 @@
 # ==============================================================================
 set -euo pipefail
 
-TARGET="${1:-timeline}"
-SCREENS="${2:-4}"
+TARGET=""
+SCREENS="4"
+OUT_FILE=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --out)
+            OUT_FILE="$2"
+            shift 2
+            ;;
+        --screens)
+            SCREENS="$2"
+            shift 2
+            ;;
+        *)
+            if [ -z "$TARGET" ]; then
+                TARGET="$1"
+            elif [[ "$1" =~ ^[0-9]+$ ]]; then
+                SCREENS="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+[ -z "$TARGET" ] && TARGET="timeline"
+
 RESEARCH_DIR="${SOSHO_RESEARCH_DIR:-.pi/work/research}"
 SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-.pi/work/scratch}"
 mkdir -p "$RESEARCH_DIR" "$SCRATCH_DIR"
@@ -20,8 +45,7 @@ case "$TARGET" in
         SLUG="timeline"
         ;;
     likes)
-        # If user handle is not specified, uses current logged in user likes if accessible or prompts
-        URL="https://x.com/i/bookmarks" # Bookmarks or likes
+        URL="https://x.com/i/bookmarks"
         SLUG="likes"
         ;;
     bookmarks)
@@ -33,17 +57,17 @@ case "$TARGET" in
         SLUG="$(echo "$URL" | sed -e 's/[^a-zA-Z0-9]/_/g' | cut -c1-30)"
         ;;
     *)
-        # Treat as search query
         ENCODED_QUERY="$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$TARGET")"
         URL="https://x.com/search?q=${ENCODED_QUERY}&f=live"
         SLUG="search_$(echo "$TARGET" | sed -e 's/[^a-zA-Z0-9]/_/g' | cut -c1-20)"
         ;;
 esac
 
-OUT_FILE="${RESEARCH_DIR}/x_${SLUG}.md"
+[ -z "$OUT_FILE" ] && OUT_FILE="${RESEARCH_DIR}/x_${SLUG}.md"
 RAW_FILE="${SCRATCH_DIR}/x_${SLUG}_raw.md"
 
 echo "🕊️ Fetching X.com via host Chrome: $URL (screens: $SCREENS)..."
+sleep 1
 dokobot read --local "$URL" --screens "$SCREENS" --timeout 90 > "$RAW_FILE" 2>/tmp/x_err.log || {
     echo "❌ Dokobot failed to read X.com:" >&2
     cat /tmp/x_err.log >&2

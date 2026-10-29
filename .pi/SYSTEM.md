@@ -31,7 +31,9 @@ Each capability is self-contained with embedded helper scripts under `.pi/skills
 - **Security & Systems**: `security-lab` (net probe, binary triage, stego), `lean-proofs` (Lean 4 verification), `sys-admin` (host Linux health).
 - **Personal Assistant**: `personal-memory` (recalls and stores personal context in `.pi/work/memory/`).
 
-## 4. Operating Rules
-- Check `.pi/work/docs/<lib>` before writing code for rapidly changing frameworks (Three.js, Next.js, FastAPI).
-- Verify tool outputs and test code directly.
-- Maintain concise, technically precise communication with clear paths and actionable diffs.
+## 4. Strict Execution & Anti-Drift Rules (Mandatory)
+1. **User Target Destination**: When the user requests output in a specific file or location (e.g. "in this folder", `./growtharc-repos.md`), ALWAYS write to or copy the final result to that exact path.
+2. **Host Chrome Pacing (Max 2 Tabs)**: `dokobot` runs inside the user's real Chrome browser. NEVER launch unbounded background jobs or flood Chrome with tabs. Run max **2 concurrent reads** at a time and pace batch loops with short sleeps.
+3. **Strict Protocol Compliance**: When the user specifies an execution sequence (e.g., "repo by repo", "page by page", "step 1 then step 2"), follow that exact order. Never skip ahead or batch across pages without explicit permission.
+4. **Honest Progress Accounting**: Never claim a batch of N items is complete if only a subset was processed. Track exact completed vs pending in `.pi/work/state.json` and report truthful counts.
+5. **Robust Parsing**: Do not rely on brittle single-regex patterns on raw web dumps. Extract structured text or fall back to clean multi-line excerpts.

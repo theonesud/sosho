@@ -5,9 +5,26 @@
 # ==============================================================================
 set -euo pipefail
 
-TARGET="${1:-}"
+TARGET=""
+OUT_FILE=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --out)
+            OUT_FILE="$2"
+            shift 2
+            ;;
+        *)
+            if [ -z "$TARGET" ]; then
+                TARGET="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
 if [ -z "$TARGET" ]; then
-    echo "Usage: $0 <owner/repo or https://github.com/owner/repo>" >&2
+    echo "Usage: $0 <owner/repo or https://github.com/owner/repo> [--out <file>]" >&2
     exit 1
 fi
 
@@ -20,9 +37,10 @@ URL="$TARGET"
 
 REPO_SLUG="$(echo "$URL" | sed -e 's|https://github.com/||' -e 's|/$||' | tr '/' '_')"
 RAW_FILE="${SCRATCH_DIR}/gh_${REPO_SLUG}_raw.md"
-OUT_FILE="${RESEARCH_DIR}/gh_${REPO_SLUG}.md"
+[ -z "$OUT_FILE" ] && OUT_FILE="${RESEARCH_DIR}/gh_${REPO_SLUG}.md"
 
 echo "🔍 Scouting GitHub repo via host Chrome: $URL..."
+sleep 1
 dokobot read --local "$URL" --timeout 90 > "$RAW_FILE" 2>/tmp/gh_err.log || {
     echo "❌ Dokobot failed to read repo page:" >&2
     cat /tmp/gh_err.log >&2

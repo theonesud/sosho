@@ -5,7 +5,26 @@
 # ==============================================================================
 set -euo pipefail
 
-TARGET="${1:-likes}"
+TARGET=""
+OUT_FILE=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --out)
+            OUT_FILE="$2"
+            shift 2
+            ;;
+        *)
+            if [ -z "$TARGET" ]; then
+                TARGET="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+[ -z "$TARGET" ] && TARGET="likes"
+
 TRANSCRIPTS_DIR="${SOSHO_TRANSCRIPTS_DIR:-.pi/work/transcripts}"
 SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-.pi/work/scratch}"
 mkdir -p "$TRANSCRIPTS_DIR" "$SCRATCH_DIR"
@@ -25,9 +44,10 @@ case "$TARGET" in
 esac
 
 RAW_FILE="${SCRATCH_DIR}/yt_feed_raw.md"
-OUT_FILE="${TRANSCRIPTS_DIR}/queue.md"
+[ -z "$OUT_FILE" ] && OUT_FILE="${TRANSCRIPTS_DIR}/queue.md"
 
 echo "📺 Fetching YouTube ($TARGET) via host Chrome..."
+sleep 1
 dokobot read --local "$URL" --timeout 90 > "$RAW_FILE" 2>/tmp/yt_err.log || {
     echo "❌ Dokobot failed to read YouTube:" >&2
     cat /tmp/yt_err.log >&2

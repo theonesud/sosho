@@ -218,6 +218,23 @@ if [ -t 0 ] && [ -t 1 ]; then
     DOCKER_INTERACTIVE_FLAGS+=("-it")
 fi
 
+# Format argument ordering (subcommands require their options before --approve)
+SUBCOMMANDS=("update" "auth" "install" "remove" "list")
+IS_SUBCOMMAND=0
+for sub in "${SUBCOMMANDS[@]}"; do
+    if [ "${FORWARD_ARGS[0]:-}" = "$sub" ]; then
+        IS_SUBCOMMAND=1
+        break
+    fi
+done
+
+FINAL_ARGS=()
+if [ "$IS_SUBCOMMAND" -eq 1 ]; then
+    FINAL_ARGS=("${FORWARD_ARGS[@]}" --approve)
+else
+    FINAL_ARGS=(--approve "${FORWARD_ARGS[@]}")
+fi
+
 # 5. Run Pi container attached to current working directory
 exec docker run "${DOCKER_INTERACTIVE_FLAGS[@]}" --rm \
     --network host \
@@ -237,5 +254,4 @@ exec docker run "${DOCKER_INTERACTIVE_FLAGS[@]}" --rm \
     "${MOUNTS[@]}" \
     -w "$WORKSPACE" \
     "$IMAGE_NAME" \
-    --approve \
-    "${FORWARD_ARGS[@]}"
+    "${FINAL_ARGS[@]}"
