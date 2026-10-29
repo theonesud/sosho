@@ -7,7 +7,6 @@
     "keepRecentTokens": 16384
   },
   "packages": [
-    "npm:pi-subagents",
     "npm:pi-lens"
   ],
   "defaultTools": [

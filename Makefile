@@ -65,6 +65,6 @@ prune:
 install-cli:
 	mkdir -p ~/.local/bin
 	cp bin/pi-launcher.sh ~/.local/bin/pi
-	cp bin/yue2-generate.sh ~/.local/bin/yue2-music
-	chmod +x ~/.local/bin/pi ~/.local/bin/yue2-music
-	@echo "Installed ~/.local/bin/pi and ~/.local/bin/yue2-music"
+	chmod +x ~/.local/bin/pi
+	@echo "Installed ~/.local/bin/pi"
+

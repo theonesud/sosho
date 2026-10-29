@@ -46,34 +46,26 @@ Powered by an aggressively uncensored MoE model (`Qwen3.6-35B-A3B`) that never r
 <tr>
 <td width="50%" valign="top">
 
-### 🛠️ 3. Uncensored Agent Skills & MCP Ecosystem
-Combines raw, unconstrained intelligence with Pi's extensible tooling stack:
-- **MCP Servers Out of the Box**: Connects to Model Context Protocol servers (e.g., `graphify` knowledge graphs, filesystem tools, custom APIs).
-- **Custom Skills & Subagents**: Leverage on-demand skills (live web browsing via `dokobot`, multi-file refactoring, autonomous subagent delegation).
-- **Unrestricted Tool Execution**: Because the model has zero refusals, your agent runs scripts, tests security vectors, and solves edge-case bugs without false-positive safety halts.
+### 🛠️ 3. Context-Lean Tooling & Disk-First Workflows
+Combines raw, unconstrained intelligence with a token-efficient UNIX and scripting harness:
+- **Lean Tool Architecture**: Pre-filtered streaming pipelines (`jq`, `grep`, `awk`) and bounded slice inspection (`chunk-read.sh`) to eliminate context blowup.
+- **Targeted Skills**: Focused, on-demand skills (e.g. headless web retrieval via `dokobot`) that fetch only essential data.
+- **Unrestricted Execution**: Because the model has zero refusals, your agent runs scripts, tests security vectors, and solves edge cases directly.
 
 </td>
 <td width="50%" valign="top">
 
-### 🎵 4. Full-Track Local AI Music Synthesis
-Compose studio-quality music with lyrics, vocals, and musical accompaniment locally via **YuE2-3B**:
-- **Natural Language Styles**: Generate tracks in any genre (lo-fi, indie acoustic, synthwave, metal).
-- **Vocal & Instrumental Fusion**: Synthesize rich vocals matched with complete instrumentation.
-- **Score & FLAC Output**: Emits lossless audio plus musical lead sheets (`.abc`) for live editing and playback.
-
-</td>
-</tr>
-<tr>
-<td colspan="2" valign="top">
-
-### 🎛 5. Smart VRAM Orchestration & Observability (Zero OOM)
-Run both a massive 35B MoE LLM and an audio generation engine on a single GPU.
-- **Dynamic Handshake**: Submitting a music job seamlessly pauses `llama.cpp` to free GPU memory, auto-resuming once audio generation finishes.
-- **Full Langfuse v4 Tracing**: Production-grade local telemetry at `localhost:3000` recording every agent thought, tool execution, latency, and token throughput.
+### 📊 4. Full Observability & State Persistence
+Production-grade local telemetry and compaction resilience:
+- **Full Langfuse v4 Tracing**: Local telemetry at `localhost:3000` recording token usage, latency, tool calls, and session trajectories.
+- **Automatic Compaction Recovery**: Disk-backed state snapshots (`.pi/work/checkpoint_last.json`) survive context truncation and compaction seamlessly.
+- **Zero Cloud Leakage**: Completely self-contained within your local environment.
 
 </td>
 </tr>
 </table>
+
+> *Looking for local AI music generation? YuE2 has been moved to a dedicated standalone module in [`yue2/`](yue2/README.md).*
 
 ---
 
@@ -89,9 +81,9 @@ make doctor
 ### 2. Auto-Tune Hardware & Install CLI
 ```bash
 make autotune      # Benchmarks CPU/GPU/RAM and auto-generates optimal .env
-make install-cli   # Links global CLI launchers into ~/.local/bin
+make install-cli   # Links global CLI launcher into ~/.local/bin
 ```
-> **Tip**: This links `pi` and `yue2-music` into your `~/.local/bin` so you can call them from anywhere.
+> **Tip**: This links `pi` into your `~/.local/bin` so you can call it from anywhere.
 
 ### 3. Launch Services
 ```bash
@@ -112,36 +104,15 @@ Invoke `pi` inside **any directory or code repository**:
 cd ~/projects/my-app
 pi
 ```
-- **MCP Servers & Tool Extensions**: Built-in integration with Model Context Protocol servers (such as `graphify` for automated code knowledge graph extraction) and project tools.
-- **Agent Skills & Subagents**: Automatic discovery of modular skills (`dokobot` for local headless/interactive browser lookups, code refactoring recipes, autonomous subagent delegation).
+- **Context-Lean Execution**: Built-in sliding-chunk inspection and UNIX pipelines to prevent context bloat on small local context windows.
+- **Targeted Skills**: Modular on-demand capabilities (such as `dokobot` for lightweight web retrieval) without context-heavy agent swarms.
 - **Uncensored Execution**: Zero refusal friction—the agent faithfully investigates low-level system internals, security bugs, and sensitive edge-case behaviors without hallucinating policy warnings.
 - **Skip Warmup**: `pi --no-warmup` (bypasses initial server probe).
 - **Hybrid APIs**: Drop a `.env` with `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in any folder to temporarily route queries to cloud models.
 </details>
 
-
-
-<details>
-<summary><b>🎼 Workflow B: Music & Vocal Generation (<code>YuE2</code>)</b></summary>
-<br>
-
-1. **Activate the music engine**:
-   ```bash
-   make music-up
-   ```
-2. **Synthesize a track**:
-   ```bash
-   bin/yue2-generate.sh \
-     --style "acoustic indie folk, emotive female vocals, warm acoustic guitar" \
-     --lyrics "[Verse]\nMorning sun hits the glass...\n[Chorus]\nFly away..." \
-     --out "song.flac" \
-     --score-out "score.abc"
-   ```
-3. **Monitor progress**: `make logs-music`
-</details>
-
-<details>
-<summary><b>📈 Workflow C: Real-Time Tracing (Langfuse)</b></summary>
+<details open>
+<summary><b>📈 Workflow B: Real-Time Tracing (Langfuse)</b></summary>
 <br>
 
 Open **[http://127.0.0.1:3000](http://127.0.0.1:3000)** in your browser:
@@ -155,33 +126,26 @@ Open **[http://127.0.0.1:3000](http://127.0.0.1:3000)** in your browser:
 ## 🏛️ Tech Stack & Architecture
 
 ```
-                          Host Terminal & Global CLI
-                    ┌─────────────────┴─────────────────┐
-                    ▼                                   ▼
-             pi (pi-sandbox)                  yue2-music (CLI)
-                    │                                   │
-       OpenAI API   │                                   │  Async Jobs
-       :8080        ▼                                   ▼  :8021
-             ┌──────────────┐   VRAM Handshake    ┌────────────────┐
-             │  llama.cpp   │◄................... │  YuE2 Gateway  │
-             │ (MoE / GGUF) │  (Pause / Resume)   │  (FastAPI/WAL) │
-             └──────┬───────┘                     └───────┬────────┘
-                    │                                     │
-          Telemetry │ :3000                               ▼
-                    ▼                             ┌────────────────┐
-             ┌──────────────┐                     │  YuE2 Engine   │
-             │   Langfuse   │                     │  (audio.cpp)   │
-             │  (ClickHouse)│                     └────────────────┘
-             └──────────────┘
+                      Host Terminal & Global CLI
+                                  │
+                                  ▼
+                           pi (pi-sandbox)
+                                  │
+                     ┌────────────┴────────────┐
+        OpenAI API   │                         │ Telemetry
+        :8080        ▼                         ▼ :3000
+              ┌──────────────┐          ┌──────────────┐
+              │  llama.cpp   │          │   Langfuse   │
+              │ (MoE / GGUF) │          │ (ClickHouse) │
+              └──────────────┘          └──────────────┘
 ```
 
 | Layer | Technology | Key Capabilities |
 |---|---|---|
 | **Inference Engine** | [llama.cpp](https://github.com/ggerganov/llama.cpp) | CUDA-accelerated MoE GGUF execution, KV cache quantization (`q8_0`/`q4_0`), low-latency C++ server |
 | **Agent Environment** | [Pi Agent](docker/Dockerfile.pi) | Ephemeral Docker sandbox, host git pass-through, centralized cache (`~/.local/share/sosho`) |
-| **Audio Engine** | [YuE2](yue2/server.json) + `audio.cpp` | Full-song vocal/instrumental synthesis, ABC notation generation, asynchronous queue |
 | **Observability** | [Langfuse v4](docker/compose.langfuse.yaml) | ClickHouse analytical store, token tracking, tool latency tracing, session replay |
-| **Orchestration** | Docker Compose v2 + Make | Localhost (`127.0.0.1`) security isolation, VRAM coordination handshake |
+| **Orchestration** | Docker Compose v2 + Make | Localhost (`127.0.0.1`) security isolation, disk-first task persistence |
 
 ---
 
@@ -196,20 +160,15 @@ make down          # Stop all containers across all profiles
 make status        # Inspect health status and ports
 make restart       # Quick restart of LLM inference service
 
-# Music Engine (YuE2)
-make music-up      # Boot YuE2 async gateway & audio engine
-make music-down    # Teardown music services to reclaim RAM
-
 # Diagnostics & Logs
 make autotune      # Auto-benchmark & generate max-performance .env
 make doctor        # Run hardware, GPU, driver & port diagnostics
 make test          # Execute automated integration & unit tests
 make logs-llm      # Stream llama.cpp logs
-make logs-music    # Stream YuE2 generation logs
 make logs-langfuse # Stream telemetry logs
 
 # Tooling
-make install-cli   # Symlink global CLI launchers into ~/.local/bin
+make install-cli   # Symlink global CLI launcher into ~/.local/bin
 make clean-cache   # Flush stale agent cache & sessions
 ```
 
@@ -225,7 +184,6 @@ Configure options via `.env` without modifying compose files:
 | `LLM_THREADS_BATCH` | `14` | Dedicated CPU threads for prompt ingestion & KV cache generation |
 | `LLM_CTX_SIZE` | `32768` | Optimized context window to keep KV cache compact & fast |
 | `LLM_KV_CACHE_TYPE` | `q4_0` | KV cache precision (`q4_0`, `q8_0`, `f16`) for 2x memory throughput |
-| `YUE2_STOP_LLAMA` | `true` | Automatically pause LLM during music generation to prevent OOM |
 | `LANGFUSE_BASE_URL`| `http://127.0.0.1:3000` | Target telemetry endpoint for agent traces |
 
 ---

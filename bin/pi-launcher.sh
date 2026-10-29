@@ -116,52 +116,7 @@ PY
     fi
 fi
 
-# 2b. Centralize Graphify venv in user-level cache (~/.local/share/sosho/venv-graphify)
-#     Avoids re-downloading and duplicating ~250MB virtualenvs across every repository
-SHARED_GRAPHIFY_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/sosho"
-GRAPHIFY_VENV="$SHARED_GRAPHIFY_DIR/venv-graphify"
-if [ ! -x "$GRAPHIFY_VENV/bin/python" ]; then
-    echo "Initializing shared Graphify environment in $GRAPHIFY_VENV..."
-    mkdir -p "$SHARED_GRAPHIFY_DIR"
-    docker run --rm \
-        --entrypoint /bin/bash \
-        --user "$(id -u):$(id -g)" \
-        -v "$SHARED_GRAPHIFY_DIR:$SHARED_GRAPHIFY_DIR" \
-        "$IMAGE_NAME" \
-        -c "python3 -m venv '$GRAPHIFY_VENV' && '$GRAPHIFY_VENV/bin/pip' install -q -U pip && '$GRAPHIFY_VENV/bin/pip' install -q 'graphifyy[mcp]'"
-fi
 
-# Ensure graphify skill is copied to workspace .pi/skills
-if [ ! -d "$TARGET_PI/skills/graphify" ] && [ -d "$SOSHO_PI/skills/graphify" ]; then
-    mkdir -p "$TARGET_PI/skills"
-    cp -r "$SOSHO_PI/skills/graphify" "$TARGET_PI/skills/"
-fi
-
-# Ensure .pi/mcp.json has local graphify server registered using shared venv
-if [ ! -f "$TARGET_PI/mcp.json" ] || ! grep -q '"graphify"' "$TARGET_PI/mcp.json" 2>/dev/null; then
-    python3 - "$TARGET_PI/mcp.json" "$WORKSPACE" "$GRAPHIFY_VENV/bin/python" <<'PY'
-import json, sys, os
-mcp_path, ws, py_bin = sys.argv[1], sys.argv[2], sys.argv[3]
-data = {"mcpServers": {}}
-if os.path.exists(mcp_path):
-    try:
-        with open(mcp_path) as f:
-            data = json.load(f)
-    except Exception:
-        pass
-servers = data.setdefault("mcpServers", {})
-servers["graphify"] = {
-    "command": py_bin,
-    "args": [
-        "-m",
-        "graphify.serve",
-        f"{ws}/graphify-out/graph.json"
-    ]
-}
-with open(mcp_path, "w") as f:
-    json.dump(data, f, indent=2)
-PY
-fi
 
 # 3. Pre-warm the local model (unless skipped).
 if [ "$SKIP_WARMUP" != "1" ] && [ -f "$TARGET_PI/models.json" ] && command -v curl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
@@ -219,7 +174,6 @@ fi
 MOUNTS=(
     -v "$WORKSPACE:$WORKSPACE"
     -v "$TARGET_PI:$TARGET_PI"
-    -v "$SHARED_GRAPHIFY_DIR:$SHARED_GRAPHIFY_DIR"
 )
 
 # Mount user git config if present (so commits have author name/email)
