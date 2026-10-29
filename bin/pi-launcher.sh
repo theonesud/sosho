@@ -95,6 +95,27 @@ PY
     fi
 fi
 
+# 2a-2. Sync compaction in TARGET_PI/settings.json with LLM_CTX_SIZE from .env if present
+if [ -f "$WORKSPACE_ENV" ] && [ -f "$TARGET_PI/settings.json" ]; then
+    ENV_CTX=$(grep -E '^[[:space:]]*LLM_CTX_SIZE=' "$WORKSPACE_ENV" | tail -n 1 | cut -d= -f2 | tr -d ' "\r\n')
+    if [ -n "$ENV_CTX" ] && [ "$ENV_CTX" -gt 0 ] 2>/dev/null; then
+        python3 - "$TARGET_PI/settings.json" "$ENV_CTX" <<'PY' 2>/dev/null || true
+import json, sys
+path, ctx = sys.argv[1], int(sys.argv[2])
+with open(path, "r") as f:
+    data = json.load(f)
+compaction = data.setdefault("compaction", {})
+reserve = min(8192, max(2048, ctx // 8))
+keep_recent = max(4096, int(ctx * 0.5))
+compaction["enabled"] = True
+compaction["reserveTokens"] = reserve
+compaction["keepRecentTokens"] = keep_recent
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
+PY
+    fi
+fi
+
 # 2b. Centralize Graphify venv in user-level cache (~/.local/share/sosho/venv-graphify)
 #     Avoids re-downloading and duplicating ~250MB virtualenvs across every repository
 SHARED_GRAPHIFY_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/sosho"
