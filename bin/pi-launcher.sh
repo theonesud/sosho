@@ -38,9 +38,27 @@ fi
 
 WORKSPACE="$(pwd)"
 
-# 1. Ensure target workspace has a local .pi directory for caching/config
+# 1. Ensure target workspace has a local .pi directory and persistent work subdirectories
 TARGET_PI="$WORKSPACE/.pi"
-mkdir -p "$TARGET_PI/.cache" "$TARGET_PI/.config"
+mkdir -p "$TARGET_PI/.cache" "$TARGET_PI/.config" \
+    "$TARGET_PI/work/memory" \
+    "$TARGET_PI/work/research" \
+    "$TARGET_PI/work/transcripts" \
+    "$TARGET_PI/work/docs" \
+    "$TARGET_PI/work/plots" \
+    "$TARGET_PI/work/security" \
+    "$TARGET_PI/work/scratch"
+
+# Ensure state.json and README.md exist in target workspace
+if [ ! -f "$TARGET_PI/work/state.json" ]; then
+    echo '{"active_task":null,"updated_at":null,"queue":[],"completed":[],"failed":[],"current_index":0,"notes":{}}' > "$TARGET_PI/work/state.json"
+fi
+
+if [ ! -f "$TARGET_PI/work/README.md" ] && [ -f "$SOSHO_PI/work/README.md" ]; then
+    cp "$SOSHO_PI/work/README.md" "$TARGET_PI/work/README.md"
+fi
+
+
 
 # 2. Automatic background extension/package updater (checks once every 24h or when requested)
 AUTO_UPDATE_STAMP="$TARGET_PI/.cache/.last_ext_update"
@@ -106,7 +124,7 @@ with open(path, "r") as f:
     data = json.load(f)
 compaction = data.setdefault("compaction", {})
 reserve = min(8192, max(2048, ctx // 8))
-keep_recent = max(4096, int(ctx * 0.5))
+keep_recent = max(4096, int(ctx * 0.25))
 compaction["enabled"] = True
 compaction["reserveTokens"] = reserve
 compaction["keepRecentTokens"] = keep_recent

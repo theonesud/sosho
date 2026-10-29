@@ -206,17 +206,15 @@ path, ctx = sys.argv[1], int(sys.argv[2])
 with open(path, "r") as f:
     data = json.load(f)
 compaction = data.setdefault("compaction", {})
-# Keep reserveTokens at 12.5% of context (min 2048, max 8192) so compaction triggers before reaching limit
 reserve = min(8192, max(2048, ctx // 8))
-# keepRecentTokens: keep ~25% of context (max 16384, min 4096) to maximize post-compaction headroom
-keep_recent = min(16384, max(4096, int(ctx * 0.25)))
+keep_recent = max(4096, int(ctx * 0.25))
 compaction["enabled"] = True
 compaction["reserveTokens"] = reserve
 compaction["keepRecentTokens"] = keep_recent
 with open(path, "w") as f:
     json.dump(data, f, indent=2)
 PY
-    echo "• Synchronized .pi/settings.json compaction (reserveTokens=$(( OPTIMAL_CTX / 8 > 8192 ? 8192 : (OPTIMAL_CTX / 8 < 2048 ? 2048 : OPTIMAL_CTX / 8) )), keepRecentTokens=$(( OPTIMAL_CTX / 4 > 16384 ? 16384 : (OPTIMAL_CTX / 4 < 4096 ? 4096 : OPTIMAL_CTX / 4) )))"
+    echo "• Synchronized .pi/settings.json compaction (reserveTokens=$(( OPTIMAL_CTX / 8 > 8192 ? 8192 : (OPTIMAL_CTX / 8 < 2048 ? 2048 : OPTIMAL_CTX / 8) )), keepRecentTokens=$(( OPTIMAL_CTX / 4 < 4096 ? 4096 : OPTIMAL_CTX / 4 )))"
 fi
 
 if [ -f "$SCRIPT_DIR/opencode.json" ]; then
