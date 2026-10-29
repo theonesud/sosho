@@ -85,10 +85,6 @@ export interface LangfuseConfig {
 }
 
 export function loadConfig(): LangfuseConfig | undefined {
-  // Kill switch: wins over both env keys and the config file.
-  if ((process.env.LANGFUSE_TRACING_ENABLED ?? "").trim().toLowerCase() === "false") {
-    return undefined;
-  }
   const file = readConfigFile();
   const asTrimmedString = (v: unknown): string | undefined =>
     typeof v === "string" && v.trim() ? v.trim() : undefined;

@@ -90,8 +90,6 @@ a single value without editing the file.
 
 | Scope                   | How                                                         |
 | ----------------------- | ----------------------------------------------------------- |
-| One run                 | `LANGFUSE_TRACING_ENABLED=false pi`                         |
-| The current shell       | `export LANGFUSE_TRACING_ENABLED=false` (undo with `unset`) |
 | Global or project scope | `pi config`, then switch the extension off                  |
 | Remove the plugin       | `pi remove npm:@langfuse/pi-observability-plugin`           |
 

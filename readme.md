@@ -156,7 +156,6 @@ pi
 Open **[http://127.0.0.1:3000](http://127.0.0.1:3000)** in your browser:
 - **Default Login**: `admin@local.dev` / `password123`
 - **Pre-configured Project**: `Pi-Agent`
-- *To run a session without tracing*: `LANGFUSE_TRACING_ENABLED=false pi`
 </details>
 
 ---
@@ -225,7 +224,6 @@ All inference, runtime, and agent settings are configurable via `.env` (generate
 | | `LLM_BATCH` | `2048` | Logical batch size for prompt evaluation and token prefill. |
 | | `LLM_UBATCH` | `512` | Physical compute micro-batch size to keep GPU utilization saturated. |
 | **Observability** | `LANGFUSE_BASE_URL` | `http://127.0.0.1:3000` | Local telemetry endpoint recording agent thoughts, tool calls, and latencies. |
-| | `LANGFUSE_TRACING_ENABLED` | `true` | Set to `false` (e.g. `LANGFUSE_TRACING_ENABLED=false pi`) to bypass telemetry. |
 | **Cloud & Downloads** | `HF_TOKEN` | *(optional)* | Hugging Face user access token for high-bandwidth model weights downloading. |
 | | `OPENAI_API_KEY` | *(optional)* | Drop in `.env` inside any project folder to temporarily route queries to OpenAI models. |
 | | `ANTHROPIC_API_KEY` | *(optional)* | Drop in `.env` inside any project folder to route queries to Claude models. |
