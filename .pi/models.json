@@ -8,8 +8,8 @@
         {
           "id": "Qwen3.6-35B-A3B",
           "name": "Qwen3.6-35B-A3B",
-          "contextWindow": 131072,
-          "maxTokens": 32768,
+          "contextWindow": 32768,
+          "maxTokens": 8192,
           "input": [
             "text",
             "image"
@@ -17,7 +17,7 @@
           "samplingParams": {
             "temperature": 0.6,
             "top_p": 0.95,
-            "min_p": 0.00,
+            "min_p": 0.0,
             "presencePenalty": 0,
             "top_k": 20
           }

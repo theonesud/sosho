@@ -169,5 +169,40 @@ YUE2_STOP_LLAMA=true
 YUE2_LLAMA_CONTAINER=llama-cpp
 EOF
 
+# 7. Synchronize client configs (.pi/models.json, opencode.json) with LLM_CTX_SIZE
+if [ -f "$SCRIPT_DIR/.pi/models.json" ]; then
+    python3 - "$SCRIPT_DIR/.pi/models.json" "$OPTIMAL_CTX" <<'PY'
+import json, sys
+path, ctx = sys.argv[1], int(sys.argv[2])
+with open(path, "r") as f:
+    data = json.load(f)
+for prov in data.get("providers", {}).values():
+    for m in prov.get("models", []):
+        m["contextWindow"] = ctx
+        # Cap maxTokens to at most half of contextWindow or 8192 for safe generation budgets
+        m["maxTokens"] = min(m.get("maxTokens", 8192), max(2048, ctx // 4))
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
+PY
+    echo "• Synchronized .pi/models.json contextWindow -> $OPTIMAL_CTX"
+fi
+
+if [ -f "$SCRIPT_DIR/opencode.json" ]; then
+    python3 - "$SCRIPT_DIR/opencode.json" "$OPTIMAL_CTX" <<'PY'
+import json, sys
+path, ctx = sys.argv[1], int(sys.argv[2])
+with open(path, "r") as f:
+    data = json.load(f)
+for prov in data.get("providers", {}).values():
+    for m in prov.get("models", {}).values():
+        limits = m.get("limit", {})
+        limits["context"] = ctx
+        limits["output"] = min(limits.get("output", 8192), max(2048, ctx // 4))
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
+PY
+    echo "• Synchronized opencode.json limit.context -> $OPTIMAL_CTX"
+fi
+
 echo "✅ Saved hardware-tailored configuration to $ENV_FILE"
 echo "To apply changes to running containers, run: make restart"

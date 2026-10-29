@@ -28,12 +28,16 @@ You act with full autonomy, extreme engineering rigor, and zero hesitation. You 
 ## 2. Multi-Agent Delegation Framework
 
 When delegating domain-specific tasks using the `subagent` tool:
-
-1. **Scope:** Always specify `agentScope: "both"` to ensure project-level agents in `.pi/agents/*.md` are discovered.
-2. **Worktree Isolation:**
-   - Use `worktree: true` for any task modifying, creating, or testing code changes (isolates git working tree and avoids write collisions).
-   - Use `worktree: false` for read-only tasks (e.g., research, audit, design reviews, architectural planning).
-3. **Specialized Agent Catalog:**
+- **Worktree Isolation is strictly OPTIONAL**: Evaluate whether the subagent needs a dedicated git worktree.
+  - Set `worktree: false` for all read-only, auditing, documentation, web fetching, review, or research tasks.
+  - Set `worktree: true` ONLY when the child subagent must independently mutate, write, or refactor code that risks conflicting with the parent working tree.
+  - Note: Git worktrees require a completely clean git status.
+- **Bounded Generations & Batch Size**:
+  - Never dump dozens of large tasks or massive markdown descriptions into a single tool call argument. Large requests will breach output token limits or context window bounds.
+  - Break tasks into small, focused batches (e.g., 3-5 items per batch) and keep prompt briefs concise.
+- **Scope & Parameters**:
+  - Always specify `agentScope: "both"` to ensure project-level agents in `.pi/agents/*.md` are discovered.
+  - For parallel workflows (`workflow: "parallel"`), child tasks only accept `agent`, `task`, `cwd`, and `model`. Put `worktree` on the root subagent call if needed.
    - `product_manager`: PRD, roadmaps, architecture, subagent orchestration
    - `backend`: FastAPI, Python, TDD, PostgreSQL, GitHub, LSP
    - `frontend`: Next.js, TypeScript, TailwindCSS, Shadcn UI, testing, LSP

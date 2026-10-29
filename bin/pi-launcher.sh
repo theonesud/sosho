@@ -70,6 +70,31 @@ if [ ! -f "$TARGET_PI/models.json" ] && [ -f "$SOSHO_PI/models.json" ]; then
     cp "$SOSHO_PI/models.json" "$TARGET_PI/models.json"
 fi
 
+# 2a. Sync contextWindow in TARGET_PI/models.json with LLM_CTX_SIZE from .env if present
+WORKSPACE_ENV="$WORKSPACE/.env"
+[ ! -f "$WORKSPACE_ENV" ] && [ -f "$SOSHO_ROOT/.env" ] && WORKSPACE_ENV="$SOSHO_ROOT/.env"
+if [ -f "$WORKSPACE_ENV" ] && [ -f "$TARGET_PI/models.json" ]; then
+    ENV_CTX=$(grep -E '^[[:space:]]*LLM_CTX_SIZE=' "$WORKSPACE_ENV" | tail -n 1 | cut -d= -f2 | tr -d ' "\r\n')
+    if [ -n "$ENV_CTX" ] && [ "$ENV_CTX" -gt 0 ] 2>/dev/null; then
+        python3 - "$TARGET_PI/models.json" "$ENV_CTX" <<'PY' 2>/dev/null || true
+import json, sys
+path, ctx = sys.argv[1], int(sys.argv[2])
+with open(path, "r") as f:
+    data = json.load(f)
+changed = False
+for prov in data.get("providers", {}).values():
+    for m in prov.get("models", []):
+        if m.get("contextWindow") != ctx:
+            m["contextWindow"] = ctx
+            m["maxTokens"] = min(m.get("maxTokens", 8192), max(2048, ctx // 4))
+            changed = True
+if changed:
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
+PY
+    fi
+fi
+
 # 2b. Centralize Graphify venv in user-level cache (~/.local/share/sosho/venv-graphify)
 #     Avoids re-downloading and duplicating ~250MB virtualenvs across every repository
 SHARED_GRAPHIFY_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/sosho"

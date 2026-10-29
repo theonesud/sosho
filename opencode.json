@@ -14,12 +14,17 @@
           "name": "Qwen3.6-35B-A3B",
           "capabilities": {
             "tools": true,
-            "input": ["text", "image"],
-            "output": ["text"]
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           },
           "limit": {
-            "context": 131072,
-            "output": 131072
+            "context": 32768,
+            "output": 8192
           }
         }
       }
