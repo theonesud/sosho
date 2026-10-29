@@ -4,7 +4,7 @@
   "compaction": {
     "enabled": true,
     "reserveTokens": 8192,
-    "keepRecentTokens": 32768
+    "keepRecentTokens": 16384
   },
   "packages": [
     "npm:pi-subagents",
@@ -20,7 +20,8 @@
   ],
   "extensions": [
     "-builtin:llama.cpp",
-    "./extensions/langfuse/src/index.ts"
+    "./extensions/langfuse/src/index.ts",
+    "./extensions/checkpoint/src/index.ts"
   ],
   "lastChangelogVersion": "1.4.0"
 }
