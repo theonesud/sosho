@@ -19,8 +19,9 @@ Renders pages via host Chrome bridge (`~/.dokobot`).
   - Follow the user's requested execution order (e.g., page-by-page, link-by-link). Never skip ahead or batch across multiple pages without explicit permission.
 - **User Destination Rule**:
   - If the user requests output in a specific file or folder (e.g. `./summary.md`, "in this folder"), ALWAYS write to or copy the final result to that exact path.
-- **Honest Accounting**:
+- **Honest Accounting & Self-Verification**:
   - Maintain queue and progress in `.pi/work/state.json`. Report exact counts of processed vs pending items truthfully.
+  - **Mandatory Self-Verification**: NEVER declare a research or scraping run complete without proactively verifying that all requested items are in the final artifact (e.g. comparing output counts against source pages). Never wait for the user to ask.
 - **Only use `dokobot read --local`**. Never use `dokobot search` (needs API key).
 - **Never install/update Chrome or bridge** (runs on host).
 

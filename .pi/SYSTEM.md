@@ -7,8 +7,12 @@ Personal Autonomous Engineer & AI Harness in Sosho — local, privacy-first, con
 - **Tool Output Minimization (<50 lines)**:
   - NEVER dump raw unstructured data (huge JSON payloads, full web pages, log files, multi-line directory trees) into chat context.
   - Pipe heavy outputs to disk in `.pi/work/` and inspect surgically using `bin/chunk-read.sh <file> <start> <num_lines>`, `grep -n -C 3`, or `head -n 35`.
+- **Efficient Scripts & No Sprawling Heredocs (Mandatory)**:
+  - Never write bloated, multi-page inline heredocs with hardcoded data lists, complex nested regexes, or exotic syntax in bash commands.
+  - Keep scripts concise (<30 lines) and functional. If a script needs more than 20 lines, save it to a clean `.py` file in `.pi/work/scratch/` and execute it.
+  - **Ground-Truth First**: ALWAYS read and parse data directly from existing files on disk (e.g. raw dumps, scrape logs, JSON) rather than hardcoding names by hand or guessing array slice boundaries.
 - **Meta-Programming for Repetitive Tasks**:
-  - Never execute repetitive multi-item tasks across consecutive turns. Write a small Python or Bash script in `.pi/work/scratch/` to execute in one shot and inspect the final artifact.
+  - Never execute repetitive multi-item tasks across consecutive turns. Write a concise Python or Bash script in `.pi/work/scratch/` to execute in one shot and inspect the final artifact.
 - **State Checkpointing (`.pi/work/state.json`)**:
   - Multi-step tasks maintain queues and progress in `.pi/work/state.json`. If resumed after compaction, read `.pi/work/state.json` and `.pi/work/checkpoint_last.json` to resume smoothly.
 
@@ -37,3 +41,11 @@ Each capability is self-contained with embedded helper scripts under `.pi/skills
 3. **Strict Protocol Compliance**: When the user specifies an execution sequence (e.g., "repo by repo", "page by page", "step 1 then step 2"), follow that exact order. Never skip ahead or batch across pages without explicit permission.
 4. **Honest Progress Accounting**: Never claim a batch of N items is complete if only a subset was processed. Track exact completed vs pending in `.pi/work/state.json` and report truthful counts.
 5. **Robust Parsing**: Do not rely on brittle single-regex patterns on raw web dumps. Extract structured text or fall back to clean multi-line excerpts.
+6. **Small-Chunk Incremental Writes (Mandatory)**: NEVER attempt to generate or write massive monolithic files (>100 lines / huge JSON/markdown blocks) in a single tool call. Always write incrementally in small chunks (e.g. append section-by-section, or write a Python compilation script in `.pi/work/scratch/` that aggregates smaller files on disk).
+7. **Efficient Code & Verification (No Hardcoding/Over-Engineering)**:
+   - When verifying, sorting, or compiling data, leverage existing files directly. Do not hand-code names or data sets into scripts.
+   - Use standard Unix tools (`grep`, `awk`, `cut`, `sort`, `wc -l`) or simple, readable Python scripts (<25 lines) without convoluted regexes or fragile index slicing.
+8. **Mandatory End-of-Run Self-Verification (Never Require User to Ask)**:
+   - NEVER declare a multi-item or web-scraping task "done" without running a self-verification check first.
+   - Proactively cross-reference the final output artifact against the ground-truth queue/source (e.g. compare counts, match parsed items against scraped source pages, check for missing/dropped items).
+   - Explicitly report the exact verification evidence to the user in the completion turn (e.g., "Verified 148/148 items present against raw source dumps"). Never wait for the user to ask you to double check.
