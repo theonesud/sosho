@@ -60,7 +60,9 @@ fi
 
 
 
-# 2. Automatic background extension/package updater (checks once every 24h or when requested)
+# 2. Automatic background updater (checks once every 24h or when requested)
+#    pi is baked into the Docker image, so its self-updater cannot work inside
+#    the ephemeral container. Rebuild the image when a newer release exists.
 AUTO_UPDATE_STAMP="$TARGET_PI/.cache/.last_ext_update"
 NOW=$(date +%s)
 LAST_UPDATE=0
@@ -68,6 +70,17 @@ LAST_UPDATE=0
 # Update if older than 24 hours (86400s) and not running a sub-command
 if [ $((NOW - LAST_UPDATE)) -gt 86400 ] && [ "$SKIP_WARMUP" != "1" ]; then
     echo "Checking and updating Pi packages & extensions..."
+
+    # Rebuild the sandbox image if the baked-in pi is older than the npm latest.
+    if command -v curl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+        IMAGE_PI_VERSION="$(docker run --rm "$IMAGE_NAME" --version 2>/dev/null | head -n1 | tr -d '[:space:]' || true)"
+        LATEST_PI_VERSION="$(curl -fsS -m 15 "https://registry.npmjs.org/@earendil-works%2fpi-coding-agent/latest" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version",""))' 2>/dev/null || true)"
+        if [ -n "$IMAGE_PI_VERSION" ] && [ -n "$LATEST_PI_VERSION" ] && [ "$IMAGE_PI_VERSION" != "$LATEST_PI_VERSION" ]; then
+            echo "New pi version available ($IMAGE_PI_VERSION -> $LATEST_PI_VERSION). Rebuilding $IMAGE_NAME..."
+            docker build --no-cache --pull -t "$IMAGE_NAME" -f "$SOSHO_ROOT/docker/Dockerfile.pi" "$SOSHO_ROOT" || true
+        fi
+    fi
+
     docker run --rm \
         --network host \
         --user "$(id -u):$(id -g)" \
