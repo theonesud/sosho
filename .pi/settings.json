@@ -22,5 +22,8 @@
     "./extensions/langfuse/src/index.ts",
     "./extensions/checkpoint/src/index.ts"
   ],
-  "lastChangelogVersion": "1.4.0"
+  "lastChangelogVersion": "1.5.2",
+  "extensionChangelogVersions": {
+    "{\"source\":\"npm:pi-lens\",\"scope\":\"project\"}": "4.4.12"
+  }
 }

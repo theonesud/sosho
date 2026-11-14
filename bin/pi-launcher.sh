@@ -101,7 +101,8 @@ if [ ! -f "$TARGET_PI/models.json" ] && [ -f "$SOSHO_PI/models.json" ]; then
     cp "$SOSHO_PI/models.json" "$TARGET_PI/models.json"
 fi
 
-# 2a. Sync contextWindow in TARGET_PI/models.json with LLM_CTX_SIZE from .env if present
+# 2a. Sync llama.cpp contextWindow in TARGET_PI/models.json with LLM_CTX_SIZE from .env if present
+# Only local llama.cpp/Qwen models follow local hardware autotune; remote providers are left unchanged.
 WORKSPACE_ENV="$WORKSPACE/.env"
 [ ! -f "$WORKSPACE_ENV" ] && [ -f "$SOSHO_ROOT/.env" ] && WORKSPACE_ENV="$SOSHO_ROOT/.env"
 if [ -f "$WORKSPACE_ENV" ] && [ -f "$TARGET_PI/models.json" ]; then
@@ -113,8 +114,9 @@ path, ctx = sys.argv[1], int(sys.argv[2])
 with open(path, "r") as f:
     data = json.load(f)
 changed = False
-for prov in data.get("providers", {}).values():
-    for m in prov.get("models", []):
+llama = data.get("providers", {}).get("llama.cpp")
+if llama:
+    for m in llama.get("models", []):
         if m.get("contextWindow") != ctx:
             m["contextWindow"] = ctx
             m["maxTokens"] = min(m.get("maxTokens", 8192), max(2048, ctx // 4))
