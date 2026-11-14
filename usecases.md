@@ -26,12 +26,18 @@ working on a large/complex codebase
 
 rather then making skill for a tool we'll make a skill for a usecase/capability and keep the tools abstracted from the agent
 
-
-i want to create a visual speaker caliberater to setup eq, compressor, limiter to harman scale
 i want separate model for separate agents, subagents, jev like models for quick decision making
-export REFUSELESS_API_KEY="abl_your_key" instead of this i will read from env file 
-
 
 check if gpu-unlock is there for both:
 dkms status
 journalctl -k -b | grep gpu_unlock
+
+voice model (tts, stt)
+decision model
+embedding
+reranker
+image gen 
+video gen
+
+
+i want to create a visual speaker caliberater to setup eq, compressor, limiter to harman scale
