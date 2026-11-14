@@ -225,15 +225,16 @@ import json, sys
 path, ctx = sys.argv[1], int(sys.argv[2])
 with open(path, "r") as f:
     data = json.load(f)
-for prov in data.get("providers", {}).values():
-    for m in prov.get("models", {}).values():
+llama = data.get("providers", {}).get("llama.cpp")
+if llama:
+    for m in llama.get("models", {}).values():
         limits = m.get("limit", {})
         limits["context"] = ctx
         limits["output"] = min(limits.get("output", 8192), max(2048, ctx // 4))
 with open(path, "w") as f:
     json.dump(data, f, indent=2)
 PY
-    echo "• Synchronized opencode.json limit.context -> $OPTIMAL_CTX"
+    echo "• Synchronized opencode.json llama.cpp limit.context -> $OPTIMAL_CTX"
 fi
 
 echo "✅ Saved hardware-tailored configuration to $ENV_FILE"
