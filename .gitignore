@@ -84,5 +84,5 @@ yue2-test/
 .pi/missions/
 .pi/npm/
 .pi/venv-*/
-.pi/work/
+.pi/scratchpad/
 graphify-out/

@@ -14,13 +14,17 @@
     "write",
     "edit",
     "bash",
+    "task_plan",
+    "task_update",
+    "task_status",
+    "task_finish",
     "+codemode",
     "+tool_search"
   ],
   "extensions": [
     "-builtin:llama.cpp",
     "./extensions/langfuse/src/index.ts",
-    "./extensions/checkpoint/src/index.ts"
+    "./extensions/scratchpad/src/index.ts"
   ],
   "lastChangelogVersion": "1.5.2",
   "extensionChangelogVersions": {

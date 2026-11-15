@@ -9,8 +9,8 @@ Renders pages via host Chrome bridge (`~/.dokobot`).
 
 ## Rules
 - **Context-Safe Reading (Mandatory)**: NEVER dump raw web pages or search results directly into stdout.
-  - **Preferred**: Use `.pi/skills/dokobot/scripts/doko-fetch.sh '<url>'` (automatically pipes raw page to `.pi/work/research/` or scratch and returns only a compact excerpt).
-  - **Manual Redirection**: `dokobot read --local '<url>' > .pi/work/research/page.md`, then inspect with `grep -i`, `head -n 40`, or python.
+  - **Preferred**: Use `.pi/skills/dokobot/scripts/doko-fetch.sh '<url>'` (automatically pipes raw page to the session's permanent scratchpad and returns only a compact excerpt).
+  - **Manual Redirection**: `dokobot read --local '<url>' > "$SOSHO_PERMANENT_DIR/page.md"`, then inspect with `grep -i`, `head -n 40`, or python.
 - **Strict Pacing & Tab Limits (CRITICAL)**:
   - Never spawn unbounded parallel subshells (`&`) with dokobot.
   - Maximum **2 concurrent reads** at any time.
@@ -20,7 +20,7 @@ Renders pages via host Chrome bridge (`~/.dokobot`).
 - **User Destination Rule**:
   - If the user requests output in a specific file or folder (e.g. `./summary.md`, "in this folder"), ALWAYS write to or copy the final result to that exact path.
 - **Honest Accounting & Self-Verification**:
-  - Maintain queue and progress in `.pi/work/state.json`. Report exact counts of processed vs pending items truthfully.
+  - Maintain queue and progress via CRUD tools (`task_plan`, `task_update`, `task_status`, `task_finish`). Report exact counts of processed vs pending items truthfully.
   - **Mandatory Self-Verification**: NEVER declare a research or scraping run complete without proactively verifying that all requested items are in the final artifact (e.g. comparing output counts against source pages). Never wait for the user to ask.
 - **Only use `dokobot read --local`**. Never use `dokobot search` (needs API key).
 - **Never install/update Chrome or bridge** (runs on host).

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # scrape-docs.sh: Scrape library documentation page via Dokobot
-# Output saved to .pi/work/docs/<lib_name>/<page_slug>.md
+# Output saved to the session's permanent docs directory
 # ==============================================================================
 set -euo pipefail
 
@@ -31,9 +31,10 @@ if [ -z "$URL" ] || [ -z "$LIB_NAME" ]; then
     exit 1
 fi
 
-DOCS_DIR="${SOSHO_DOCS_DIR:-.pi/work/docs}"
+PERM_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
+DOCS_DIR="${SOSHO_DOCS_DIR:-$PERM_DIR/docs}"
 TARGET_DIR="${DOCS_DIR}/${LIB_NAME}"
-SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-.pi/work/scratch}"
+SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-$PERM_DIR}"
 mkdir -p "$TARGET_DIR" "$SCRATCH_DIR"
 
 SLUG="$(echo "$URL" | sed -e 's|https://||' -e 's|http://||' -e 's|[^a-zA-Z0-9]|_|g' | cut -c1-40)"

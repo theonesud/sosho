@@ -5,7 +5,7 @@ description: Fetch and index version-pinned library documentation (via llms.txt 
 
 # LibDocs: Version-Pinned Documentation & Idiomatic Patterns
 
-Prevents outdated API hallucinations by pulling accurate, version-specific documentation into `.pi/work/docs/<library>/`.
+Prevents outdated API hallucinations by pulling accurate, version-specific documentation into the session's permanent `docs/<library>/` directory.
 
 ## Usage
 

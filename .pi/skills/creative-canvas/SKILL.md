@@ -19,6 +19,6 @@ Specialized skill for visual coding, 3D scenes, physics simulations, and generat
 ```
 
 ## Protocol
-1. For Three.js or P5.js code, consult `.pi/work/docs/` first (via `libdocs`) to verify modern CDN URLs and import syntax.
+1. For Three.js or P5.js code, consult `libdocs` first to verify modern CDN URLs and import syntax.
 2. Favor self-contained, elegant single-file HTML or minimal modules with standard ES imports.
 3. Launch `preview.sh` and provide the user with the clickable `http://localhost:<port>` link.

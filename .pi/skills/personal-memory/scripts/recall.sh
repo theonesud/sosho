@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# recall.sh: Search personal memory files in .pi/work/memory/
+# recall.sh: Search personal memory files
 # ==============================================================================
 set -euo pipefail
 
 QUERY="${1:-}"
-MEM_DIR="${SOSHO_MEMORY_DIR:-.pi/work/memory}"
+PERM_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
+MEM_DIR="${SOSHO_MEMORY_DIR:-$PERM_DIR/memory}"
 mkdir -p "$MEM_DIR"
 
 if [ -z "$QUERY" ]; then

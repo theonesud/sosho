@@ -5,7 +5,7 @@
 set -euo pipefail
 
 PORT="${1:-8000}"
-SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-.pi/work/scratch}"
+SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}}"
 PID_FILE="${SCRATCH_DIR}/preview_${PORT}.pid"
 
 if [ -f "$PID_FILE" ]; then

@@ -7,7 +7,7 @@ set -euo pipefail
 FRAMEWORK="${1:-static}"
 PROJECT_DIR="${2:-.}"
 PORT="${3:-}"
-SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-.pi/work/scratch}"
+SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}}"
 mkdir -p "$SCRATCH_DIR"
 
 if [ ! -d "$PROJECT_DIR" ]; then

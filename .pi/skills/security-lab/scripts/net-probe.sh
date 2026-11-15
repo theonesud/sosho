@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # net-probe.sh: Safe local network discovery for owned devices
-# Output saved to .pi/work/security/net_probe.md. Compact table to stdout.
+# Output saved to the session's permanent security directory. Compact table to stdout.
 # ==============================================================================
 set -euo pipefail
 
 TARGET="${1:-192.168.1.0/24}"
-SEC_DIR="${SOSHO_SECURITY_DIR:-.pi/work/security}"
+SEC_DIR="${SOSHO_SECURITY_DIR:-${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}/security}"
 mkdir -p "$SEC_DIR"
 OUT_FILE="${SEC_DIR}/net_probe.md"
 

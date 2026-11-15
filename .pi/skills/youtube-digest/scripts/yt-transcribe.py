@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 yt-transcribe.py: Fast YouTube transcript extractor using youtube-transcript-api.
-Writes full timestamped transcript to .pi/work/transcripts/<video_id>.md.
+Writes full timestamped transcript to the session's permanent transcripts directory.
 Outputs a compact ~25-line outline to stdout for context safety.
 """
 import sys
@@ -34,7 +34,9 @@ def main():
         sys.exit(1)
 
     target = sys.argv[1]
-    out_dir = sys.argv[2] if len(sys.argv) > 2 else os.getenv("SOSHO_TRANSCRIPTS_DIR", ".pi/work/transcripts")
+    session_id = os.getenv("SOSHO_SESSION_ID", "default")
+    default_perm = os.getenv("SOSHO_PERMANENT_DIR", f".pi/scratchpad/{session_id}/permanent")
+    out_dir = sys.argv[2] if len(sys.argv) > 2 else os.getenv("SOSHO_TRANSCRIPTS_DIR", os.path.join(default_perm, "transcripts"))
     os.makedirs(out_dir, exist_ok=True)
 
     video_id = extract_video_id(target)

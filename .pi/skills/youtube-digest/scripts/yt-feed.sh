@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # yt-feed.sh: Harvest YouTube liked videos, playlists, or search results via Dokobot
-# Output saved to .pi/work/transcripts/queue.md. Compact list to stdout.
+# Output saved to the session's permanent transcripts directory. Compact list to stdout.
 # ==============================================================================
 set -euo pipefail
 
@@ -25,8 +25,9 @@ done
 
 [ -z "$TARGET" ] && TARGET="likes"
 
-TRANSCRIPTS_DIR="${SOSHO_TRANSCRIPTS_DIR:-.pi/work/transcripts}"
-SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-.pi/work/scratch}"
+PERM_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
+TRANSCRIPTS_DIR="${SOSHO_TRANSCRIPTS_DIR:-$PERM_DIR/transcripts}"
+SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-$PERM_DIR}"
 mkdir -p "$TRANSCRIPTS_DIR" "$SCRATCH_DIR"
 
 URL=""

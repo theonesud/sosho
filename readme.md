@@ -56,9 +56,9 @@ Integrates your real authenticated Chrome session and deterministic helper scrip
 
 ### 📊 4. Disk-First Persistence & Observability
 Engineered to operate reliably within bounded local context windows (32K–64K):
-- **Structured Persistent Workspaces**: Dedicated subdirectories in `.pi/work/` for memory, research, transcripts, and docs.
+- **Session-Isolated Scratchpads**: Dedicated per-session workspaces in `.pi/scratchpad/<session-id>/` with `ephemeral/` state and `permanent/` artifact sandboxes.
 - **Full Langfuse v4 Tracing**: Local telemetry at `localhost:3000` recording token usage, latency, tool calls, and trajectories.
-- **Automatic Compaction Recovery**: Checkpoint snapshots survive context truncation and compaction seamlessly.
+- **Automatic Compaction & Interruption Recovery**: Task queues and compaction snapshots persist in `ephemeral/state.json` via atomic CRUD tools (`task_plan`, `task_update`, `task_status`, `task_finish`).
 
 </td>
 </tr>
@@ -102,31 +102,26 @@ Every capability is self-contained with its own deterministic helper scripts in 
 | **`github-scout`** | `scripts/gh-stars.sh`, `scripts/gh-analyze.sh` | Browses your starred repositories and produces feasibility & architecture briefs. |
 | **`youtube-digest`**| `scripts/yt-feed.sh`, `scripts/yt-transcribe.py` | Extracts video queues and pulls full timestamped transcripts sub-second without downloading media. |
 | **`libdocs`** | `scripts/pull-llms-txt.sh`, `scripts/find-doc.sh` | Downloads standardized `llms.txt` and searches API signatures to prevent version hallucinations. |
-| **`data-lab`** | `scripts/eda.py`, `scripts/quick-plot.py` | Fast exploratory data analysis (<35 lines) and zero-boilerplate plotting saved to `.pi/work/plots/`. |
+| **`data-lab`** | `scripts/eda.py`, `scripts/quick-plot.py` | Fast exploratory data analysis (<35 lines) and zero-boilerplate plotting saved to the session's permanent plots directory. |
 | **`creative-canvas`**| `scripts/preview.sh`, `scripts/kill-preview.sh` | Builds and serves Three.js 3D scenes, generative canvas art, and HTML5/Pygame simulations locally. |
 | **`web-craft`** | `scripts/dev.sh`, `scripts/stop.sh`, `scripts/test-api.sh` | Background dev servers for Next.js, FastAPI, and interactive website presentations (Reveal.js). |
 | **`security-lab`** | `scripts/net-probe.sh`, `scripts/bin-triage.sh` | Safe local subnet device probes, binary reverse engineering triage, and steganography scans. |
 | **`lean-proofs`** | `scripts/verify.sh` | Formal theorem verification in Lean 4 with concise error reporting. |
 | **`sys-admin`** | `scripts/host-status.sh` | Single-command health snapshot of CPU, RAM, disk, RTX GPU thermals, and failed systemd units. |
-| **`personal-memory`**| `scripts/recall.sh` | Organic long-term memory stored in `.pi/work/memory/` for personal assistant conversations. |
+| **`personal-memory`**| `scripts/recall.sh` | Organic personal memory for personal assistant conversations. |
 | **`dokobot`** | `scripts/doko-fetch.sh` | Core web browser bridge using host Chrome with output redirection to disk. |
 
 ---
 
-## 📁 Persistent Working Space (`.pi/work/`)
+## 📁 Session-Driven Scratchpad (`.pi/scratchpad/<session-id>/`)
 
-To keep the agent's context clean and prevent memory loss during auto-compaction, all outputs are written directly to structured disk directories:
+To keep the agent's context clean, prevent cross-session state leaks, and survive interruptions or auto-compaction, every session operates inside its own isolated directory:
 
 ```
-.pi/work/
-├── memory/          # Permanent user memory (life history, goals, preferences, personality)
-├── research/        # Research dossiers, trend analyses, myth checks, X.com & GitHub scouts
-├── transcripts/     # Full YouTube transcripts with timestamp markers & queue indices
-├── docs/            # Version-pinned library references & llms.txt cheatsheets
-├── plots/           # Output charts and visualizations from data-lab
-├── security/        # Network probe logs and binary triage reports
-├── scratch/         # One-off execution scripts and temporary tool dumps
-└── state.json       # Task queue tracking & auto-compaction checkpoint recovery
+.pi/scratchpad/<session-id>/
+├── ephemeral/
+│   └── state.json   # Managed exclusively via CRUD tools (task_plan, task_update, task_status, task_finish)
+└── permanent/       # Unmanaged session sandbox for scripts, web dumps, research, plots, and artifacts
 ```
 
 ---

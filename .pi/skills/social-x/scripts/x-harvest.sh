@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # x-harvest.sh: Harvest X.com timeline, likes, bookmarks, or searches via Dokobot
-# Output saved to .pi/work/research/x_<target>.md. Prints compact index to stdout.
+# Output saved to the session's permanent research directory. Prints compact index to stdout.
 # ==============================================================================
 set -euo pipefail
 
@@ -32,8 +32,9 @@ done
 
 [ -z "$TARGET" ] && TARGET="timeline"
 
-RESEARCH_DIR="${SOSHO_RESEARCH_DIR:-.pi/work/research}"
-SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-.pi/work/scratch}"
+PERM_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
+RESEARCH_DIR="${SOSHO_RESEARCH_DIR:-$PERM_DIR/research}"
+SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-$PERM_DIR}"
 mkdir -p "$RESEARCH_DIR" "$SCRATCH_DIR"
 
 URL=""
@@ -45,11 +46,11 @@ case "$TARGET" in
         SLUG="timeline"
         ;;
     likes)
-        URL="https://x.com/i/bookmarks"
+        URL="https://x.com/i/history/likes"
         SLUG="likes"
         ;;
     bookmarks)
-        URL="https://x.com/i/bookmarks"
+        URL="https://x.com/i/history"
         SLUG="bookmarks"
         ;;
     http*|https*)

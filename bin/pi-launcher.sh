@@ -38,25 +38,10 @@ fi
 
 WORKSPACE="$(pwd)"
 
-# 1. Ensure target workspace has a local .pi directory and persistent work subdirectories
+# 1. Ensure target workspace has a local .pi directory and session scratchpad root
 TARGET_PI="$WORKSPACE/.pi"
-mkdir -p "$TARGET_PI/.cache" "$TARGET_PI/.config" \
-    "$TARGET_PI/work/memory" \
-    "$TARGET_PI/work/research" \
-    "$TARGET_PI/work/transcripts" \
-    "$TARGET_PI/work/docs" \
-    "$TARGET_PI/work/plots" \
-    "$TARGET_PI/work/security" \
-    "$TARGET_PI/work/scratch"
+mkdir -p "$TARGET_PI/.cache" "$TARGET_PI/.config" "$TARGET_PI/scratchpad"
 
-# Ensure state.json and README.md exist in target workspace
-if [ ! -f "$TARGET_PI/work/state.json" ]; then
-    echo '{"active_task":null,"updated_at":null,"queue":[],"completed":[],"failed":[],"current_index":0,"notes":{}}' > "$TARGET_PI/work/state.json"
-fi
-
-if [ ! -f "$TARGET_PI/work/README.md" ] && [ -f "$SOSHO_PI/work/README.md" ]; then
-    cp "$SOSHO_PI/work/README.md" "$TARGET_PI/work/README.md"
-fi
 
 
 

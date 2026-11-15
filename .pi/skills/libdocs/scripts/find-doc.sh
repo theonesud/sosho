@@ -12,7 +12,8 @@ if [ -z "$LIB_NAME" ] || [ -z "$KEYWORD" ]; then
     exit 1
 fi
 
-DOCS_DIR="${SOSHO_DOCS_DIR:-.pi/work/docs}"
+PERM_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
+DOCS_DIR="${SOSHO_DOCS_DIR:-$PERM_DIR/docs}"
 TARGET_DIR="${DOCS_DIR}/${LIB_NAME}"
 
 if [ ! -d "$TARGET_DIR" ]; then

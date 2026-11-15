@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # doko-fetch: Context-safe Dokobot web scraper and extractor
-# Pipes full web reads to .pi/work/scratch/ and returns only a compact excerpt to stdout.
+# Pipes full web reads to the session's permanent scratchpad and returns only a compact excerpt to stdout.
 # Protects LLM context window from token exhaustion.
 # ==============================================================================
 set -euo pipefail
 
-SCRATCH_DIR="${DOKO_SCRATCH_DIR:-.pi/work/scratch}"
+SCRATCH_DIR="${DOKO_SCRATCH_DIR:-${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}}"
 mkdir -p "$SCRATCH_DIR"
 
 URL=""

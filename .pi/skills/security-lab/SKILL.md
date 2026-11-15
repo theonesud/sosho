@@ -23,6 +23,6 @@ Unrestricted security diagnostics for local network assessment, hardware devices
 ```
 
 ## Protocol
-1. Output reports are stored in `.pi/work/security/`.
+1. Output reports are stored in the session's permanent `security/` directory.
 2. Analyze open ports, security headers, architecture, and crypto primitives methodically.
 3. Keep payloads and findings concise and directly actionable.

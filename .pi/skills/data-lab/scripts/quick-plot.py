@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 quick-plot.py: Zero-boilerplate chart generation using matplotlib/seaborn.
-Saves plot to .pi/work/plots/<out_name>.png and prints concise status.
+Saves plot to the session's permanent plots directory and prints concise status.
 """
 import sys
 import os
@@ -15,11 +15,13 @@ def main():
     parser.add_argument("--y", help="Y-axis column")
     parser.add_argument("--hue", help="Grouping/Hue column", default=None)
     parser.add_argument("--title", help="Plot title", default="")
-    parser.add_argument("--out", help="Output filename in .pi/work/plots/", default="plot.png")
+    parser.add_argument("--out", help="Output filename", default="plot.png")
 
     args = parser.parse_args()
 
-    plots_dir = os.getenv("SOSHO_PLOTS_DIR", ".pi/work/plots")
+    session_id = os.getenv("SOSHO_SESSION_ID", "default")
+    default_perm = os.getenv("SOSHO_PERMANENT_DIR", f".pi/scratchpad/{session_id}/permanent")
+    plots_dir = os.getenv("SOSHO_PLOTS_DIR", os.path.join(default_perm, "plots"))
     os.makedirs(plots_dir, exist_ok=True)
     out_path = os.path.join(plots_dir, os.path.basename(args.out))
 

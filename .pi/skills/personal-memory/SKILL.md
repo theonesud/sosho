@@ -5,7 +5,7 @@ description: Recall, record, and update the user's personal memory (life history
 
 # Personal Memory: Life History, Preferences & Personality
 
-Maintains organic, long-term personal memory about the user in `.pi/work/memory/`.
+Maintains organic personal memory about the user in the session's `memory/` directory.
 
 ## Usage
 
@@ -20,5 +20,5 @@ Maintains organic, long-term personal memory about the user in `.pi/work/memory/
 
 ## Protocol
 1. For personal assistant or conversational turns, check relevant memory files (e.g. `profile.md`, `preferences.md`, `plans.md`) using `recall.sh` or targeted file reads.
-2. When the user shares new personal details, life milestones, preferences, or changes in plans, create or append to the appropriate file in `.pi/work/memory/`.
+2. When the user shares new personal details, life milestones, preferences, or changes in plans, create or append to the appropriate file in the memory directory.
 3. Keep memory entries clean, factual, and chronological.

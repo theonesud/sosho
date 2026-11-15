@@ -26,4 +26,4 @@ Dedicated workflow for serious webapps, REST/FastAPI microservices, and interact
 ## Protocol
 1. For Next.js (App router vs Pages router) or FastAPI (Pydantic v2), consult `libdocs` first to verify correct idioms.
 2. Develop modular components; use `test-api.sh` to verify endpoints.
-3. Keep server logs in `.pi/work/scratch/` and inspect errors via `bin/chunk-read.sh`.
+3. Keep server logs in the session's `permanent/` directory and inspect errors via `bin/chunk-read.sh`.

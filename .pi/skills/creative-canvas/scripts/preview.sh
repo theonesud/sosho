@@ -6,7 +6,7 @@ set -euo pipefail
 
 TARGET="${1:-index.html}"
 PORT="${2:-8000}"
-SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-.pi/work/scratch}"
+SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}}"
 mkdir -p "$SCRATCH_DIR"
 
 # Find directory to serve

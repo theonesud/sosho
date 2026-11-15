@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # gh-analyze.sh: Analyze a GitHub repository for capabilities and feasibility
-# Output saved to .pi/work/research/gh_<repo>.md. Compact brief to stdout.
+# Output saved to the session's permanent research directory. Compact brief to stdout.
 # ==============================================================================
 set -euo pipefail
 
@@ -28,8 +28,9 @@ if [ -z "$TARGET" ]; then
     exit 1
 fi
 
-RESEARCH_DIR="${SOSHO_RESEARCH_DIR:-.pi/work/research}"
-SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-.pi/work/scratch}"
+PERM_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
+RESEARCH_DIR="${SOSHO_RESEARCH_DIR:-$PERM_DIR/research}"
+SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-$PERM_DIR}"
 mkdir -p "$RESEARCH_DIR" "$SCRATCH_DIR"
 
 URL="$TARGET"

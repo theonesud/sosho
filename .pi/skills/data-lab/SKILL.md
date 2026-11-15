@@ -14,18 +14,18 @@ Focused primitives to inspect data and generate plots without polluting LLM cont
 .pi/skills/data-lab/scripts/eda.py data.csv
 .pi/skills/data-lab/scripts/eda.py database.sqlite users
 
-# 2. Quick plotting (saved to .pi/work/plots/<out>.png)
+# 2. Quick plotting (saved to the session's permanent plots directory)
 .pi/skills/data-lab/scripts/quick-plot.py data.csv --type scatter --x "age" --y "income" --out "scatter.png"
 .pi/skills/data-lab/scripts/quick-plot.py data.csv --type corr --out "correlation.png"
 .pi/skills/data-lab/scripts/quick-plot.py data.csv --type hist --x "latency" --out "dist.png"
 
 # 3. Iterative ML & Graph experiments
-# Write Python scripts in .pi/work/scratch/ (e.g. .pi/work/scratch/train_model.py).
-# Have the script print ONLY final metrics and save weights/plots to .pi/work/plots/.
-python3 .pi/work/scratch/train_model.py
+# Write Python scripts in the active session's permanent scratchpad (.pi/scratchpad/<session-id>/permanent/).
+# Have the script print ONLY final metrics and save weights/plots to permanent/plots/.
+python3 "$SOSHO_PERMANENT_DIR/train_model.py"
 ```
 
 ## Protocol
 1. Run `eda.py` first to inspect columns and distributions.
 2. For insights or visual verification, run `quick-plot.py`.
-3. For graph algorithms (NetworkX) or PyTorch/scikit-learn models, keep training scripts in `.pi/work/scratch/` and report only concise tabular metrics.
+3. For graph algorithms (NetworkX) or PyTorch/scikit-learn models, keep training scripts in the session's `permanent/` directory and report only concise tabular metrics.
