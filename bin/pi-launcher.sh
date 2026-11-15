@@ -166,8 +166,9 @@ PY
     case "$BASE_URL" in
         http://127.0.0.1:*|http://localhost:*|http://0.0.0.0:*)
             if [ -n "$MODEL_ID" ]; then
+                HEALTH_URL="${BASE_URL%/v1}/health"
                 # Check if model server is reachable first
-                if curl -fsS -m 2 "$BASE_URL/health" >/dev/null 2>&1; then
+                if curl -fsS -m 2 "$HEALTH_URL" >/dev/null 2>&1; then
                     echo "Pre-warming local model $MODEL_ID (press Ctrl+C to skip, or use --no-warmup)..."
 WARM_PAYLOAD="$(python3 - "$MODEL_ID" "$SOSHO_PI/SYSTEM.md" "$SOSHO_PI/APPEND_SYSTEM.md" <<'PY'
 import json, sys, os
@@ -221,10 +222,10 @@ mkdir -p "$WORKTREES_DIR" 2>/dev/null || true
 [ -d "$HOME/.dokobot" ] && MOUNTS+=(-v "$HOME/.dokobot:$HOME/.dokobot")
 [ -d "$HOME/skills" ] && MOUNTS+=(-v "$HOME/skills:$HOME/skills:ro")
 
-# Pass any API keys from local .env if present in workspace (e.g. OPENAI_API_KEY, ANTHROPIC_API_KEY)
+# Pass any API keys from .env (workspace .env or fallback to SOSHO_ROOT/.env)
 ENV_ARGS=()
-if [ -f "$WORKSPACE/.env" ]; then
-    ENV_ARGS+=(--env-file "$WORKSPACE/.env")
+if [ -f "$WORKSPACE_ENV" ]; then
+    ENV_ARGS+=(--env-file "$WORKSPACE_ENV")
 fi
 
 # TTY flags

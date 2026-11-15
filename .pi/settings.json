@@ -24,6 +24,6 @@
   ],
   "lastChangelogVersion": "1.5.2",
   "extensionChangelogVersions": {
-    "{\"source\":\"npm:pi-lens\",\"scope\":\"project\"}": "4.4.12"
+    "{\"source\":\"npm:pi-lens\",\"scope\":\"project\"}": "4.5.0"
   }
 }

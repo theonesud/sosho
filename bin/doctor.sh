@@ -25,8 +25,8 @@ else
     fail "Cannot communicate with Docker daemon. Is Docker running?"
 fi
 
-# 2. NVIDIA GPU and Container Toolkit
-echo "2. Checking NVIDIA Container Toolkit..."
+# 2. NVIDIA GPU, Container Toolkit & Hardware Unlock
+echo "2. Checking NVIDIA GPU, Container Toolkit & Hardware Unlock..."
 if command -v nvidia-smi >/dev/null 2>&1; then
     GPU_NAME="$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | head -n1)"
     pass "Host GPU detected: $GPU_NAME"
@@ -35,25 +35,37 @@ if command -v nvidia-smi >/dev/null 2>&1; then
     else
         fail "NVIDIA Container Toolkit test failed. Docker cannot allocate GPUs."
     fi
+
+    # Check gpu-unlock status
+    if journalctl -k -b 2>/dev/null | grep -q "gpu_unlock: unlocked"; then
+        pass "gpu-unlock active: Ampere/Ada/Turing full tensor core throughput unlocked"
+    else
+        warn "gpu-unlock not detected in current boot log. Check /etc/default/grub or dkms status if installed."
+    fi
 else
     warn "nvidia-smi not found on host. GPU acceleration will not be available."
 fi
 
-# 3. Port Availabilities
-echo "3. Checking Port Availabilities..."
-check_port() {
+# 3. Port & Service Health
+echo "3. Checking Port & Service Health..."
+check_port_service() {
     local port=$1
     local name=$2
+    local container=$3
     if nc -z 127.0.0.1 "$port" 2>/dev/null || ss -tulpn 2>/dev/null | grep -q ":$port "; then
-        warn "Port $port ($name) is currently bound or in use"
+        if [ -n "$container" ] && docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${container}$"; then
+            pass "Port $port ($name) is active and served by healthy container '$container'"
+        else
+            warn "Port $port ($name) is bound by an external process or container"
+        fi
     else
-        pass "Port $port ($name) is available"
+        pass "Port $port ($name) is available (ready to start)"
     fi
 }
 
-check_port 8080 "llama.cpp"
-check_port 3000 "Langfuse Web"
-check_port 8021 "YuE2 Gateway"
+check_port_service 8080 "llama.cpp" "llama-cpp"
+check_port_service 3000 "Langfuse Web" "sosho-langfuse-web-1"
+check_port_service 8021 "YuE2 Gateway" "sosho-yue2-api-1"
 
 # 4. Disk Space for Models
 echo "4. Checking Disk Space for Models..."

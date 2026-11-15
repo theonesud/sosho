@@ -78,6 +78,12 @@ services:
       - --host
       - 0.0.0.0
       - -cmoe
+      - --moe-cache-mib
+      - "${LLM_MOE_CACHE_MIB:-1536}"
+      - -lm
+      - "${LLM_LOAD_MODE:-mlock}"
+      - --image-min-tokens
+      - "1024"
       - -c
       - "${LLM_CTX_SIZE:-65536}"
       - -n
@@ -87,20 +93,19 @@ services:
       - -t
       - ${LLM_THREADS:-8}
       - -ctk
-      - "${LLM_KV_CACHE_TYPE:-q8_0}"
+      - "${LLM_KV_CACHE_TYPE:-q4_0}"
       - -ctv
-      - "${LLM_KV_CACHE_TYPE:-q8_0}"
-      - --cache-reuse
-      - "64"
+      - "${LLM_KV_CACHE_TYPE:-q4_0}"
       - -b
       - "${LLM_BATCH:-2048}"
       - -ub
-      - "${LLM_UBATCH:-1024}"
+      - "${LLM_UBATCH:-512}"
       - -tb
-      - ${LLM_THREADS_BATCH:-14}
+      - ${LLM_THREADS_BATCH:-12}
       - --cache-prompt
-      - --chat-template-kwargs
-      - '{"preserve_thinking":true}'
+      - --reasoning
+      - "on"
+      - --reasoning-preserve
       - --sleep-idle-seconds
       - "900"
       - -fa
