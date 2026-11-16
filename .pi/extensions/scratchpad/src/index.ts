@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 export interface TaskPlanParams {
@@ -62,6 +62,7 @@ export interface SessionState {
 
 export interface SessionPaths {
   sessionId: string;
+  folderName: string;
   baseDir: string;
   ephemeralDir: string;
   permanentDir: string;
@@ -72,7 +73,35 @@ export function getSessionPaths(ctx: ExtensionContext): SessionPaths {
   const cwd = ctx.cwd || process.cwd();
   const rawSessionId = ctx.sessionManager?.getSessionId?.() || "default";
   const sessionId = rawSessionId.replace(/[^a-zA-Z0-9_-]/g, "_");
-  const baseDir = join(cwd, ".pi", "scratchpad", sessionId);
+  const scratchpadRoot = join(cwd, ".pi", "scratchpad");
+
+  // Determine folder name: format as <datetime>_<sessionid> (e.g. 2026-11-16T17-20-00Z_01a1e4...)
+  let folderName = "";
+  if (existsSync(scratchpadRoot)) {
+    const existing = readdirSync(scratchpadRoot).find(
+      (d) => d.endsWith(`_${sessionId}`) || d === sessionId,
+    );
+    if (existing) {
+      folderName = existing;
+    }
+  }
+
+  if (!folderName) {
+    const sessionFile = ctx.sessionManager?.getSessionFile?.();
+    let timeStamp = "";
+    if (sessionFile) {
+      const match = basename(sessionFile).match(/^(\d{4}-\d{2}-\d{2}T[\d-]+Z)_(.+)\.jsonl$/);
+      if (match) {
+        timeStamp = match[1];
+      }
+    }
+    if (!timeStamp) {
+      timeStamp = new Date().toISOString().replace(/[:.]/g, "-");
+    }
+    folderName = `${timeStamp}_${sessionId}`;
+  }
+
+  const baseDir = join(scratchpadRoot, folderName);
   const ephemeralDir = join(baseDir, "ephemeral");
   const permanentDir = join(baseDir, "permanent");
   const statePath = join(ephemeralDir, "state.json");
@@ -88,7 +117,7 @@ export function getSessionPaths(ctx: ExtensionContext): SessionPaths {
   process.env.SOSHO_SCRATCH_DIR = permanentDir;
   process.env.DOKO_SCRATCH_DIR = permanentDir;
 
-  return { sessionId, baseDir, ephemeralDir, permanentDir, statePath };
+  return { sessionId, folderName, baseDir, ephemeralDir, permanentDir, statePath };
 }
 
 export class StateManager {
@@ -169,7 +198,7 @@ function getStateManager(ctx: ExtensionContext): { sm: StateManager; paths: Sess
 function formatStateSummary(state: SessionState, paths: SessionPaths): string {
   const lines: string[] = [
     `Session ID: ${state.session_id}`,
-    `Permanent Workspace ($SOSHO_PERMANENT_DIR): .pi/scratchpad/${state.session_id}/permanent`,
+    `Permanent Workspace ($SOSHO_PERMANENT_DIR): .pi/scratchpad/${paths.folderName}/permanent`,
     `Status: ${state.status}`,
   ];
 
@@ -298,7 +327,7 @@ export default function (pi: ExtensionAPI) {
       latestSessionId = paths.sessionId;
 
       const state = sm.read();
-      const relPermanent = `.pi/scratchpad/${paths.sessionId}/permanent`;
+      const relPermanent = `.pi/scratchpad/${paths.folderName}/permanent`;
 
       // Static session preamble to preserve prompt KV cache across turns
       const addonLines: string[] = [
