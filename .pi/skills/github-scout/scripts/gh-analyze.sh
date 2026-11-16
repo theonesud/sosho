@@ -29,16 +29,15 @@ if [ -z "$TARGET" ]; then
 fi
 
 PERM_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
-RESEARCH_DIR="${SOSHO_RESEARCH_DIR:-$PERM_DIR/research}"
 SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-$PERM_DIR}"
-mkdir -p "$RESEARCH_DIR" "$SCRATCH_DIR"
+mkdir -p "$PERM_DIR"
 
 URL="$TARGET"
 [[ "$URL" != http* ]] && URL="https://github.com/$TARGET"
 
 REPO_SLUG="$(echo "$URL" | sed -e 's|https://github.com/||' -e 's|/$||' | tr '/' '_')"
 RAW_FILE="${SCRATCH_DIR}/gh_${REPO_SLUG}_raw.md"
-[ -z "$OUT_FILE" ] && OUT_FILE="${RESEARCH_DIR}/gh_${REPO_SLUG}.md"
+[ -z "$OUT_FILE" ] && OUT_FILE="${PERM_DIR}/gh_${REPO_SLUG}.md"
 
 echo "🔍 Scouting GitHub repo via host Chrome: $URL..."
 sleep 1

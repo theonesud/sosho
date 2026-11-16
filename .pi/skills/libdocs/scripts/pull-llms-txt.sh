@@ -14,7 +14,7 @@ if [ -z "$TARGET" ]; then
 fi
 
 PERM_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
-DOCS_DIR="${SOSHO_DOCS_DIR:-$PERM_DIR/docs}"
+DOCS_DIR="${PERM_DIR}/docs"
 mkdir -p "$DOCS_DIR"
 
 # Clean target URL

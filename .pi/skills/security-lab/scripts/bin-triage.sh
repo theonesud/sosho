@@ -10,7 +10,7 @@ if [ -z "$TARGET" ] || [ ! -f "$TARGET" ]; then
     exit 1
 fi
 
-SEC_DIR="${SOSHO_SECURITY_DIR:-${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}/security}"
+SEC_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
 mkdir -p "$SEC_DIR"
 SLUG="$(basename "$TARGET" | sed -e 's/[^a-zA-Z0-9]/_/g')"
 OUT_FILE="${SEC_DIR}/triage_${SLUG}.md"

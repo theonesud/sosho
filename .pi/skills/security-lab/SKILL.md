@@ -10,11 +10,11 @@ Unrestricted security diagnostics for local network assessment, hardware devices
 ## Usage
 
 ```bash
-# 1. Probe local subnet or specific target device
+# 1. Probe local subnet or specific target device (saves to $SOSHO_PERMANENT_DIR/net_probe.md)
 .pi/skills/security-lab/scripts/net-probe.sh 192.168.1.0/24
 .pi/skills/security-lab/scripts/net-probe.sh 192.168.1.105
 
-# 2. Triage unknown binary or firmware snippet
+# 2. Triage unknown binary or firmware (saves to $SOSHO_PERMANENT_DIR/triage_<slug>.md)
 .pi/skills/security-lab/scripts/bin-triage.sh ./firmware.bin
 .pi/skills/security-lab/scripts/bin-triage.sh ./target_elf
 
@@ -23,6 +23,6 @@ Unrestricted security diagnostics for local network assessment, hardware devices
 ```
 
 ## Protocol
-1. Output reports are stored in the session's permanent `security/` directory.
-2. Analyze open ports, security headers, architecture, and crypto primitives methodically.
-3. Keep payloads and findings concise and directly actionable.
+1. Diagnostic reports are stored in `$SOSHO_PERMANENT_DIR`.
+2. Inspect open ports, headers, architecture, and crypto primitives methodically.
+3. Keep findings concise and actionable.

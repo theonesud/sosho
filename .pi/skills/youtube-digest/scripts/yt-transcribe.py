@@ -36,7 +36,7 @@ def main():
     target = sys.argv[1]
     session_id = os.getenv("SOSHO_SESSION_ID", "default")
     default_perm = os.getenv("SOSHO_PERMANENT_DIR", f".pi/scratchpad/{session_id}/permanent")
-    out_dir = sys.argv[2] if len(sys.argv) > 2 else os.getenv("SOSHO_TRANSCRIPTS_DIR", os.path.join(default_perm, "transcripts"))
+    out_dir = sys.argv[2] if len(sys.argv) > 2 else default_perm
     os.makedirs(out_dir, exist_ok=True)
 
     video_id = extract_video_id(target)

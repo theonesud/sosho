@@ -1,33 +1,22 @@
 ---
 name: dokobot
-description: Web search, page reading, and multi-source research via host Chrome (JS, auth, locale). Use for general web lookup, JS-heavy/auth pages, or research.
+description: Web search, page reading, and research via host Chrome (JS, auth, locale). Use for general web lookup, JS-heavy/auth pages, or web research.
 ---
 
 # Dokobot — Web Search & Research
 
 Renders pages via host Chrome bridge (`~/.dokobot`).
 
-## Rules
-- **Context-Safe Reading (Mandatory)**: NEVER dump raw web pages or search results directly into stdout.
-  - **Preferred**: Use `.pi/skills/dokobot/scripts/doko-fetch.sh '<url>'` (automatically pipes raw page to the session's permanent scratchpad and returns only a compact excerpt).
-  - **Manual Redirection**: `dokobot read --local '<url>' > "$SOSHO_PERMANENT_DIR/page.md"`, then inspect with `grep -i`, `head -n 40`, or python.
-- **Strict Pacing & Tab Limits (CRITICAL)**:
-  - Never spawn unbounded parallel subshells (`&`) with dokobot.
-  - Maximum **2 concurrent reads** at any time.
-  - When looping over multiple items, run sequentially or in pairs with a `sleep 1` pause to prevent flooding host Chrome with dozens of tabs.
-- **Strict Protocol Compliance**:
-  - Follow the user's requested execution order (e.g., page-by-page, link-by-link). Never skip ahead or batch across multiple pages without explicit permission.
-- **User Destination Rule**:
-  - If the user requests output in a specific file or folder (e.g. `./summary.md`, "in this folder"), ALWAYS write to or copy the final result to that exact path.
-- **Honest Accounting & Self-Verification**:
-  - Maintain queue and progress via CRUD tools (`task_plan`, `task_update`, `task_status`, `task_finish`). Report exact counts of processed vs pending items truthfully.
-  - **Mandatory Self-Verification**: NEVER declare a research or scraping run complete without proactively verifying that all requested items are in the final artifact (e.g. comparing output counts against source pages). Never wait for the user to ask.
-- **Only use `dokobot read --local`**. Never use `dokobot search` (needs API key).
-- **Never install/update Chrome or bridge** (runs on host).
+## Context-Safe Reading
+Never dump raw web pages into stdout. Use `doko-fetch.sh` (pipes full content to `$SOSHO_PERMANENT_DIR` and returns a compact excerpt):
 
-## Context-Safe Search & Reading
 ```bash
 .pi/skills/dokobot/scripts/doko-fetch.sh 'https://www.google.com/search?q=rust+web+frameworks'
 .pi/skills/dokobot/scripts/doko-fetch.sh 'https://duckduckgo.com/?q=latest+ai+trends'
 .pi/skills/dokobot/scripts/doko-fetch.sh '<url>' --screens 5 --timeout 90
 ```
+
+## Rules
+- Only use `dokobot read --local` (or `doko-fetch.sh`). Never use `dokobot search` (requires API key).
+- Follow SYSTEM.md host Chrome pacing (max 2 concurrent reads, `sleep 1`) and `task_*` progress tracking.
+- Never attempt to install or update Chrome or the host bridge.

@@ -21,7 +21,7 @@ def main():
 
     session_id = os.getenv("SOSHO_SESSION_ID", "default")
     default_perm = os.getenv("SOSHO_PERMANENT_DIR", f".pi/scratchpad/{session_id}/permanent")
-    plots_dir = os.getenv("SOSHO_PLOTS_DIR", os.path.join(default_perm, "plots"))
+    plots_dir = os.path.dirname(args.out) if os.path.dirname(args.out) else default_perm
     os.makedirs(plots_dir, exist_ok=True)
     out_path = os.path.join(plots_dir, os.path.basename(args.out))
 

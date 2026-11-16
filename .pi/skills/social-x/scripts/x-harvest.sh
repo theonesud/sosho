@@ -33,9 +33,8 @@ done
 [ -z "$TARGET" ] && TARGET="timeline"
 
 PERM_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
-RESEARCH_DIR="${SOSHO_RESEARCH_DIR:-$PERM_DIR/research}"
 SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-$PERM_DIR}"
-mkdir -p "$RESEARCH_DIR" "$SCRATCH_DIR"
+mkdir -p "$PERM_DIR"
 
 URL=""
 SLUG="timeline"
@@ -64,7 +63,7 @@ case "$TARGET" in
         ;;
 esac
 
-[ -z "$OUT_FILE" ] && OUT_FILE="${RESEARCH_DIR}/x_${SLUG}.md"
+[ -z "$OUT_FILE" ] && OUT_FILE="${PERM_DIR}/x_${SLUG}.md"
 RAW_FILE="${SCRATCH_DIR}/x_${SLUG}_raw.md"
 
 echo "🕊️ Fetching X.com via host Chrome: $URL (screens: $SCREENS)..."

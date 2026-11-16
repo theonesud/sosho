@@ -27,13 +27,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 PERM_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
-RESEARCH_DIR="${SOSHO_RESEARCH_DIR:-$PERM_DIR/research}"
 SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-$PERM_DIR}"
-mkdir -p "$RESEARCH_DIR" "$SCRATCH_DIR"
+mkdir -p "$PERM_DIR"
 
 URL="https://github.com/stars?page=${PAGE}"
-RAW_FILE="${SCRATCH_DIR}/gh_stars_raw.md"
-[ -z "$OUT_FILE" ] && OUT_FILE="${RESEARCH_DIR}/gh_stars.md"
+RAW_FILE="${SCRATCH_DIR}/gh_stars_p${PAGE}_raw.md"
+[ -z "$OUT_FILE" ] && OUT_FILE="${PERM_DIR}/gh_stars_p${PAGE}.md"
 
 echo "⭐ Fetching GitHub Stars (page $PAGE) via host Chrome..."
 sleep 1

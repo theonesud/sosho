@@ -108,7 +108,6 @@ Every capability is self-contained with its own deterministic helper scripts in 
 | **`security-lab`** | `scripts/net-probe.sh`, `scripts/bin-triage.sh` | Safe local subnet device probes, binary reverse engineering triage, and steganography scans. |
 | **`lean-proofs`** | `scripts/verify.sh` | Formal theorem verification in Lean 4 with concise error reporting. |
 | **`sys-admin`** | `scripts/host-status.sh` | Single-command health snapshot of CPU, RAM, disk, RTX GPU thermals, and failed systemd units. |
-| **`personal-memory`**| `scripts/recall.sh` | Organic personal memory for personal assistant conversations. |
 | **`dokobot`** | `scripts/doko-fetch.sh` | Core web browser bridge using host Chrome with output redirection to disk. |
 
 ---

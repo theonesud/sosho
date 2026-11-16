@@ -26,9 +26,8 @@ done
 [ -z "$TARGET" ] && TARGET="likes"
 
 PERM_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
-TRANSCRIPTS_DIR="${SOSHO_TRANSCRIPTS_DIR:-$PERM_DIR/transcripts}"
 SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-$PERM_DIR}"
-mkdir -p "$TRANSCRIPTS_DIR" "$SCRATCH_DIR"
+mkdir -p "$PERM_DIR"
 
 URL=""
 case "$TARGET" in
@@ -45,7 +44,7 @@ case "$TARGET" in
 esac
 
 RAW_FILE="${SCRATCH_DIR}/yt_feed_raw.md"
-[ -z "$OUT_FILE" ] && OUT_FILE="${TRANSCRIPTS_DIR}/queue.md"
+[ -z "$OUT_FILE" ] && OUT_FILE="${PERM_DIR}/queue.md"
 
 echo "📺 Fetching YouTube ($TARGET) via host Chrome..."
 sleep 1

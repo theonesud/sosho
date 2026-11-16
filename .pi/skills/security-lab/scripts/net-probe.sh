@@ -6,7 +6,7 @@
 set -euo pipefail
 
 TARGET="${1:-192.168.1.0/24}"
-SEC_DIR="${SOSHO_SECURITY_DIR:-${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}/security}"
+SEC_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
 mkdir -p "$SEC_DIR"
 OUT_FILE="${SEC_DIR}/net_probe.md"
 

@@ -32,7 +32,7 @@ if [ -z "$URL" ] || [ -z "$LIB_NAME" ]; then
 fi
 
 PERM_DIR="${SOSHO_PERMANENT_DIR:-.pi/scratchpad/${SOSHO_SESSION_ID:-default}/permanent}"
-DOCS_DIR="${SOSHO_DOCS_DIR:-$PERM_DIR/docs}"
+DOCS_DIR="${PERM_DIR}/docs"
 TARGET_DIR="${DOCS_DIR}/${LIB_NAME}"
 SCRATCH_DIR="${SOSHO_SCRATCH_DIR:-$PERM_DIR}"
 mkdir -p "$TARGET_DIR" "$SCRATCH_DIR"

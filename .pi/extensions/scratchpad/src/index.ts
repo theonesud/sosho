@@ -22,6 +22,7 @@ export interface TaskStatusParams {
 
 export interface TaskFinishParams {
   summary: string;
+  force?: boolean;
 }
 
 export interface TaskItem {
@@ -41,14 +42,6 @@ export interface TaskHistoryEntry {
   failed: number;
 }
 
-export interface CompactionContext {
-  last_compacted_at: string;
-  reason: string;
-  last_user_prompt?: string;
-  recent_tool_calls?: Array<{ tool: string; args?: unknown }>;
-  compaction_summary?: string;
-}
-
 export interface SessionState {
   session_id: string;
   status: "idle" | "running" | "completed" | "interrupted";
@@ -64,7 +57,6 @@ export interface SessionState {
   };
   tasks: TaskItem[];
   history: TaskHistoryEntry[];
-  compaction_context?: CompactionContext;
   updated_at: string;
 }
 
@@ -95,10 +87,6 @@ export function getSessionPaths(ctx: ExtensionContext): SessionPaths {
   process.env.SOSHO_PERMANENT_DIR = permanentDir;
   process.env.SOSHO_SCRATCH_DIR = permanentDir;
   process.env.DOKO_SCRATCH_DIR = permanentDir;
-  process.env.SOSHO_RESEARCH_DIR = join(permanentDir, "research");
-  process.env.SOSHO_PLOTS_DIR = join(permanentDir, "plots");
-  process.env.SOSHO_SECURITY_DIR = join(permanentDir, "security");
-  process.env.SOSHO_TRANSCRIPTS_DIR = join(permanentDir, "transcripts");
 
   return { sessionId, baseDir, ephemeralDir, permanentDir, statePath };
 }
@@ -143,7 +131,6 @@ export class StateManager {
         progress: parsed.progress || { total: 0, completed: 0, failed: 0 },
         tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
         history: Array.isArray(parsed.history) ? parsed.history : [],
-        compaction_context: parsed.compaction_context,
         updated_at: parsed.updated_at || new Date().toISOString(),
       };
     } catch {
@@ -182,7 +169,7 @@ function getStateManager(ctx: ExtensionContext): { sm: StateManager; paths: Sess
 function formatStateSummary(state: SessionState, paths: SessionPaths): string {
   const lines: string[] = [
     `Session ID: ${state.session_id}`,
-    `Permanent Workspace: .pi/scratchpad/${state.session_id}/permanent`,
+    `Permanent Workspace ($SOSHO_PERMANENT_DIR): .pi/scratchpad/${state.session_id}/permanent`,
     `Status: ${state.status}`,
   ];
 
@@ -246,22 +233,31 @@ export default function (pi: ExtensionAPI) {
   process.once("SIGTERM", markInterruptedOnSignal);
 
   // ---------------------------------------------------------------------------
-  // 1. Block manual read/write/edit to ephemeral/state.json
+  // 1. Block manual access to ephemeral/state.json across read, write, edit, bash
   // ---------------------------------------------------------------------------
   pi.on("tool_call", async (event, ctx) => {
-    if (event.toolName !== "write" && event.toolName !== "edit" && event.toolName !== "read") {
-      return undefined;
-    }
-    const targetPath = String((event.input as Record<string, unknown>)?.path || "");
-    if (targetPath.includes("ephemeral/state.json") || targetPath.endsWith("/state.json")) {
-      if (ctx.hasUI && ctx.ui?.notify) {
-        ctx.ui.notify("Blocked direct file access to state.json. Using task_* tools instead.", "warning");
+    if (event.toolName === "write" || event.toolName === "edit" || event.toolName === "read") {
+      const targetPath = String((event.input as Record<string, unknown>)?.path || "");
+      if (targetPath.includes("ephemeral/state.json") || targetPath.endsWith("/state.json")) {
+        if (ctx.hasUI && ctx.ui?.notify) {
+          ctx.ui.notify("Blocked direct file access to state.json. Using task_* tools instead.", "warning");
+        }
+        return {
+          block: true,
+          reason:
+            "Direct file access to state.json is forbidden. Use the dedicated CRUD tools (`task_plan`, `task_update`, `task_status`, `task_finish`) to inspect or mutate task state.",
+        };
       }
-      return {
-        block: true,
-        reason:
-          "Direct file access to state.json is forbidden. Use the dedicated CRUD tools (`task_plan`, `task_update`, `task_status`, `task_finish`) to inspect or mutate task state.",
-      };
+    } else if (event.toolName === "bash") {
+      const cmd = String((event.input as Record<string, unknown>)?.command || "");
+      if (/(^|\s)(cat|grep|sed|awk|vi|vim|nano|head|tail|python|python3|node|rm|cp|mv)\s+.*state\.json/i.test(cmd) ||
+          cmd.includes("ephemeral/state.json")) {
+        return {
+          block: true,
+          reason:
+            "Direct access to state.json via bash is forbidden. Use `task_status`, `task_plan`, `task_update`, or `task_finish`.",
+        };
+      }
     }
     return undefined;
   });
@@ -293,7 +289,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   // ---------------------------------------------------------------------------
-  // 3. Inject Active Session Scratchpad Paths & Interruption Notice Before Agent Turn
+  // 3. Inject Scratchpad Paths & Recovery Notice Before Agent Turn (Preserves KV Cache)
   // ---------------------------------------------------------------------------
   pi.on("before_agent_start", async (event, ctx) => {
     try {
@@ -304,21 +300,18 @@ export default function (pi: ExtensionAPI) {
       const state = sm.read();
       const relPermanent = `.pi/scratchpad/${paths.sessionId}/permanent`;
 
+      // Static session preamble to preserve prompt KV cache across turns
       const addonLines: string[] = [
         "",
         "## Active Session Scratchpad",
         `- **Session ID**: \`${paths.sessionId}\``,
-        `- **Permanent Workspace**: \`${relPermanent}/\` (use this directory for all scripts, raw web dumps, research, plots, and intermediate files)`,
-        `- **Task State Management**: Managed strictly via CRUD tools (\`task_plan\`, \`task_update\`, \`task_status\`, \`task_finish\`). Never read or edit \`state.json\` directly. Only create a task plan for multi-step (2+) or batch tasks; do not use task tools for trivial single-turn questions.`,
+        `- **Permanent Workspace**: \`${relPermanent}/\` (also exported as \`$SOSHO_PERMANENT_DIR\`)`,
+        `- **Task State**: Managed strictly via CRUD tools (\`task_plan\`, \`task_update\`, \`task_status\`, \`task_finish\`). Never access \`state.json\` directly.`,
       ];
 
       if (state.status === "interrupted" && state.active_task) {
         addonLines.push(
           `- **INTERRUPTION RECOVERY**: Previous run was interrupted during task "${state.active_task.title}" (${state.progress.completed}/${state.progress.total} completed). Call \`task_status\` before continuing if resuming this work.`,
-        );
-      } else if (state.status === "running" && state.active_task) {
-        addonLines.push(
-          `- **ACTIVE TASK**: "${state.active_task.title}" (${state.progress.completed}/${state.progress.total} completed, current step: ${state.active_task.current_step || "in progress"}).`,
         );
       }
 
@@ -331,69 +324,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   // ---------------------------------------------------------------------------
-  // 4. Lifecycle: Session Compaction (Stored directly in state.json)
-  // ---------------------------------------------------------------------------
-  pi.on("session_before_compact", async (event, ctx) => {
-    try {
-      const { sm, paths } = getStateManager(ctx);
-      const entries = (ctx.sessionManager?.getEntries?.() as unknown as Array<Record<string, unknown>>) || [];
-      const userMessages = entries.filter(
-        (e) => e.type === "message" && (e.message as Record<string, unknown>)?.role === "user",
-      );
-      const lastUserMsg = userMessages[userMessages.length - 1];
-      const rawContent = (lastUserMsg?.message as Record<string, unknown>)?.content;
-      const lastPrompt = typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent || "");
-
-      const recentToolCalls: Array<{ tool: string; args?: unknown }> = [];
-      for (let i = entries.length - 1; i >= 0 && recentToolCalls.length < 6; i--) {
-        const e = entries[i];
-        const msg = e.message as Record<string, unknown> | undefined;
-        if (e.type === "message" && msg?.content && Array.isArray(msg.content)) {
-          for (const p of msg.content) {
-            if (p.type === "toolCall") {
-              recentToolCalls.push({ tool: p.name, args: p.arguments });
-            }
-          }
-        }
-      }
-
-      sm.mutate((s) => {
-        s.compaction_context = {
-          last_compacted_at: new Date().toISOString(),
-          reason: event.reason || "auto",
-          last_user_prompt: lastPrompt.slice(0, 1000),
-          recent_tool_calls: recentToolCalls,
-        };
-      });
-
-      if (ctx.hasUI && ctx.ui?.notify) {
-        ctx.ui.notify(`💾 Pre-compaction state saved to .pi/scratchpad/${paths.sessionId}/ephemeral/state.json`);
-      }
-    } catch (err) {
-      console.error("[Scratchpad Extension] Failed to save pre-compaction state:", err);
-    }
-  });
-
-  pi.on("session_compact", async (event, ctx) => {
-    try {
-      const { sm } = getStateManager(ctx);
-      const entry = event.compactionEntry as { summary?: string } | undefined;
-      sm.mutate((s) => {
-        if (!s.compaction_context) {
-          s.compaction_context = {
-            last_compacted_at: new Date().toISOString(),
-            reason: event.reason || "auto",
-          };
-        }
-        s.compaction_context.compaction_summary = entry?.summary || "";
-      });
-    } catch (err) {
-      console.error("[Scratchpad Extension] Failed to record compaction summary:", err);
-    }
-  });
-
-  // ---------------------------------------------------------------------------
-  // 5. Lifecycle: Session Shutdown
+  // 4. Lifecycle: Session Shutdown
   // ---------------------------------------------------------------------------
   pi.on("session_shutdown", async (_event, ctx) => {
     try {
@@ -410,7 +341,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   // ---------------------------------------------------------------------------
-  // 6. CRUD Tool: task_plan
+  // 5. CRUD Tool: task_plan
   // ---------------------------------------------------------------------------
   pi.registerTool({
     name: "task_plan",
@@ -474,7 +405,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   // ---------------------------------------------------------------------------
-  // 7. CRUD Tool: task_update
+  // 6. CRUD Tool: task_update
   // ---------------------------------------------------------------------------
   pi.registerTool({
     name: "task_update",
@@ -563,13 +494,13 @@ export default function (pi: ExtensionAPI) {
   });
 
   // ---------------------------------------------------------------------------
-  // 8. CRUD Tool: task_status
+  // 7. CRUD Tool: task_status
   // ---------------------------------------------------------------------------
   pi.registerTool({
     name: "task_status",
     label: "Task Status",
     description:
-      "Read the current session task state, progress counts, active/pending steps, and session task history. Call this after context compaction or session resume.",
+      "Read the current session task state, progress counts, active/pending steps, and session task history. Call this after session resume.",
     promptSnippet: "task_status: Inspect active task progress, pending items, and session history",
     parameters: {
       type: "object",
@@ -601,13 +532,13 @@ export default function (pi: ExtensionAPI) {
   });
 
   // ---------------------------------------------------------------------------
-  // 9. CRUD Tool: task_finish
+  // 8. CRUD Tool: task_finish
   // ---------------------------------------------------------------------------
   pi.registerTool({
     name: "task_finish",
     label: "Task Finish",
     description:
-      "Complete the active task plan, archive it to the session history, and reset the active queue so the session is clean for any subsequent task.",
+      "Complete the active task plan, archive it to the session history, and reset the active queue so the session is clean for any subsequent task. Requires all items to be marked 'done' or 'failed', unless force=true.",
     promptSnippet: "task_finish: Archive completed task plan and reset active queue to idle",
     parameters: {
       type: "object",
@@ -616,12 +547,41 @@ export default function (pi: ExtensionAPI) {
           type: "string",
           description: "Final verification summary and output artifact paths produced",
         },
+        force: {
+          type: "boolean",
+          description: "Allow completing even if some items are still pending or in_progress (default false)",
+        },
       },
       required: ["summary"],
     } as any,
     async execute(_toolCallId, rawParams, _signal, _onUpdate, ctx) {
       const params = rawParams as TaskFinishParams;
       const { sm } = getStateManager(ctx);
+      const state = sm.read();
+
+      if (!state.active_task) {
+        return {
+          content: [{ type: "text", text: "No active task to finish (state is already idle)." }],
+        };
+      }
+
+      const pendingOrInProgress = state.tasks.filter(
+        (t) => t.status === "pending" || t.status === "in_progress",
+      );
+
+      if (pendingOrInProgress.length > 0 && !params.force) {
+        const itemIds = pendingOrInProgress.map((t) => `${t.id} (${t.status})`).join(", ");
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Cannot finish task: ${pendingOrInProgress.length} item(s) are still unfinished: ${itemIds}. Use \`task_update\` to mark them 'done' or 'failed' (with a reason), or pass force=true.`,
+            },
+          ],
+        };
+      }
+
       const updated = sm.mutate((s) => {
         const title = s.active_task?.title || "Completed Task";
         const goal = s.active_task?.goal || "";
@@ -648,7 +608,7 @@ export default function (pi: ExtensionAPI) {
         content: [
           {
             type: "text",
-            text: `Task "${lastHistory.title}" marked completed and archived to session history (${lastHistory.completed}/${lastHistory.total} done). Active queue is now clean and idle.`,
+            text: `Task "${lastHistory.title}" marked completed and archived to session history (${lastHistory.completed}/${lastHistory.total} done, ${lastHistory.failed} failed). Active queue is now clean and idle.`,
           },
         ],
       };

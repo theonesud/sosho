@@ -1,16 +1,16 @@
 ---
 name: web-craft
-description: Build interactive website presentations (Reveal.js / HTML decks) and small fullstack webapps using Next.js and FastAPI, with background dev server runners and endpoint testing.
+description: Build interactive website presentations (Reveal.js / HTML decks) and fullstack webapps using Next.js and FastAPI, with background dev server runners and endpoint testing.
 ---
 
 # Web Craft: Presentations, Next.js & FastAPI Webapps
 
-Dedicated workflow for serious webapps, REST/FastAPI microservices, and interactive website presentations.
+Workflow for webapps, REST/FastAPI services, and interactive HTML presentations.
 
 ## Usage
 
 ```bash
-# 1. Start a dev server in background
+# 1. Start dev server in background
 .pi/skills/web-craft/scripts/dev.sh next ./my-next-app 3001
 .pi/skills/web-craft/scripts/dev.sh fastapi ./my-api 8001
 .pi/skills/web-craft/scripts/dev.sh presentation ./deck 8005
@@ -24,6 +24,6 @@ Dedicated workflow for serious webapps, REST/FastAPI microservices, and interact
 ```
 
 ## Protocol
-1. For Next.js (App router vs Pages router) or FastAPI (Pydantic v2), consult `libdocs` first to verify correct idioms.
-2. Develop modular components; use `test-api.sh` to verify endpoints.
-3. Keep server logs in the session's `permanent/` directory and inspect errors via `bin/chunk-read.sh`.
+1. Consult `libdocs` for modern Next.js/FastAPI idioms when needed.
+2. Verify endpoints with `test-api.sh`.
+3. Background server logs and PIDs are maintained in `$SOSHO_PERMANENT_DIR`.
