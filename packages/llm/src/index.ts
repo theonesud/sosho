@@ -60,6 +60,7 @@ export interface ChatCompletionOptions {
   temperature?: number;
   maxTokens?: number;
   timeoutMs?: number;
+  signal?: AbortSignal;
   cwd?: string;
   soshoRoot?: string;
   traceName?: string;
@@ -78,6 +79,18 @@ export interface ChatCompletionResult {
     total_tokens?: number;
   };
 }
+
+export type ChatCompletionStreamEvent =
+  | { type: "delta"; content: string }
+  | {
+      type: "done";
+      content: string;
+      provider: string;
+      model: string;
+      durationMs: number;
+      usage?: ChatCompletionResult["usage"];
+      fallbackUsed: boolean;
+    };
 
 export function getDefaultSoshoRoot(): string {
   if (process.env.SOSHO_ROOT && existsSync(join(process.env.SOSHO_ROOT, ".pi"))) {
@@ -369,6 +382,9 @@ export async function chatCompletion(options: ChatCompletionOptions): Promise<Ch
   const startMs = Date.now();
   const startIso = new Date(startMs).toISOString();
 
+  const timeoutSignal = AbortSignal.timeout(options.timeoutMs ?? 60_000);
+  const fetchSignal = options.signal ? AbortSignal.any([timeoutSignal, options.signal]) : timeoutSignal;
+
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -381,7 +397,7 @@ export async function chatCompletion(options: ChatCompletionOptions): Promise<Ch
       temperature: options.temperature ?? 0.3,
       max_tokens: options.maxTokens ?? 1024,
     }),
-    signal: AbortSignal.timeout(options.timeoutMs ?? 60_000),
+    signal: fetchSignal,
   });
 
   if (!res.ok) {
@@ -417,3 +433,138 @@ export async function chatCompletion(options: ChatCompletionOptions): Promise<Ch
     usage: data.usage,
   };
 }
+
+export async function* chatCompletionStream(
+  options: ChatCompletionOptions,
+): AsyncGenerator<ChatCompletionStreamEvent> {
+  const cwd = options.cwd ?? process.cwd();
+  const soshoRoot = options.soshoRoot ?? getDefaultSoshoRoot();
+  const env = loadEnvMap(cwd, soshoRoot);
+
+  let baseUrl: string;
+  let apiKey: string;
+  let provider: string;
+  let model: string;
+  let fallbackUsed = false;
+
+  if (options.provider && options.model) {
+    const modelsFile = loadModelsConfig(cwd, soshoRoot);
+    const providerCfg = modelsFile.providers[options.provider];
+    if (!providerCfg?.baseUrl) {
+      throw new Error(`Provider '${options.provider}' not found in .pi/models.json`);
+    }
+    provider = options.provider;
+    model = options.model;
+    baseUrl = providerCfg.baseUrl.replace(/\/+$/, "");
+    apiKey = resolveProviderApiKey(provider, providerCfg, env);
+  } else {
+    const resolved = await resolveRoleEndpoint(options.role || "main", { cwd, soshoRoot });
+    provider = resolved.provider;
+    model = options.model || resolved.model;
+    baseUrl = resolved.baseUrl;
+    apiKey = resolved.apiKey;
+    fallbackUsed = resolved.usedFallback;
+  }
+
+  const startMs = Date.now();
+  const startIso = new Date(startMs).toISOString();
+
+  const timeoutSignal = AbortSignal.timeout(options.timeoutMs ?? 60_000);
+  const fetchSignal = options.signal ? AbortSignal.any([timeoutSignal, options.signal]) : timeoutSignal;
+
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: options.messages,
+      temperature: options.temperature ?? 0.3,
+      max_tokens: options.maxTokens ?? 1024,
+      stream: true,
+    }),
+    signal: fetchSignal,
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`LLM ${provider}/${model} HTTP ${res.status}: ${errText.slice(0, 300)}`);
+  }
+
+  if (!res.body) {
+    throw new Error(`LLM ${provider}/${model} returned empty stream body`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let fullContent = "";
+  let usage: ChatCompletionResult["usage"];
+
+  try {
+    while (true) {
+      if (fetchSignal.aborted) {
+        throw fetchSignal.reason ?? new Error("Stream aborted");
+      }
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data:")) continue;
+        const payload = trimmed.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          const parsed = JSON.parse(payload) as {
+            choices?: Array<{ delta?: { content?: string } }>;
+            usage?: ChatCompletionResult["usage"];
+          };
+          if (parsed.usage) {
+            usage = parsed.usage;
+          }
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (typeof delta === "string" && delta.length > 0) {
+            fullContent += delta;
+            yield { type: "delta", content: delta };
+          }
+        } catch {
+          // Ignore malformed SSE JSON chunks
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const endMs = Date.now();
+  void emitLangfuseGeneration(env, {
+    traceId: options.traceId || randomUUID(),
+    traceName: options.traceName || "Sosho LLM Stream",
+    provider,
+    model,
+    input: options.messages,
+    output: fullContent,
+    startTime: startIso,
+    endTime: new Date(endMs).toISOString(),
+    usage,
+    metadata: { fallbackUsed, ...(options.metadata ?? {}) },
+  });
+
+  yield {
+    type: "done",
+    content: fullContent,
+    provider,
+    model,
+    durationMs: endMs - startMs,
+    usage,
+    fallbackUsed,
+  };
+}
+
+export * from "./subagent-runtime.ts";

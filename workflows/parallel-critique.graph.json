@@ -1,0 +1,93 @@
+{
+  "id": "parallel-critique",
+  "name": "Parallel Multi-Tier Critique Loop",
+  "description": "Fans out a draft to main, subagent, and local-uncensored critics across cloud-io and local-gpu queues, synthesizes feedback, and routes via a bounded decision loop.",
+  "version": 1,
+  "entryNode": "prepare_draft",
+  "maxSteps": 12,
+  "nodes": [
+    {
+      "id": "prepare_draft",
+      "type": "agent",
+      "label": "Prepare Draft",
+      "position": { "x": 80, "y": 200 },
+      "tier": "main",
+      "queue": "cloud-io",
+      "promptTemplate": "Prepare or revise the technical proposal for: {{topic}}\nPrior synthesis (if any): {{synthesis}}",
+      "outputKey": "draft"
+    },
+    {
+      "id": "critic_main",
+      "type": "agent",
+      "label": "Architecture Critic (Main)",
+      "position": { "x": 380, "y": 60 },
+      "tier": "main",
+      "queue": "cloud-io",
+      "promptTemplate": "Critique the architecture and correctness of this draft:\n{{draft}}",
+      "outputKey": "critique_main"
+    },
+    {
+      "id": "critic_subagent",
+      "type": "subagent",
+      "label": "Edge-Case Critic (Subagent)",
+      "position": { "x": 380, "y": 200 },
+      "role": "Edge-Case Reviewer",
+      "tier": "subagent",
+      "queue": "cloud-io",
+      "promptTemplate": "Identify edge cases, missing tests, and failure modes in this draft:\n{{draft}}",
+      "outputKey": "critique_subagent"
+    },
+    {
+      "id": "critic_local",
+      "type": "agent",
+      "label": "Red-Team Critic (Local GPU)",
+      "position": { "x": 380, "y": 340 },
+      "tier": "local-uncensored",
+      "queue": "local-gpu",
+      "promptTemplate": "Provide an unfiltered red-team critique of this draft:\n{{draft}}",
+      "outputKey": "critique_local"
+    },
+    {
+      "id": "synthesize_critiques",
+      "type": "agent",
+      "label": "Synthesize Critiques",
+      "position": { "x": 680, "y": 200 },
+      "tier": "main",
+      "queue": "cloud-io",
+      "promptTemplate": "Synthesize these critiques into an action list and quality verdict:\nMain: {{critique_main}}\nSubagent: {{critique_subagent}}\nLocal: {{critique_local}}",
+      "outputKey": "synthesis"
+    },
+    {
+      "id": "quality_gate",
+      "type": "decision",
+      "label": "Approve or Revise",
+      "position": { "x": 960, "y": 200 },
+      "tier": "decision",
+      "queue": "cloud-io",
+      "promptTemplate": "Review the synthesis below and choose 'approve' if ready or 'revise' if another pass is needed:\n{{synthesis}}",
+      "branches": ["approve", "revise"],
+      "outputKey": "gate_decision"
+    },
+    {
+      "id": "finalize_output",
+      "type": "agent",
+      "label": "Finalize Proposal",
+      "position": { "x": 1240, "y": 200 },
+      "tier": "main",
+      "queue": "cloud-io",
+      "promptTemplate": "Produce the final approved output from:\nDraft:\n{{draft}}\nSynthesis:\n{{synthesis}}",
+      "outputKey": "final_output"
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "prepare_draft", "target": "critic_main" },
+    { "id": "e2", "source": "prepare_draft", "target": "critic_subagent" },
+    { "id": "e3", "source": "prepare_draft", "target": "critic_local" },
+    { "id": "e4", "source": "critic_main", "target": "synthesize_critiques" },
+    { "id": "e5", "source": "critic_subagent", "target": "synthesize_critiques" },
+    { "id": "e6", "source": "critic_local", "target": "synthesize_critiques" },
+    { "id": "e7", "source": "synthesize_critiques", "target": "quality_gate" },
+    { "id": "e8", "source": "quality_gate", "target": "finalize_output", "condition": "approve" },
+    { "id": "e9", "source": "quality_gate", "target": "prepare_draft", "condition": "revise" }
+  ]
+}

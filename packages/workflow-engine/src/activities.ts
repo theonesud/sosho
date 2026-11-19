@@ -2,12 +2,12 @@ import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { chatCompletion, loadEnvMap, resolveRoleEndpoint } from "../../llm/src/index.ts";
+import { chatCompletion, getDefaultSoshoRoot, loadEnvMap, resolveRoleEndpoint } from "../../llm/src/index.ts";
 import {
   drainInboxToEpisodic,
   type MemoryScope,
   rebuildCoreProfile,
-  searchMemory,
+  searchMemoryAsync,
   upsertMemory,
 } from "../../memory/src/store.ts";
 import type { GraphNode } from "./schema.ts";
@@ -49,6 +49,7 @@ export interface ActivityResult {
   value?: unknown;
   branch?: string;
   preview: string;
+  renderedPrompt?: string;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -59,17 +60,25 @@ export async function withNodeRetryAndTimeout<T>(
   node: GraphNode,
   fn: (signal: AbortSignal, attempt: number) => Promise<T>,
   baseDelayMs = 500,
+  externalSignal?: AbortSignal,
 ): Promise<T> {
   const maxAttempts = Math.max(1, node.retryMaxAttempts ?? 1);
   const timeoutMs = (node.timeoutSeconds ?? 120) * 1000;
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const signal = AbortSignal.timeout(timeoutMs);
+    if (externalSignal?.aborted) {
+      throw externalSignal.reason ?? new Error("Run aborted");
+    }
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    const signal = externalSignal ? AbortSignal.any([timeoutSignal, externalSignal]) : timeoutSignal;
     try {
       return await fn(signal, attempt);
     } catch (err) {
       lastError = err;
+      if (externalSignal?.aborted) {
+        throw err;
+      }
       if (attempt < maxAttempts) {
         const delay = baseDelayMs * 2 ** (attempt - 1);
         await sleep(delay);
@@ -85,6 +94,7 @@ async function runPiPrint(
   cwd: string,
   timeoutMs: number,
   piBinary: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const endpoint = await resolveRoleEndpoint(tier, { cwd });
   const args = [
@@ -101,6 +111,7 @@ async function runPiPrint(
     cwd,
     timeout: timeoutMs,
     maxBuffer: 1024 * 1024 * 4,
+    signal,
   });
   return (stdout || stderr).trim();
 }
@@ -197,9 +208,10 @@ export async function executeNodeActivity(input: {
   node: GraphNode;
   data: Record<string, unknown>;
   cwd: string;
+  signal?: AbortSignal;
   options?: ActivityRuntimeOptions;
 }): Promise<ActivityResult> {
-  const { node, data, cwd, options } = input;
+  const { node, data, cwd, signal: externalSignal, options } = input;
   const piBinary = options?.piBinary || process.env.SOSHO_PI_BIN || "pi";
   const retryBaseDelayMs = options?.retryBaseDelayMs ?? 500;
   const yue2PollIntervalMs = options?.yue2PollIntervalMs ?? 2000;
@@ -220,12 +232,18 @@ export async function executeNodeActivity(input: {
             ],
             temperature: 0.2,
             timeoutMs,
+            signal,
             cwd,
             traceId: options?.runId,
             traceName: `Workflow Agent: ${node.label}`,
             metadata: { nodeId: node.id, nodeType: node.type },
           });
-          return { outputKey: node.outputKey, value: res.content, preview: res.content.slice(0, 240) };
+          return {
+            outputKey: node.outputKey,
+            value: res.content,
+            preview: res.content.slice(0, 240),
+            renderedPrompt: prompt,
+          };
         }
 
         case "subagent": {
@@ -238,8 +256,13 @@ export async function executeNodeActivity(input: {
               "",
               prompt,
             ].join("\n");
-            const text = await runPiPrint(fullPrompt, node.tier, cwd, timeoutMs, piBinary);
-            return { outputKey: node.outputKey, value: text, preview: text.slice(0, 240) };
+            const text = await runPiPrint(fullPrompt, node.tier, cwd, timeoutMs, piBinary, signal);
+            return {
+              outputKey: node.outputKey,
+              value: text,
+              preview: text.slice(0, 240),
+              renderedPrompt: fullPrompt,
+            };
           }
           const sys = `You are a focused subagent (${node.role}). Return a concise structured result.`;
           const res = await chatCompletion({
@@ -250,12 +273,18 @@ export async function executeNodeActivity(input: {
             ],
             temperature: 0.2,
             timeoutMs,
+            signal,
             cwd,
             traceId: options?.runId,
             traceName: `Workflow Subagent: ${node.role}`,
             metadata: { nodeId: node.id, role: node.role },
           });
-          return { outputKey: node.outputKey, value: res.content, preview: res.content.slice(0, 240) };
+          return {
+            outputKey: node.outputKey,
+            value: res.content,
+            preview: res.content.slice(0, 240),
+            renderedPrompt: prompt,
+          };
         }
 
         case "decision": {
@@ -269,6 +298,7 @@ export async function executeNodeActivity(input: {
             ],
             temperature: 0.0,
             timeoutMs,
+            signal,
             cwd,
             traceId: options?.runId,
             traceName: `Workflow Decision: ${node.label}`,
@@ -286,18 +316,33 @@ export async function executeNodeActivity(input: {
             const found = node.branches.find((b) => text.toLowerCase().includes(b.toLowerCase()));
             if (found) chosen = found;
           }
-          return { outputKey: node.outputKey, value: chosen, branch: chosen, preview: `branch=${chosen}` };
+          return {
+            outputKey: node.outputKey,
+            value: chosen,
+            branch: chosen,
+            preview: `branch=${chosen}`,
+            renderedPrompt: prompt,
+          };
         }
 
         case "skill": {
-          const skillPath = join(cwd, ".pi", "skills", node.skillName, "SKILL.md");
-          const skillInstructions = existsSync(skillPath)
+          const skillCandidates = [
+            join(cwd, ".pi", "skills", node.skillName, "SKILL.md"),
+            join(getDefaultSoshoRoot(), ".pi", "skills", node.skillName, "SKILL.md"),
+          ];
+          const skillPath = skillCandidates.find((p) => existsSync(p));
+          const skillInstructions = skillPath
             ? readFileSync(skillPath, "utf8").slice(0, 6000)
             : `Skill '${node.skillName}' requested.`;
           const prompt = renderTemplate(node.promptTemplate, data);
           const fullPrompt = `Follow this Sosho skill (${node.skillName}):\n\n${skillInstructions}\n\nTask:\n${prompt}`;
-          const text = await runPiPrint(fullPrompt, node.tier, cwd, timeoutMs, piBinary);
-          return { outputKey: node.outputKey, value: text, preview: text.slice(0, 240) };
+          const text = await runPiPrint(fullPrompt, node.tier, cwd, timeoutMs, piBinary, signal);
+          return {
+            outputKey: node.outputKey,
+            value: text,
+            preview: text.slice(0, 240),
+            renderedPrompt: fullPrompt,
+          };
         }
 
         case "tool": {
@@ -307,9 +352,15 @@ export async function executeNodeActivity(input: {
               cwd,
               timeout: timeoutMs,
               maxBuffer: 1024 * 1024 * 4,
+              signal,
             });
             const out = (stdout || stderr).trim();
-            return { outputKey: node.outputKey, value: out, preview: out.slice(0, 240) };
+            return {
+              outputKey: node.outputKey,
+              value: out,
+              preview: out.slice(0, 240),
+              renderedPrompt: target,
+            };
           }
           if (node.toolKind === "yue2") {
             const body = node.bodyTemplate ? renderTemplate(node.bodyTemplate, data) : undefined;
@@ -318,6 +369,7 @@ export async function executeNodeActivity(input: {
               outputKey: node.outputKey,
               value: result,
               preview: `yue2 ${result.jobId} (${result.audioPath ? "audio saved" : "done"})`,
+              renderedPrompt: body || target,
             };
           }
           const method = node.method || (node.bodyTemplate ? "POST" : "GET");
@@ -330,18 +382,24 @@ export async function executeNodeActivity(input: {
           });
           const text = await res.text();
           if (!res.ok) throw new Error(`HTTP tool ${res.status}: ${text.slice(0, 200)}`);
-          return { outputKey: node.outputKey, value: text, preview: text.slice(0, 240) };
+          return {
+            outputKey: node.outputKey,
+            value: text,
+            preview: text.slice(0, 240),
+            renderedPrompt: target,
+          };
         }
 
         case "memory": {
           if (node.operation === "search") {
             const q = renderTemplate(node.queryOrTitleTemplate || "", data);
-            const hits = searchMemory({ query: q, scope: node.scope, limit: 6 }, cwd);
+            const hits = await searchMemoryAsync({ query: q, scope: node.scope, limit: 6 }, cwd);
             const formatted = hits.map((h) => `[${h.record.id}] ${h.record.title}: ${h.record.content}`).join("\n");
             return {
               outputKey: node.outputKey,
               value: formatted || "(no matching memories)",
               preview: `${hits.length} memories recalled`,
+              renderedPrompt: q,
             };
           }
           if (node.operation === "save") {
@@ -357,6 +415,7 @@ export async function executeNodeActivity(input: {
               outputKey: node.outputKey,
               value: res.record.id,
               preview: `saved ${res.record.id} (${scope})`,
+              renderedPrompt: `${title}: ${content}`,
             };
           }
           const scopes: MemoryScope[] =
@@ -375,5 +434,6 @@ export async function executeNodeActivity(input: {
       }
     },
     retryBaseDelayMs,
+    externalSignal,
   );
 }

@@ -1,43 +1,32 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import type { Server } from "node:http";
 import { join, resolve } from "node:path";
-import {
-  archiveMemory,
-  closeMemoryIndexes,
-  drainInboxToEpisodic,
-  loadScopeMemories,
-  type MemoryScope,
-  type MemoryType,
-  readCoreProfile,
-  rebuildCoreProfile,
-  searchMemory,
-  upsertMemory,
-} from "../../../packages/memory/src/store.ts";
+import { createAdaptorServer } from "@hono/node-server";
+import { Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { closeMemoryIndexes } from "../../../packages/memory/src/store.ts";
 import { type NodeExecutor, WorkflowEngine } from "../../../packages/workflow-engine/src/engine.ts";
-import { GraphValidationError, validateGraph } from "../../../packages/workflow-engine/src/schema.ts";
+import { GraphValidationError } from "../../../packages/workflow-engine/src/schema.ts";
+import { HttpError, isSafeWorkflowId, MAX_BODY_BYTES, type StudioContext } from "./context.ts";
+import { createOpenApiRoutes } from "./openapi.ts";
+import { createEventsRoutes } from "./routes/events.ts";
+import { createMemoryRoutes } from "./routes/memory.ts";
+import { createMusicRoutes } from "./routes/music.ts";
+import { createRunsRoutes } from "./routes/runs.ts";
+import { createSkillsRoutes } from "./routes/skills.ts";
+import { createSystemRoutes } from "./routes/system.ts";
+import { createWorkflowsRoutes } from "./routes/workflows.ts";
+import { SseHub } from "./sse.ts";
+
+export { isSafeWorkflowId };
 
 const DEFAULT_ALLOWED_ORIGINS = new Set([
   "http://127.0.0.1:4100",
   "http://localhost:4100",
 ]);
 
-const MAX_BODY_BYTES = 1024 * 1024; // 1 MiB
 const MUTATING_METHODS = new Set(["POST", "PUT", "DELETE"]);
-
-class HttpError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
-
-export function isSafeWorkflowId(id: string): boolean {
-  if (!id || id.length > 128) return false;
-  if (id.includes("/") || id.includes("\\") || id.includes("..") || id.includes("\0")) return false;
-  return /^[a-zA-Z0-9._-]+$/.test(id);
-}
 
 function loadStudioToken(root: string): string {
   const fromEnv = process.env.SOSHO_STUDIO_TOKEN?.trim();
@@ -56,8 +45,7 @@ function loadStudioToken(root: string): string {
   return randomBytes(24).toString("hex");
 }
 
-function verifyBearer(req: IncomingMessage, expectedToken: string): boolean {
-  const auth = req.headers.authorization;
+function verifyBearerHeader(auth: string | undefined, expectedToken: string): boolean {
   if (!auth || !auth.startsWith("Bearer ")) return false;
   const provided = auth.slice("Bearer ".length).trim();
   const a = Buffer.from(provided, "utf8");
@@ -77,7 +65,9 @@ export interface StudioServerOptions {
 
 export function createStudioServer(options: StudioServerOptions = {}): {
   server: Server;
+  app: Hono;
   engine: WorkflowEngine;
+  sse: SseHub;
   token: string;
   closeAll: () => void;
 } {
@@ -96,512 +86,120 @@ export function createStudioServer(options: StudioServerOptions = {}): {
     executor: options.executor,
   });
 
-  const sseClients = new Set<ServerResponse>();
-
-  function broadcastEvent(payload: Record<string, unknown>) {
-    const data = `data: ${JSON.stringify(payload)}\n\n`;
-    for (const res of sseClients) {
-      try {
-        res.write(data);
-      } catch {
-        sseClients.delete(res);
-      }
-    }
-  }
+  const sse = new SseHub(HEARTBEAT_MS);
 
   // Forward in-process SQLite DAG engine events directly to SSE subscribers
   engine.on("event", (ev: Record<string, unknown>) => {
-    broadcastEvent(ev);
+    sse.broadcast(ev);
   });
 
   // Recover any interrupted 'running' runs on startup
   engine.recoverInterruptedRuns();
 
-  const heartbeatTimer = setInterval(() => {
-    for (const res of sseClients) {
-      try {
-        res.write(": ping\n\n");
-      } catch {
-        sseClients.delete(res);
+  const ctx: StudioContext = {
+    root: ROOT,
+    workflowsDir: WORKFLOWS_DIR,
+    skillsDir: SKILLS_DIR,
+    port: PORT,
+    engine,
+    sse,
+  };
+
+  const app = new Hono();
+
+  // Strict loopback CORS + Origin check + Bearer auth + Content-Length guard
+  app.use("*", async (c, next) => {
+    const origin = c.req.header("origin");
+    c.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    c.header("Vary", "Origin");
+
+    if (origin) {
+      if (!DEFAULT_ALLOWED_ORIGINS.has(origin)) {
+        return c.json({ error: "Origin not allowed" }, 403);
+      }
+      c.header("Access-Control-Allow-Origin", origin);
+    }
+
+    if (c.req.method === "OPTIONS") {
+      return c.body(null, 204);
+    }
+
+    if (MUTATING_METHODS.has(c.req.method)) {
+      if (!verifyBearerHeader(c.req.header("authorization"), STUDIO_TOKEN)) {
+        return c.json({ error: "Unauthorized: missing or invalid bearer token" }, 401);
+      }
+      const contentLength = Number(c.req.header("content-length") || "0");
+      if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+        return c.json({ error: "Payload too large (max 1 MiB)" }, 413);
       }
     }
-  }, HEARTBEAT_MS);
-  heartbeatTimer.unref();
 
-  function corsHeaders(req: IncomingMessage): Record<string, string> {
-    const origin = req.headers.origin;
-    const headers: Record<string, string> = {
-      "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      Vary: "Origin",
-    };
-    if (origin && DEFAULT_ALLOWED_ORIGINS.has(origin)) {
-      headers["Access-Control-Allow-Origin"] = origin;
-    }
-    return headers;
-  }
-
-  function sendJson(req: IncomingMessage, res: ServerResponse, status: number, body: unknown) {
-    res.writeHead(status, {
-      "Content-Type": "application/json",
-      ...corsHeaders(req),
-    });
-    res.end(JSON.stringify(body));
-  }
-
-  async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
-    const chunks: Buffer[] = [];
-    let total = 0;
-    for await (const chunk of req) {
-      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      total += buf.length;
-      if (total > MAX_BODY_BYTES) {
-        throw new HttpError(413, "Payload too large (max 1 MiB)");
-      }
-      chunks.push(buf);
-    }
-    const raw = Buffer.concat(chunks).toString("utf8").trim();
-    if (!raw) return {};
-    try {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-        throw new HttpError(400, "JSON body must be an object");
-      }
-      return parsed as Record<string, unknown>;
-    } catch (err) {
-      if (err instanceof HttpError) throw err;
-      throw new HttpError(400, "Invalid JSON payload");
-    }
-  }
-
-  const server = createServer(async (req, res) => {
-    try {
-      const origin = req.headers.origin;
-      if (origin && !DEFAULT_ALLOWED_ORIGINS.has(origin)) {
-        sendJson(req, res, 403, { error: "Origin not allowed" });
-        return;
-      }
-
-      if (req.method === "OPTIONS") {
-        res.writeHead(204, corsHeaders(req));
-        res.end();
-        return;
-      }
-
-      if (req.method && MUTATING_METHODS.has(req.method)) {
-        if (!verifyBearer(req, STUDIO_TOKEN)) {
-          sendJson(req, res, 401, { error: "Unauthorized: missing or invalid bearer token" });
-          return;
-        }
-      }
-
-      const url = new URL(req.url || "/", `http://127.0.0.1:${PORT}`);
-      const path = url.pathname;
-
-      // 0. Root & Health Info
-      if (req.method === "GET" && (path === "/" || path === "/health")) {
-        sendJson(req, res, 200, {
-          service: "sosho-studio-api",
-          status: "ok",
-          ui: "http://127.0.0.1:4100",
-          endpoints: [
-            "/api/system/status",
-            "/api/workflows",
-            "/api/runs",
-            "/api/memory",
-            "/api/skills",
-            "/api/music/jobs",
-            "/api/events",
-          ],
-        });
-        return;
-      }
-
-      // 0b. System Status (live probes for all Sosho services + roles + skills)
-      if (req.method === "GET" && path === "/api/system/status") {
-        const probe = async (id: string, name: string, targetUrl: string, uiUrl: string, detail: string) => {
-          const t0 = Date.now();
-          try {
-            const r = await fetch(targetUrl, { signal: AbortSignal.timeout(1500) });
-            return { id, name, ok: r.ok, status: r.status, latencyMs: Date.now() - t0, url: uiUrl, detail };
-          } catch {
-            return { id, name, ok: false, status: 0, latencyMs: Date.now() - t0, url: uiUrl, detail };
-          }
-        };
-        const services = await Promise.all([
-          probe("llama-cpp", "Local GPU LLM", "http://127.0.0.1:8080/health", "http://127.0.0.1:8080", "Qwen3.6-35B-A3B (:8080)"),
-          probe("llama-decision", "CPU Decision Router", "http://127.0.0.1:8081/health", "http://127.0.0.1:8081", "Qwen3-1.7B (:8081)"),
-          probe("llama-embed", "CPU Embeddings", "http://127.0.0.1:8082/health", "http://127.0.0.1:8082", "embeddinggemma (:8082)"),
-          probe("langfuse", "Langfuse Telemetry", "http://127.0.0.1:3000/api/public/health", "http://127.0.0.1:3000", "Traces & Prompts (:3000)"),
-          probe("yue2", "YuE2 Music Gateway", "http://127.0.0.1:8021/health/live", "http://127.0.0.1:8021/docs", "Audio Synthesis (:8021)"),
-        ]);
-        services.unshift({
-          id: "studio-api",
-          name: "Sosho Studio API",
-          ok: true,
-          status: 200,
-          latencyMs: 0,
-          url: `http://127.0.0.1:${PORT}`,
-          detail: `SQLite WAL DAG Engine (:${PORT})`,
-        });
-
-        let roles: Record<string, { provider: string; model: string; description?: string }> = {};
-        const rolesPath = join(ROOT, ".pi", "model-roles.json");
-        if (existsSync(rolesPath)) {
-          try {
-            const parsed = JSON.parse(readFileSync(rolesPath, "utf8")) as {
-              roles?: Record<string, { provider: string; model: string; description?: string }>;
-            };
-            roles = parsed.roles || {};
-          } catch {
-            roles = {};
-          }
-        }
-        const skills = existsSync(SKILLS_DIR)
-          ? readdirSync(SKILLS_DIR, { withFileTypes: true })
-              .filter((d) => d.isDirectory())
-              .map((d) => d.name)
-              .sort()
-          : [];
-        sendJson(req, res, 200, { services, roles, skills });
-        return;
-      }
-
-      // 0c. YuE2 Music Gateway Proxy (/api/music/jobs*)
-      if (path === "/api/music/jobs" || path.startsWith("/api/music/jobs/")) {
-        const yue2Base = (process.env.YUE2_GATEWAY_URL || "http://127.0.0.1:8021").replace(/\/+$/, "");
-        const yue2Key = process.env.YUE2_API_KEY?.trim() || "";
-        const targetPath = path.replace(/^\/api\/music/, "/v1") + url.search;
-        const headers: Record<string, string> = {};
-        if (yue2Key) headers.Authorization = `Bearer ${yue2Key}`;
-        let bodyStr: string | undefined;
-        if (req.method === "POST") {
-          const body = await readBody(req);
-          bodyStr = JSON.stringify(body);
-          headers["Content-Type"] = "application/json";
-        }
-        try {
-          const upstream = await fetch(`${yue2Base}${targetPath}`, {
-            method: req.method || "GET",
-            headers,
-            body: bodyStr,
-            signal: AbortSignal.timeout(15_000),
-          });
-          const ct = upstream.headers.get("content-type") || "application/octet-stream";
-          const buf = Buffer.from(await upstream.arrayBuffer());
-          res.writeHead(upstream.status, {
-            "Content-Type": ct,
-            ...corsHeaders(req),
-          });
-          res.end(buf);
-        } catch (err) {
-          sendJson(req, res, 502, {
-            error: `YuE2 gateway unreachable: ${err instanceof Error ? err.message : String(err)}`,
-          });
-        }
-        return;
-      }
-
-      // 1. SSE Live Events Stream (with 15s : ping heartbeat)
-      if (req.method === "GET" && path === "/api/events") {
-        res.writeHead(200, {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-          ...corsHeaders(req),
-        });
-        res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
-        sseClients.add(res);
-        req.on("close", () => sseClients.delete(res));
-        return;
-      }
-
-      if (req.method === "POST" && path === "/api/events") {
-        const body = await readBody(req);
-        broadcastEvent(body);
-        sendJson(req, res, 200, { ok: true });
-        return;
-      }
-
-      // 2. Workflows CRUD (workflows/*.graph.json)
-      if (req.method === "GET" && path === "/api/workflows") {
-        const files = readdirSync(WORKFLOWS_DIR).filter((f) => f.endsWith(".graph.json"));
-        const list = files.map((f) => {
-          const g = JSON.parse(readFileSync(join(WORKFLOWS_DIR, f), "utf8")) as {
-            id: string;
-            name: string;
-            description?: string;
-          };
-          return { file: f, id: g.id, name: g.name, description: g.description || "" };
-        });
-        sendJson(req, res, 200, { workflows: list });
-        return;
-      }
-
-      if (req.method === "GET" && path.startsWith("/api/workflows/")) {
-        const id = decodeURIComponent(path.slice("/api/workflows/".length));
-        if (!isSafeWorkflowId(id)) {
-          sendJson(req, res, 400, { error: "Invalid workflow ID" });
-          return;
-        }
-        const files = readdirSync(WORKFLOWS_DIR).filter((f) => f.endsWith(".graph.json"));
-        for (const f of files) {
-          const g = JSON.parse(readFileSync(join(WORKFLOWS_DIR, f), "utf8")) as { id: string };
-          if (g.id === id || f === id) {
-            sendJson(req, res, 200, g);
-            return;
-          }
-        }
-        sendJson(req, res, 404, { error: "Workflow not found" });
-        return;
-      }
-
-      if (req.method === "POST" && path === "/api/workflows") {
-        const graph = await readBody(req);
-        const rawId = graph.id !== undefined ? String(graph.id).trim() : `wf-${randomBytes(3).toString("hex")}`;
-        if (!isSafeWorkflowId(rawId)) {
-          sendJson(req, res, 400, { error: "Invalid workflow ID" });
-          return;
-        }
-        graph.id = rawId;
-        const validated = validateGraph(graph);
-        let outPath = join(WORKFLOWS_DIR, `${validated.id}.graph.json`);
-        const existingFiles = readdirSync(WORKFLOWS_DIR).filter((f) => f.endsWith(".graph.json"));
-        for (const f of existingFiles) {
-          try {
-            const existing = JSON.parse(readFileSync(join(WORKFLOWS_DIR, f), "utf8")) as { id?: string };
-            if (existing.id === validated.id) {
-              outPath = join(WORKFLOWS_DIR, f);
-              break;
-            }
-          } catch {
-            // ignore unreadable file
-          }
-        }
-        writeFileSync(outPath, `${JSON.stringify(validated, null, 2)}\n`, "utf8");
-        sendJson(req, res, 200, { ok: true, id: validated.id, path: outPath });
-        return;
-      }
-
-      if (req.method === "DELETE" && path.startsWith("/api/workflows/")) {
-        const id = decodeURIComponent(path.slice("/api/workflows/".length));
-        if (!isSafeWorkflowId(id)) {
-          sendJson(req, res, 400, { error: "Invalid workflow ID" });
-          return;
-        }
-        const files = readdirSync(WORKFLOWS_DIR).filter((f) => f.endsWith(".graph.json"));
-        for (const f of files) {
-          const full = join(WORKFLOWS_DIR, f);
-          const g = JSON.parse(readFileSync(full, "utf8")) as { id: string };
-          if (g.id === id || f === id) {
-            unlinkSync(full);
-            sendJson(req, res, 200, { ok: true, id });
-            return;
-          }
-        }
-        sendJson(req, res, 404, { error: "Workflow not found" });
-        return;
-      }
-
-      // 3. Skills Discovery
-      if (req.method === "GET" && path === "/api/skills") {
-        const skills = existsSync(SKILLS_DIR)
-          ? readdirSync(SKILLS_DIR, { withFileTypes: true })
-              .filter((d) => d.isDirectory())
-              .map((d) => d.name)
-          : [];
-        sendJson(req, res, 200, { skills });
-        return;
-      }
-
-      // 4. SQLite WAL DAG Workflow Runs & HITL Checkpoints
-      if (req.method === "GET" && path === "/api/runs") {
-        const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") || "50")));
-        const runs = engine.listRuns(limit).map((r) => ({
-          runId: r.runId,
-          graphId: r.graphId,
-          status: r.status,
-          currentNodeId: r.currentNodeId,
-          stepCount: r.stepCount,
-          pausedCheckpoint: r.pausedCheckpoint,
-          error: r.error,
-          createdAt: r.createdAt,
-          updatedAt: r.updatedAt,
-        }));
-        sendJson(req, res, 200, { runs });
-        return;
-      }
-
-      if (req.method === "POST" && path === "/api/runs") {
-        const body = await readBody(req);
-        const validated = validateGraph(body.graph);
-        const initialData =
-          body.initialData && typeof body.initialData === "object" && !Array.isArray(body.initialData)
-            ? (body.initialData as Record<string, unknown>)
-            : {};
-        const run = await engine.startRun(validated, initialData);
-        sendJson(req, res, 202, { runId: run.runId, status: run.status });
-        return;
-      }
-
-      const cancelMatch = path.match(/^\/api\/runs\/([^/]+)\/cancel$/);
-      if (req.method === "POST" && cancelMatch) {
-        const runId = decodeURIComponent(cancelMatch[1]);
-        const run = engine.cancelRun(runId);
-        sendJson(req, res, 200, { ok: true, runId: run.runId, status: run.status });
-        return;
-      }
-
-      const cpMatch = path.match(/^\/api\/runs\/([^/]+)\/checkpoint$/);
-      if (req.method === "POST" && cpMatch) {
-        const runId = decodeURIComponent(cpMatch[1]);
-        const body = await readBody(req);
-        const updated = await engine.signalCheckpoint(runId, {
-          nodeId: String(body.nodeId || ""),
-          action: body.action === "reject" ? "reject" : "approve",
-          statePatch:
-            body.statePatch && typeof body.statePatch === "object" && !Array.isArray(body.statePatch)
-              ? (body.statePatch as Record<string, unknown>)
-              : undefined,
-          note: body.note ? String(body.note) : undefined,
-        });
-        sendJson(req, res, 200, { ok: true, runId: updated.runId, status: updated.status });
-        return;
-      }
-
-      if (req.method === "GET" && path.startsWith("/api/runs/")) {
-        const runId = decodeURIComponent(path.slice("/api/runs/".length));
-        const run = engine.getRun(runId);
-        if (!run) {
-          sendJson(req, res, 404, { error: "Run not found" });
-          return;
-        }
-        sendJson(req, res, 200, run);
-        return;
-      }
-
-      // 5. Two-Tier Memory Explorer API
-      if (req.method === "GET" && path === "/api/memory") {
-        const q = url.searchParams.get("q")?.trim() || "";
-        const scope = (url.searchParams.get("scope") || "both") as MemoryScope | "both";
-        const items = q
-          ? searchMemory({ query: q, scope, limit: 25 }, ROOT).map((r) => ({ ...r.record, score: r.score }))
-          : [
-              ...(scope === "global" ? [] : loadScopeMemories("project", ROOT, false)),
-              ...(scope === "project" ? [] : loadScopeMemories("global", ROOT, false)),
-            ];
-        sendJson(req, res, 200, {
-          items,
-          profiles: {
-            global: readCoreProfile("global", ROOT),
-            project: readCoreProfile("project", ROOT),
-          },
-        });
-        return;
-      }
-
-      if (req.method === "POST" && path === "/api/memory") {
-        const body = await readBody(req);
-        const scope: MemoryScope = body.scope === "global" ? "global" : "project";
-        const resSave = upsertMemory(
-          {
-            scope,
-            type: (body.type as MemoryType) || "semantic",
-            title: String(body.title || "Untitled"),
-            content: String(body.content || ""),
-            tags: Array.isArray(body.tags) ? (body.tags as string[]) : [],
-            entities: Array.isArray(body.entities) ? (body.entities as string[]) : [],
-            importance: typeof body.importance === "number" ? body.importance : 0.75,
-          },
-          ROOT,
-        );
-        rebuildCoreProfile(scope, ROOT);
-        sendJson(req, res, 200, resSave);
-        return;
-      }
-
-      if (req.method === "POST" && path === "/api/memory/consolidate") {
-        const counts = {
-          project: drainInboxToEpisodic("project", ROOT),
-          global: drainInboxToEpisodic("global", ROOT),
-        };
-        sendJson(req, res, 200, { ok: true, counts });
-        return;
-      }
-
-      const supersedeMatch = path.match(/^\/api\/memory\/([^/]+)\/supersede$/);
-      if (req.method === "POST" && supersedeMatch) {
-        const id = decodeURIComponent(supersedeMatch[1]);
-        const body = await readBody(req);
-        const scope: MemoryScope = body.scope === "global" ? "global" : "project";
-        const resSave = upsertMemory(
-          {
-            scope,
-            type: (body.type as MemoryType) || "semantic",
-            title: String(body.title || "Updated Memory"),
-            content: String(body.content || ""),
-            tags: Array.isArray(body.tags) ? (body.tags as string[]) : [],
-            entities: Array.isArray(body.entities) ? (body.entities as string[]) : [],
-            importance: typeof body.importance === "number" ? body.importance : 0.8,
-            supersedes_id: id,
-          },
-          ROOT,
-        );
-        rebuildCoreProfile(scope, ROOT);
-        sendJson(req, res, 200, resSave);
-        return;
-      }
-
-      if (req.method === "DELETE" && path.startsWith("/api/memory/")) {
-        const id = decodeURIComponent(path.slice("/api/memory/".length));
-        const scopeParam = url.searchParams.get("scope");
-        const scope: MemoryScope = scopeParam === "global" ? "global" : "project";
-        const reason = url.searchParams.get("reason") || "archived_from_studio";
-        const ok = archiveMemory(id, scope, reason, ROOT);
-        if (!ok) {
-          sendJson(req, res, 404, { error: "Memory record not found" });
-          return;
-        }
-        rebuildCoreProfile(scope, ROOT);
-        sendJson(req, res, 200, { ok: true, id, scope });
-        return;
-      }
-
-      sendJson(req, res, 404, { error: "Not found" });
-    } catch (err) {
-      if (err instanceof HttpError) {
-        sendJson(req, res, err.status, { error: err.message });
-        return;
-      }
-      if (err instanceof GraphValidationError) {
-        sendJson(req, res, 400, { error: err.message });
-        return;
-      }
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.startsWith("Run not found:")) {
-        sendJson(req, res, 404, { error: msg });
-        return;
-      }
-      sendJson(req, res, 500, { error: msg });
-    }
+    await next();
   });
 
-  function closeAll(): void {
-    clearInterval(heartbeatTimer);
-    for (const res of sseClients) {
-      try {
-        res.end();
-      } catch {
-        // ignore
-      }
+  // Root & Health Info
+  const healthPayload = {
+    service: "sosho-studio-api",
+    status: "ok",
+    ui: "http://127.0.0.1:4100",
+    endpoints: [
+      "/api/system/status",
+      "/api/system/gpu",
+      "/api/system/gpu/unload",
+      "/api/system/doctor",
+      "/api/workflows",
+      "/api/runs",
+      "/api/memory",
+      "/api/skills",
+      "/api/music/jobs",
+      "/api/events",
+      "/api/openapi.json",
+      "/api/docs",
+    ],
+  };
+
+  app.get("/", (c) => c.json(healthPayload));
+  app.get("/health", (c) => c.json(healthPayload));
+
+  // Mount modular route groups
+  app.route("/api/workflows", createWorkflowsRoutes(ctx));
+  app.route("/api/runs", createRunsRoutes(ctx));
+  app.route("/api/memory", createMemoryRoutes(ctx));
+  app.route("/api/music", createMusicRoutes(ctx));
+  app.route("/api/system", createSystemRoutes(ctx));
+  app.route("/api/skills", createSkillsRoutes(ctx));
+  app.route("/api/events", createEventsRoutes(ctx));
+  app.route("/api", createOpenApiRoutes());
+
+  app.notFound((c) => c.json({ error: "Not found" }, 404));
+
+  app.onError((err, c) => {
+    if (err instanceof HttpError) {
+      const payload: Record<string, unknown> = { error: err.message };
+      if (err.details !== undefined) payload.details = err.details;
+      return c.json(payload, err.status as ContentfulStatusCode);
     }
-    sseClients.clear();
+    if (err instanceof GraphValidationError) {
+      return c.json({ error: err.message }, 400);
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.startsWith("Run not found:")) {
+      return c.json({ error: msg }, 404);
+    }
+    return c.json({ error: msg }, 500);
+  });
+
+  const server = createAdaptorServer({ fetch: app.fetch }) as Server;
+
+  function closeAll(): void {
+    sse.closeAll();
     server.close();
     engine.close();
     closeMemoryIndexes();
   }
 
-  return { server, engine, token: STUDIO_TOKEN, closeAll };
+  return { server, app, engine, sse, token: STUDIO_TOKEN, closeAll };
 }
 
 const isMain = process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename);

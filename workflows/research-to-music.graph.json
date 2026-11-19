@@ -1,0 +1,70 @@
+{
+  "id": "research-to-music",
+  "name": "Research to Music Pipeline",
+  "description": "Researches a theme with a skill, drafts lyrics and style tags, pauses for human review, generates audio with YuE2, and saves the result to project memory.",
+  "version": 1,
+  "entryNode": "research_theme",
+  "maxSteps": 15,
+  "nodes": [
+    {
+      "id": "research_theme",
+      "type": "skill",
+      "label": "Research Theme (Skill)",
+      "position": { "x": 80, "y": 140 },
+      "skillName": "web-research",
+      "tier": "subagent",
+      "queue": "cloud-io",
+      "promptTemplate": "Research imagery, mood, and musical references for: {{topic}}",
+      "outputKey": "research_notes"
+    },
+    {
+      "id": "draft_lyrics",
+      "type": "agent",
+      "label": "Draft Lyrics & Style",
+      "position": { "x": 360, "y": 140 },
+      "tier": "main",
+      "queue": "cloud-io",
+      "promptTemplate": "Using these notes:\n{{research_notes}}\n\nWrite concise song lyrics and a YuE2 style prompt for {{topic}}.",
+      "outputKey": "music_spec"
+    },
+    {
+      "id": "review_lyrics",
+      "type": "checkpoint",
+      "label": "Human Review & Edit",
+      "position": { "x": 640, "y": 140 },
+      "message": "Review or edit music_spec before sending the job to YuE2.",
+      "allowStateEdit": true
+    },
+    {
+      "id": "generate_audio",
+      "type": "tool",
+      "label": "Generate Audio (YuE2)",
+      "position": { "x": 920, "y": 140 },
+      "toolKind": "yue2",
+      "queue": "local-gpu",
+      "commandOrUrl": "http://127.0.0.1:8000/v1/jobs",
+      "bodyTemplate": "{\"prompt\": {{music_spec}}}",
+      "timeoutSeconds": 600,
+      "outputKey": "audio_result"
+    },
+    {
+      "id": "save_song_memory",
+      "type": "memory",
+      "label": "Save Song to Project Memory",
+      "position": { "x": 1200, "y": 140 },
+      "operation": "save",
+      "scope": "project",
+      "memoryType": "episodic",
+      "queryOrTitleTemplate": "Generated Song: {{topic}}",
+      "contentTemplate": "Spec:\n{{music_spec}}\n\nArtifacts:\n{{audio_result}}",
+      "outputKey": "saved_memory"
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "research_theme", "target": "draft_lyrics" },
+    { "id": "e2", "source": "draft_lyrics", "target": "review_lyrics" },
+    { "id": "e3", "source": "review_lyrics", "target": "generate_audio", "condition": "approve" },
+    { "id": "e4", "source": "review_lyrics", "target": "draft_lyrics", "condition": "reject" },
+    { "id": "e5", "source": "generate_audio", "target": "save_song_memory" }
+  ]
+}

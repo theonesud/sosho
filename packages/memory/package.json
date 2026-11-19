@@ -6,7 +6,8 @@
     ".": "./src/store.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx test/memory.test.ts && tsx test/capture.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1"

@@ -1,12 +1,15 @@
-export type WorkspaceTab = "overview" | "workflows" | "memory" | "music";
 export type NodeKind = "agent" | "subagent" | "decision" | "tool" | "skill" | "checkpoint" | "memory";
 export type ModelTier = "main" | "subagent" | "subagent-code" | "decision" | "local-uncensored";
+export type QueueLane = "cloud-io" | "local-gpu" | "host-browser";
 
 export interface RawGraphNode {
   id: string;
   type: NodeKind;
   label: string;
   position?: { x: number; y: number };
+  queue?: QueueLane;
+  retryMaxAttempts?: number;
+  timeoutSeconds?: number;
   [key: string]: unknown;
 }
 
@@ -43,6 +46,8 @@ export interface NodeExecutionLog {
   startedAt: string;
   finishedAt?: string;
   outputPreview?: string;
+  renderedPrompt?: string;
+  traceUrl?: string;
   branch?: string;
   error?: string;
 }
@@ -58,6 +63,7 @@ export interface RunSummary {
   graphId: string;
   status: "running" | "waiting_checkpoint" | "completed" | "failed" | "cancelled";
   currentNodeId: string | null;
+  activeNodeIds?: string[];
   stepCount: number;
   pausedCheckpoint?: PausedCheckpoint | null;
   error?: string;
@@ -85,6 +91,29 @@ export interface SystemStatusResponse {
   services: ServiceStatus[];
   roles: Record<string, { provider: string; model: string; description?: string }>;
   skills: string[];
+}
+
+export interface QueueLaneStat {
+  active: number;
+  queued: number;
+}
+
+export interface QueueStats {
+  "cloud-io": QueueLaneStat;
+  "local-gpu": QueueLaneStat;
+  "host-browser": QueueLaneStat;
+}
+
+export interface GpuState {
+  available: boolean;
+  owner?: string;
+  gpus: Array<{
+    name: string;
+    memoryUsedMb: number;
+    memoryTotalMb: number;
+    utilizationPct: number;
+    temperatureC: number;
+  }>;
 }
 
 export interface MemoryItem {
@@ -127,13 +156,15 @@ export const NODE_META: Record<NodeKind, { color: string; badge: string; hint: s
 
 export const MODEL_TIERS: ModelTier[] = ["main", "subagent", "subagent-code", "decision", "local-uncensored"];
 
+export const QUEUE_LANES: QueueLane[] = ["cloud-io", "local-gpu", "host-browser"];
+
 export const WORKFLOW_TEMPLATES: Record<string, RawGraph> = {
   "parallel-compare": {
     id: "parallel-compare",
     name: "Parallel Multi-Agent Synthesis",
     description: "Fans out to two subagents in parallel, joins both results, and synthesizes a final report.",
     version: 1,
-    entryNode: "pros_agent",
+    entryNode: "seed",
     maxSteps: 15,
     nodes: [
       {
@@ -172,7 +203,8 @@ export const WORKFLOW_TEMPLATES: Record<string, RawGraph> = {
         label: "Final Executive Brief",
         tier: "main",
         position: { x: 640, y: 150 },
-        promptTemplate: "Combine both analyses into one clear recommendation on {{topic}}.\n\nStrengths:\n{{pros}}\n\nRisks:\n{{risks}}",
+        promptTemplate:
+          "Combine both analyses into one clear recommendation on {{topic}}.\n\nStrengths:\n{{pros}}\n\nRisks:\n{{risks}}",
         outputKey: "final_brief",
       },
     ],
@@ -204,7 +236,6 @@ export const WORKFLOW_TEMPLATES: Record<string, RawGraph> = {
     edges: [],
   },
 };
-WORKFLOW_TEMPLATES["parallel-compare"].entryNode = "seed";
 
 export function extractTemplateVariables(graph: RawGraph | null): string[] {
   if (!graph) return [];
@@ -221,11 +252,21 @@ export function extractTemplateVariables(graph: RawGraph | null): string[] {
     for (const key of ["promptTemplate", "queryOrTitleTemplate", "contentTemplate", "commandOrUrl", "bodyTemplate"]) {
       const val = n[key];
       if (typeof val !== "string") continue;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(val)) !== null) {
+      re.lastIndex = 0;
+      let m: RegExpExecArray | null = re.exec(val);
+      while (m !== null) {
         if (!produced.has(m[1])) referenced.add(m[1]);
+        m = re.exec(val);
       }
     }
   }
   return Array.from(referenced);
+}
+
+export function formatLatency(startedAt?: string, finishedAt?: string): string | null {
+  if (!startedAt || !finishedAt) return null;
+  const ms = new Date(finishedAt).getTime() - new Date(startedAt).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
 }

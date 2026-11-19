@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  chatCompletionStream,
   clearHealthCache,
   isHealthEndpointUp,
   loadEnvMap,
@@ -99,6 +100,110 @@ try {
     assert.equal(healthCalls, 2);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+
+  // 3. chatCompletionStream SSE deltas + done event + AbortSignal
+  let lastStreamFlag = false;
+  const streamServer = createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => {
+      body += String(c);
+    });
+    req.on("end", () => {
+      try {
+        const parsed = JSON.parse(body) as { stream?: boolean };
+        lastStreamFlag = parsed.stream === true;
+      } catch {
+        lastStreamFlag = false;
+      }
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+      });
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "Hello " } }] })}\n\n`);
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "world!" } }] })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({
+          choices: [{ delta: {} }],
+          usage: { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 },
+        })}\n\n`,
+      );
+      res.write("data: [DONE]\n\n");
+      res.end();
+    });
+  });
+  await new Promise<void>((resolve) => streamServer.listen(0, "127.0.0.1", resolve));
+  const sAddr = streamServer.address();
+  const sPort = typeof sAddr === "object" && sAddr ? sAddr.port : 0;
+
+  try {
+    writeFileSync(
+      join(soshoDir, ".pi", "models.json"),
+      JSON.stringify({
+        providers: {
+          "mock-stream": { baseUrl: `http://127.0.0.1:${sPort}/v1`, apiKey: "test-key" },
+        },
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      join(soshoDir, ".pi", "model-roles.json"),
+      JSON.stringify({
+        roles: {
+          main: { provider: "mock-stream", model: "mock-1" },
+        },
+      }),
+      "utf8",
+    );
+
+    const deltas: string[] = [];
+    let doneEvent:
+      | {
+          type: "done";
+          content: string;
+          provider: string;
+          model: string;
+          durationMs: number;
+          usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+          fallbackUsed: boolean;
+        }
+      | undefined;
+
+    for await (const ev of chatCompletionStream({
+      role: "main",
+      messages: [{ role: "user", content: "hi" }],
+      cwd: wsDir,
+      soshoRoot: soshoDir,
+    })) {
+      if (ev.type === "delta") deltas.push(ev.content);
+      if (ev.type === "done") doneEvent = ev;
+    }
+
+    assert.equal(lastStreamFlag, true, "chatCompletionStream must post stream: true");
+    assert.deepEqual(deltas, ["Hello ", "world!"]);
+    assert.ok(doneEvent, "chatCompletionStream must yield final done event");
+    assert.equal(doneEvent.content, "Hello world!");
+    assert.equal(doneEvent.provider, "mock-stream");
+    assert.equal(doneEvent.model, "mock-1");
+    assert.equal(doneEvent.fallbackUsed, false);
+    assert.equal(doneEvent.usage?.total_tokens, 7);
+
+    // Pre-aborted signal must reject immediately
+    const ac = new AbortController();
+    ac.abort(new Error("user_aborted"));
+    await assert.rejects(async () => {
+      for await (const _ev of chatCompletionStream({
+        role: "main",
+        messages: [{ role: "user", content: "hi" }],
+        cwd: wsDir,
+        soshoRoot: soshoDir,
+        signal: ac.signal,
+      })) {
+        // should not yield
+      }
+    });
+  } finally {
+    await new Promise<void>((resolve) => streamServer.close(() => resolve()));
   }
 
   console.log("ALL LLM PACKAGE TESTS PASSED");

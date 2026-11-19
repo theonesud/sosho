@@ -13,6 +13,14 @@ export class Semaphore {
     this.limit = Math.max(1, Math.floor(limit));
   }
 
+  get activeCount(): number {
+    return this.active;
+  }
+
+  get maxLimit(): number {
+    return this.limit;
+  }
+
   async acquire(): Promise<() => void> {
     if (this.active < this.limit) {
       this.active++;

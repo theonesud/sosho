@@ -2,8 +2,15 @@
   "name": "@sosho/workflow-engine",
   "version": "0.1.0",
   "type": "module",
+  "exports": {
+    ".": "./src/engine.ts",
+    "./schema": "./src/schema.ts",
+    "./store": "./src/store.ts",
+    "./activities": "./src/activities.ts"
+  },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx test/schema.test.ts && tsx test/max-steps.test.ts && tsx test/activities.test.ts && tsx test/engine.test.ts && tsx test/telemetry-cancel.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",

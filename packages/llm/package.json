@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./subagent-runtime": "./src/subagent-runtime.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "tsx test/llm.test.ts"
+    "test": "tsx test/llm.test.ts && tsx test/subagents.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

@@ -46,6 +46,7 @@ export type NodeExecutor = (input: {
   cwd: string;
   runId: string;
   queue: TaskQueue;
+  signal?: AbortSignal;
 }) => Promise<ActivityResult>;
 
 export interface WorkflowEngineOptions {
@@ -60,6 +61,7 @@ export class WorkflowEngine extends EventEmitter {
   private readonly cwd: string;
   private readonly executor: NodeExecutor;
   private readonly activeLoops = new Map<string, Promise<void>>();
+  private readonly runAbortControllers = new Map<string, AbortController>();
   private readonly cancelledRuns = new Set<string>();
   private readonly queues: Record<TaskQueue, Semaphore> = {
     "cloud-io": new Semaphore(8),
@@ -73,17 +75,44 @@ export class WorkflowEngine extends EventEmitter {
     this.store = new WorkflowRunStore(options.cwd, options.dbPath);
     this.executor =
       options.executor ||
-      (async ({ node, data, cwd, runId }) =>
+      (async ({ node, data, cwd, runId, signal }) =>
         executeNodeActivity({
           node,
           data,
           cwd,
+          signal,
           options: { ...options.activityOptions, runId },
         }));
   }
 
   private emitWorkflowEvent(event: Record<string, unknown>): void {
     this.emit("event", { timestamp: new Date().toISOString(), ...event });
+  }
+
+  getQueueStats(): Record<TaskQueue, { active: number; limit: number }> {
+    return {
+      "cloud-io": {
+        active: this.queues["cloud-io"].activeCount,
+        limit: this.queues["cloud-io"].maxLimit,
+      },
+      "local-gpu": {
+        active: this.queues["local-gpu"].activeCount,
+        limit: this.queues["local-gpu"].maxLimit,
+      },
+      "host-browser": {
+        active: this.queues["host-browser"].activeCount,
+        limit: this.queues["host-browser"].maxLimit,
+      },
+    };
+  }
+
+  private emitQueueStats(runId: string, queue: TaskQueue): void {
+    this.emitWorkflowEvent({
+      type: "queue_stats",
+      runId,
+      queue,
+      queues: this.getQueueStats(),
+    });
   }
 
   async startRun(
@@ -184,6 +213,11 @@ export class WorkflowEngine extends EventEmitter {
       return run;
     }
     this.cancelledRuns.add(runId);
+    const controller = this.runAbortControllers.get(runId);
+    if (controller) {
+      controller.abort(new Error("cancelled_by_user"));
+      this.runAbortControllers.delete(runId);
+    }
     run.status = "cancelled";
     run.currentNodeId = null;
     run.frontier = [];
@@ -228,15 +262,18 @@ export class WorkflowEngine extends EventEmitter {
 
   private launchLoop(runId: string): void {
     if (this.activeLoops.has(runId)) return;
-    const promise = this.driveRun(runId).finally(() => {
+    const controller = new AbortController();
+    this.runAbortControllers.set(runId, controller);
+    const promise = this.driveRun(runId, controller.signal).finally(() => {
       this.activeLoops.delete(runId);
+      this.runAbortControllers.delete(runId);
     });
     this.activeLoops.set(runId, promise);
   }
 
-  private async driveRun(runId: string): Promise<void> {
+  private async driveRun(runId: string, runSignal?: AbortSignal): Promise<void> {
     while (true) {
-      if (this.cancelledRuns.has(runId)) {
+      if (this.cancelledRuns.has(runId) || runSignal?.aborted) {
         this.cancelledRuns.delete(runId);
         return;
       }
@@ -311,16 +348,22 @@ export class WorkflowEngine extends EventEmitter {
 
       const waveEntries = wave.map((nodeId) => {
         const node = nodeMap.get(nodeId)!;
+        const queue = pickTaskQueue(node);
+        const startedMs = Date.now();
+        const inputSnapshot = { ...run.data };
         run.stepCount += 1;
         const entry = {
           step: run.stepCount,
           nodeId,
           type: node.type,
           status: "running" as const,
-          startedAt: new Date().toISOString(),
+          startedAt: new Date(startedMs).toISOString(),
+          queue,
+          inputSnapshot,
+          traceId: runId,
         };
         run.history.push(entry);
-        return { node, entry };
+        return { node, entry, queue, startedMs, inputSnapshot };
       });
 
       run.currentNodeId = wave[0] ?? null;
@@ -337,22 +380,27 @@ export class WorkflowEngine extends EventEmitter {
 
       try {
         const results = await Promise.all(
-          waveEntries.map(({ node }) => {
-            const queue = pickTaskQueue(node);
-            return this.queues[queue].run(async () => {
+          waveEntries.map(async ({ node, queue, inputSnapshot }) => {
+            const release = await this.queues[queue].acquire();
+            this.emitQueueStats(runId, queue);
+            try {
               const res = await this.executor({
                 node,
-                data: { ...run.data },
+                data: { ...inputSnapshot },
                 cwd: this.cwd,
                 runId,
                 queue,
+                signal: runSignal,
               });
               return { node, res };
-            });
+            } finally {
+              release();
+              this.emitQueueStats(runId, queue);
+            }
           }),
         );
 
-        if (this.cancelledRuns.has(runId)) {
+        if (this.cancelledRuns.has(runId) || runSignal?.aborted) {
           this.cancelledRuns.delete(runId);
           return;
         }
@@ -360,15 +408,22 @@ export class WorkflowEngine extends EventEmitter {
         const nextTargets: string[] = [];
         for (let i = 0; i < results.length; i++) {
           const { node, res } = results[i];
-          const logEntry = waveEntries[i].entry;
+          const { entry: logEntry, startedMs, inputSnapshot } = waveEntries[i];
+          const stateDiff: Record<string, unknown> = {};
           if (res.outputKey) {
+            if (inputSnapshot[res.outputKey] !== res.value) {
+              stateDiff[res.outputKey] = res.value;
+            }
             run.data[res.outputKey] = res.value;
           }
           Object.assign(logEntry, {
             status: "done",
             finishedAt: new Date().toISOString(),
+            durationMs: Date.now() - startedMs,
             outputPreview: res.preview,
             branch: res.branch,
+            renderedPrompt: res.renderedPrompt,
+            stateDiff,
           });
           this.emitWorkflowEvent({
             type: "node_done",
@@ -397,12 +452,17 @@ export class WorkflowEngine extends EventEmitter {
         run.currentNodeId = run.frontier[0] ?? null;
         this.store.saveRun(run);
       } catch (err) {
+        if (this.cancelledRuns.has(runId) || runSignal?.aborted) {
+          this.cancelledRuns.delete(runId);
+          return;
+        }
         const message = err instanceof Error ? err.message : String(err);
-        for (const { entry, node } of waveEntries) {
+        for (const { entry, node, startedMs } of waveEntries) {
           if (entry.status === "running") {
             Object.assign(entry, {
               status: "failed",
               finishedAt: new Date().toISOString(),
+              durationMs: Date.now() - startedMs,
               error: message,
             });
             this.emitWorkflowEvent({

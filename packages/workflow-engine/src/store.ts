@@ -26,6 +26,7 @@ export interface PausedCheckpoint {
 export interface PersistedWorkflowRun extends WorkflowRunState {
   graph: GraphDefinition;
   frontier: string[];
+  activeNodeIds: string[];
   pausedCheckpoint: PausedCheckpoint | null;
   createdAt: string;
   updatedAt: string;

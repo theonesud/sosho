@@ -136,7 +136,15 @@ export interface NodeExecutionLog {
   outputPreview?: string;
   branch?: string;
   error?: string;
+  renderedPrompt?: string;
+  inputSnapshot?: Record<string, unknown>;
+  stateDiff?: Record<string, unknown>;
+  queue?: TaskQueue;
+  durationMs?: number;
+  traceId?: string;
 }
+
+export type StepExecutionRecord = NodeExecutionLog;
 
 export interface WorkflowRunState {
   runId: string;

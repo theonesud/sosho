@@ -72,6 +72,7 @@
     { "id": "e3", "source": "route_depth", "target": "deep_research", "condition": "deep" },
     { "id": "e4", "source": "quick_answer", "target": "hitl_review" },
     { "id": "e5", "source": "deep_research", "target": "hitl_review" },
-    { "id": "e6", "source": "hitl_review", "target": "save_mem", "condition": "approve" }
+    { "id": "e6", "source": "hitl_review", "target": "save_mem", "condition": "approve" },
+    { "id": "e7", "source": "hitl_review", "target": "deep_research", "condition": "reject" }
   ]
 }

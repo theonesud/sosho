@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+:root {
+  --bg-canvas: #09090b;
+  --bg-surface: #111114;
+  --bg-elevated: #18181c;
+  --border-subtle: #27272a;
+  --border-strong: #3f3f46;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent-primary: #10b981;
+  --state-info: #38bdf8;
+  --state-warning: #f59e0b;
+  --state-error: #ef4444;
+}
+
+@theme inline {
+  --color-canvas: var(--bg-canvas);
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent-primary);
+  --color-info: var(--state-info);
+  --color-warning: var(--state-warning);
+  --color-error: var(--state-error);
+  --font-sans: var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  border-color: var(--border-subtle);
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: rgba(16, 185, 129, 0.25);
+  color: var(--text-primary);
+}
+
+input,
+textarea,
+select {
+  caret-color: var(--accent-primary);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom dark scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* Focus visible ring */
+:focus-visible {
+  outline: 1.5px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+/* React Flow obsidian overrides */
+.react-flow__background {
+  background-color: var(--bg-canvas) !important;
+}
+
+.react-flow__controls {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45) !important;
+}
+
+.react-flow__controls-button {
+  background: var(--bg-surface) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  fill: var(--text-secondary) !important;
+  color: var(--text-secondary) !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--bg-elevated) !important;
+  fill: var(--text-primary) !important;
+}
+
+.react-flow__minimap {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: 8px !important;
+}
+
+.react-flow__edge-textbg {
+  fill: var(--bg-elevated) !important;
+}
+
+.react-flow__edge-text {
+  fill: var(--text-secondary) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+}
+
+@keyframes pulse-node {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(56, 189, 248, 0);
+  }
+}
+
+.node-pulse-active {
+  animation: pulse-node 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
