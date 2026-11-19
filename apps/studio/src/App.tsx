@@ -50,6 +50,14 @@ const STATUS_BORDER: Record<string, string> = {
   failed: "#ef4444",
 };
 
+function getAuthHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const token =
+    (typeof window !== "undefined" ? window.localStorage.getItem("sosho_studio_token") : "") ||
+    (import.meta.env.VITE_SOSHO_STUDIO_TOKEN as string | undefined) ||
+    "";
+  return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
+}
+
 export default function App() {
   const [tab, setTab] = useState<"canvas" | "memory">("canvas");
   const [workflows, setWorkflows] = useState<Array<{ id: string; name: string }>>([]);
@@ -184,7 +192,7 @@ export default function App() {
     if (!g) return;
     const res = await fetch("/api/workflows", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(g),
     });
     setStatusBanner(res.ok ? `Saved ${g.id}.graph.json` : "Save failed");
@@ -204,7 +212,7 @@ export default function App() {
     setPausedCheckpoint(null);
     const res = await fetch("/api/runs", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ graph: g, initialData }),
     });
     const data = (await res.json()) as { runId?: string; error?: string };
@@ -228,7 +236,7 @@ export default function App() {
     }
     const res = await fetch(`/api/runs/${encodeURIComponent(activeRunId)}/checkpoint`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ nodeId: pausedCheckpoint.nodeId, action, statePatch }),
     });
     if (res.ok) {
@@ -468,7 +476,10 @@ export default function App() {
             <button onClick={loadMemories} style={btnStyle(true)}>Search</button>
             <button
               onClick={async () => {
-                await fetch("/api/memory/consolidate", { method: "POST" });
+                await fetch("/api/memory/consolidate", {
+                  method: "POST",
+                  headers: getAuthHeaders(),
+                });
                 loadMemories();
                 setStatusBanner("Consolidated memory inbox & refreshed profiles.");
               }}
