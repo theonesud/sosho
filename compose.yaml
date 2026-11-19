@@ -267,17 +267,12 @@ services:
       YUE2_UNLOAD_AFTER_JOB: ${YUE2_UNLOAD_AFTER_JOB:-true}
       YUE2_RETENTION_SECONDS: ${YUE2_RETENTION_SECONDS:-86400}
       YUE2_MAX_GIB: ${YUE2_MAX_GIB:-5}
-      # VRAM handshake: the gateway pauses llama-cpp for the duration of a job
-      # and starts it again afterwards. Requires the Docker socket below.
+      # VRAM handshake: unload active models via llama-cpp HTTP API (no Docker socket needed).
       YUE2_STOP_LLAMA: ${YUE2_STOP_LLAMA:-true}
-      YUE2_LLAMA_CONTAINER: ${YUE2_LLAMA_CONTAINER:-llama-cpp}
-      YUE2_DOCKER_SOCKET: /var/run/docker.sock
+      YUE2_LLAMA_URL: ${YUE2_LLAMA_URL:-http://llama-cpp:8080}
+      YUE2_BIND_HOST: ${YUE2_BIND_HOST:-127.0.0.1}
     volumes:
       - ./yue2-data:/data
-      # Lets the gateway stop/start llama-cpp. Mounting the socket grants
-      # control of the Docker daemon; remove it and set YUE2_STOP_LLAMA=false
-      # if you prefer to coordinate VRAM by hand.
-      - /var/run/docker.sock:/var/run/docker.sock
 
   # Interactive agent; not started by `up` (profile), use `docker compose run --rm pi`.
   pi:

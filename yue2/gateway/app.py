@@ -51,8 +51,10 @@ RETENTION_SECONDS = int(os.environ.get("YUE2_RETENTION_SECONDS", "86400"))
 MAX_GIB = float(os.environ.get("YUE2_MAX_GIB", "5"))
 DEFAULT_FORMAT = os.environ.get("YUE2_AUDIO_FORMAT", "flac")
 
-# VRAM handshake: pause the LLM container while YuE2 runs, then bring it back.
-DOCKER_SOCKET = os.environ.get("YUE2_DOCKER_SOCKET", "/var/run/docker.sock")
+# VRAM handshake: unload active llama-cpp models over HTTP while YuE2 runs (no Docker socket needed).
+LLAMA_URL = os.environ.get("YUE2_LLAMA_URL", "http://llama-cpp:8080").rstrip("/")
+BIND_HOST = os.environ.get("YUE2_BIND_HOST", "127.0.0.1").strip()
+DOCKER_SOCKET = os.environ.get("YUE2_DOCKER_SOCKET", "")
 LLAMA_CONTAINER = os.environ.get("YUE2_LLAMA_CONTAINER", "llama-cpp")
 STOP_LLAMA = os.environ.get("YUE2_STOP_LLAMA", "true").lower() in ("1", "true", "yes")
 LLAMA_READY_TIMEOUT = float(os.environ.get("YUE2_LLAMA_READY_TIMEOUT_SECONDS", "180"))
@@ -182,17 +184,27 @@ async def unload_engine_model() -> None:
 
 
 class DockerCtl:
-    """Minimal Docker Engine API client over the mounted unix socket.
+    """Coordinate GPU VRAM with llama-cpp via its unprivileged HTTP model unload API.
 
-    Used only to pause/restart the LLM container so YuE2 gets the whole GPU.
+    Falls back to Docker socket only when YUE2_DOCKER_SOCKET is explicitly configured
+    and YUE2_LLAMA_URL is empty.
     """
 
     def __init__(self) -> None:
         self._lock = asyncio.Lock()
+        self._unloaded_models: list[str] = []
+
+    @property
+    def _use_http(self) -> bool:
+        return bool(LLAMA_URL)
 
     @property
     def enabled(self) -> bool:
-        return STOP_LLAMA and Path(DOCKER_SOCKET).exists()
+        if not STOP_LLAMA:
+            return False
+        if self._use_http:
+            return True
+        return bool(DOCKER_SOCKET) and Path(DOCKER_SOCKET).exists()
 
     def _client(self) -> httpx.AsyncClient:
         transport = httpx.AsyncHTTPTransport(uds=DOCKER_SOCKET)
@@ -210,7 +222,18 @@ class DockerCtl:
         """Return stopped | starting | healthy | unknown."""
         if not STOP_LLAMA:
             return "unknown"
-        if not Path(DOCKER_SOCKET).exists():
+        if self._use_http:
+            try:
+                async with httpx.AsyncClient(timeout=5) as client:
+                    r = await client.get(f"{LLAMA_URL}/health")
+                    if r.status_code == 200:
+                        return "healthy"
+                    if r.status_code == 503:
+                        return "starting"
+            except Exception:  # noqa: BLE001
+                return "unknown"
+            return "unknown"
+        if not DOCKER_SOCKET or not Path(DOCKER_SOCKET).exists():
             return "unknown"
         try:
             async with self._client() as client:
@@ -227,10 +250,32 @@ class DockerCtl:
             return "unknown"
 
     async def pause(self) -> bool:
-        """Stop the LLM container. Returns True only if we actually stopped it."""
+        """Unload active llama-cpp models via HTTP to free VRAM. Returns True if any model was unloaded."""
         if not self.enabled:
             return False
         async with self._lock:
+            if self._use_http:
+                unloaded = False
+                self._unloaded_models = []
+                try:
+                    async with httpx.AsyncClient(timeout=30) as client:
+                        r = await client.get(f"{LLAMA_URL}/v1/models")
+                        if r.status_code == 200:
+                            models = r.json().get("data", [])
+                            for m in models:
+                                status = (m.get("status") or {}).get("value")
+                                mid = m.get("id")
+                                if mid and status in ("loaded", "loading"):
+                                    LOG.info("unloading llama-cpp model %s via HTTP to free VRAM", mid)
+                                    ur = await client.post(f"{LLAMA_URL}/models/unload", json={"model": mid})
+                                    if ur.status_code == 200:
+                                        self._unloaded_models.append(mid)
+                                        unloaded = True
+                    if unloaded:
+                        await asyncio.sleep(2)
+                except Exception as exc:  # noqa: BLE001
+                    LOG.warning("could not unload llama-cpp models via HTTP: %s", exc)
+                return unloaded
             try:
                 if not await self._running():
                     LOG.info("%s not running; GPU already free", LLAMA_CONTAINER)
@@ -248,6 +293,18 @@ class DockerCtl:
 
     async def resume(self) -> None:
         async with self._lock:
+            if self._use_http:
+                # llama-cpp stays running in router mode and reloads models on demand.
+                # Verify it is still healthy.
+                try:
+                    async with httpx.AsyncClient(timeout=10) as client:
+                        r = await client.get(f"{LLAMA_URL}/health")
+                        if r.status_code == 200:
+                            LOG.info("llama-cpp HTTP endpoint healthy; models will reload on demand")
+                except Exception as exc:  # noqa: BLE001
+                    LOG.warning("llama-cpp health check after YuE2 job failed: %s", exc)
+                self._unloaded_models = []
+                return
             try:
                 LOG.info("starting %s again", LLAMA_CONTAINER)
                 async with self._client() as client:
@@ -494,6 +551,10 @@ REQUEST_OPTIONS = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _queue, _worker
+    if BIND_HOST not in ("127.0.0.1", "localhost", "::1") and not API_KEY:
+        raise RuntimeError(
+            f"YUE2_API_KEY is required when YUE2_BIND_HOST={BIND_HOST!r} is outside loopback"
+        )
     init_db()
     # A job left "running" when the gateway died has lost its engine call.
     db_exec(
