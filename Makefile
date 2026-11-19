@@ -1,4 +1,4 @@
-.PHONY: help autotune up down restart status logs logs-llm logs-langfuse logs-music music-up music-down decision-up embed-up studio-api studio-ui test-memory clean install-cli
+.PHONY: help autotune doctor test up down restart status logs logs-llm logs-langfuse logs-music music-up music-down decision-up embed-up studio-api studio-ui test-memory clean install-cli
 
 # Default target: display help
 help:
