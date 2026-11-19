@@ -162,11 +162,15 @@ echo "--------------------------------------------------------"
 ENV_FILE=".env"
 TEMP_ENV="$(mktemp)"
 
-# Read and preserve any existing non-autotuned keys from .env
+# Read and preserve any existing non-autotuned keys from .env (including custom LANGFUSE_* and YUE2_*)
 EXISTING_KEYS=""
 if [ -f "$ENV_FILE" ]; then
-    EXISTING_KEYS="$(grep -E '^[A-Z0-9_]+=' "$ENV_FILE" | grep -v -E '^(UID|GID|LLM_|LANGFUSE_|YUE2_)' || true)"
+    EXISTING_KEYS="$(grep -E '^[A-Z0-9_]+=' "$ENV_FILE" | grep -v -E '^(UID|GID|LLM_THREADS|LLM_THREADS_BATCH|LLM_CTX_SIZE|LLM_KV_CACHE_TYPE|LLM_UBATCH|LLM_BATCH|LLM_MOE_CACHE_MIB|LLM_LOAD_MODE|LLM_MLOCK|LLM_CPU_MASK)=' || true)"
 fi
+
+has_env_key() {
+    printf '%s\n' "$EXISTING_KEYS" | grep -q -E "^$1="
+}
 
 cat << EOF > "$TEMP_ENV"
 # ==============================================================================
@@ -187,18 +191,19 @@ LLM_UBATCH=$UBATCH
 LLM_BATCH=$BATCH
 LLM_MOE_CACHE_MIB=$LLM_MOE_CACHE_MIB
 LLM_LOAD_MODE=$LLM_LOAD_MODE
-LLM_MLOCK=$USE_MLOCK
-LLM_CPU_MASK=${P_CORE_MASK:-0x0}
-
-# Observability
-LANGFUSE_BASE_URL=http://127.0.0.1:3000
-LANGFUSE_PUBLIC_KEY=pk-lf-local-pi
-LANGFUSE_SECRET_KEY=sk-lf-local-pi
-
-# Music engine integration
-YUE2_STOP_LLAMA=true
-YUE2_LLAMA_CONTAINER=llama-cpp
 EOF
+
+{
+    echo ""
+    echo "# Observability Defaults"
+    has_env_key "LANGFUSE_BASE_URL" || echo "LANGFUSE_BASE_URL=http://127.0.0.1:3000"
+    has_env_key "LANGFUSE_PUBLIC_KEY" || echo "LANGFUSE_PUBLIC_KEY=pk-lf-local-pi"
+    has_env_key "LANGFUSE_SECRET_KEY" || echo "LANGFUSE_SECRET_KEY=sk-lf-local-pi"
+    echo ""
+    echo "# Music Engine Defaults"
+    has_env_key "YUE2_STOP_LLAMA" || echo "YUE2_STOP_LLAMA=true"
+    has_env_key "YUE2_LLAMA_CONTAINER" || echo "YUE2_LLAMA_CONTAINER=llama-cpp"
+} >> "$TEMP_ENV"
 
 if [ -n "$EXISTING_KEYS" ]; then
     echo "" >> "$TEMP_ENV"
@@ -253,7 +258,7 @@ import json, sys
 path, ctx = sys.argv[1], int(sys.argv[2])
 with open(path, "r") as f:
     data = json.load(f)
-llama = data.get("providers", {}).get("llama.cpp")
+llama = data.get("providers", {}).get("llamacpp")
 if llama:
     for m in llama.get("models", {}).values():
         limits = m.get("limit", {})
@@ -262,7 +267,7 @@ if llama:
 with open(path, "w") as f:
     json.dump(data, f, indent=2)
 PY
-    echo "• Synchronized opencode.json llama.cpp limit.context -> $OPTIMAL_CTX"
+    echo "• Synchronized opencode.json llamacpp limit.context -> $OPTIMAL_CTX"
 fi
 
 echo "✅ Saved hardware-tailored configuration to $ENV_FILE"
