@@ -418,7 +418,9 @@ async def run_job(job_id: str) -> None:
         wav = decode_audio(result["audio"])
         job_dir = DATA_DIR / "jobs" / job_id
         job_dir.mkdir(parents=True, exist_ok=True)
-        audio_path = to_flac(wav, job_dir / ("audio.flac" if DEFAULT_FORMAT == "flac" else "audio.wav"))
+        audio_path = await asyncio.to_thread(
+            to_flac, wav, job_dir / ("audio.flac" if DEFAULT_FORMAT == "flac" else "audio.wav")
+        )
 
         score = decode_score(result.get("artifacts", []))
         score_path = None
