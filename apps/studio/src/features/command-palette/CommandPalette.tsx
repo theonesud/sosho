@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiJson, authHeaders } from "@/api";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { normalizeSkills } from "@/lib/utils";
 import { useStudioStore } from "@/stores/studio-store";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import type { RunSummary, SystemStatusResponse, WorkflowSummary } from "@/types";
@@ -124,7 +125,7 @@ export function CommandPalette() {
 
   const workflows = workflowsData ?? [];
   const runs = runsData ?? [];
-  const skills = systemData?.skills ?? [];
+  const skills = normalizeSkills(systemData?.skills);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -265,15 +266,15 @@ export function CommandPalette() {
                 heading="Skills"
                 className="px-1 py-1 text-[11px] font-medium text-text-muted [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1"
               >
-                {skills.slice(0, 10).map((skill) => (
+                {skills.slice(0, 10).map((skill, idx) => (
                   <Command.Item
-                    key={skill}
-                    value={`skill ${skill}`}
-                    onSelect={() => go(`/playground?skill=${encodeURIComponent(skill)}`)}
+                    key={skill.path || `${skill.name}-${idx}`}
+                    value={`skill ${skill.name}`}
+                    onSelect={() => go(`/playground?skill=${encodeURIComponent(skill.name)}`)}
                     className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-text-primary aria-selected:bg-zinc-800"
                   >
                     <Sparkles className="h-3 w-3 text-sky-400 shrink-0" />
-                    <span className="font-mono text-[12px]">{skill}</span>
+                    <span className="font-mono text-[12px]">{skill.name}</span>
                   </Command.Item>
                 ))}
               </Command.Group>

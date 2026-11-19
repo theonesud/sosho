@@ -5,8 +5,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { normalizeSkills } from "@/lib/utils";
 import { useStudioStore } from "@/stores/studio-store";
-import type { GpuState, ServiceStatus } from "@/types";
+import type { GpuState, ServiceStatus, SkillInfo } from "@/types";
 
 interface RoleConfig {
   provider?: string;
@@ -18,17 +19,11 @@ interface RoleConfig {
   fallbacks?: string[];
 }
 
-interface SkillInfo {
-  name: string;
-  description: string;
-  path: string;
-}
-
 interface SystemStatusPayload {
   services: ServiceStatus[];
   roles: Record<string, RoleConfig>;
   providers?: string[];
-  skills?: SkillInfo[];
+  skills?: Array<string | SkillInfo>;
 }
 
 interface DoctorResult {
@@ -89,10 +84,10 @@ export function SystemWorkspace() {
       }
 
       if (skillsRes.ok) {
-        const skillsJson = (await skillsRes.json()) as { skills?: SkillInfo[] };
-        setSkills(Array.isArray(skillsJson.skills) ? skillsJson.skills : []);
+        const skillsJson = (await skillsRes.json()) as { skills?: unknown };
+        setSkills(normalizeSkills(skillsJson.skills));
       } else if (Array.isArray(statusJson.skills)) {
-        setSkills(statusJson.skills);
+        setSkills(normalizeSkills(statusJson.skills));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -394,8 +389,11 @@ export function SystemWorkspace() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-              {skills.map((skill) => (
-                <div key={skill.path} className="rounded-md border border-border-subtle bg-elevated p-3 space-y-1.5">
+              {skills.map((skill, idx) => (
+                <div
+                  key={skill.path || `${skill.name}-${idx}`}
+                  className="rounded-md border border-border-subtle bg-elevated p-3 space-y-1.5"
+                >
                   <div className="text-[13px] font-semibold text-text-primary">{skill.name}</div>
                   <p className="text-[12px] leading-relaxed text-text-secondary">
                     {skill.description || "No description provided in SKILL.md frontmatter."}

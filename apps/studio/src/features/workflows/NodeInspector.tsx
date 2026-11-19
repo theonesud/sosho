@@ -6,13 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { normalizeSkills } from "@/lib/utils";
 import { useWorkflowStore } from "@/stores/workflow-store";
-import { MODEL_TIERS, NODE_META, QUEUE_LANES, type RawGraph } from "@/types";
+import { MODEL_TIERS, NODE_META, QUEUE_LANES, type RawGraph, type SkillInfo } from "@/types";
 
 interface NodeInspectorProps {
   graph: RawGraph | null;
   readOnly?: boolean;
-  availableSkills?: string[];
+  availableSkills?: Array<string | SkillInfo>;
 }
 
 const selectClass =
@@ -219,9 +220,9 @@ export function NodeInspector({ graph, readOnly = false, availableSkills = [] }:
                   className={selectClass}
                 >
                   <option value="">Select skill...</option>
-                  {availableSkills.map((sk) => (
-                    <option key={sk} value={sk}>
-                      {sk}
+                  {normalizeSkills(availableSkills).map((sk, idx) => (
+                    <option key={sk.path || `${sk.name}-${idx}`} value={sk.name}>
+                      {sk.name}
                     </option>
                   ))}
                 </select>

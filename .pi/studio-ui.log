@@ -35,3 +35,60 @@
  GET /memory 200 in 18ms
  GET /music 200 in 14ms
  GET / 200 in 14ms
+ ✓ Compiled in 717ms (1153 modules)
+ GET / 200 in 67ms
+ ✓ Compiled in 396ms (1153 modules)
+ GET / 200 in 65ms
+ ✓ Compiled in 275ms (1153 modules)
+ GET / 200 in 39ms
+ ✓ Compiled in 195ms (1153 modules)
+ GET / 200 in 36ms
+ ✓ Compiled in 181ms (1153 modules)
+ GET / 200 in 35ms
+ ✓ Compiled in 180ms (1153 modules)
+ GET / 200 in 34ms
+ ✓ Compiled in 200ms (1153 modules)
+ GET / 200 in 40ms
+ ✓ Compiled in 255ms (1153 modules)
+ GET / 200 in 37ms
+ ✓ Compiled in 179ms (1153 modules)
+ GET / 200 in 35ms
+ ✓ Compiled in 177ms (1153 modules)
+ GET / 200 in 35ms
+ ✓ Compiled in 169ms (1153 modules)
+ GET / 200 in 37ms
+ ✓ Compiled in 199ms (1153 modules)
+ GET / 200 in 37ms
+ ✓ Compiled in 221ms (1153 modules)
+ GET / 200 in 36ms
+ ✓ Compiled in 180ms (1153 modules)
+ GET / 200 in 34ms
+Failed to proxy http://127.0.0.1:4101/api/events Error: connect ECONNREFUSED 127.0.0.1:4101
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:4101) {
+  errno: -111,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 4101
+}
+Error: connect ECONNREFUSED 127.0.0.1:4101
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:4101) {
+  errno: -111,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 4101
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1259ms (1502 modules)
+ GET / 200 in 635ms
+ GET / 200 in 12ms
+ GET / 200 in 218ms
+ GET /playground 200 in 21ms
+ GET /memory 200 in 23ms
+ GET /music 200 in 18ms
+ GET /system 200 in 23ms
+ GET /music 200 in 13ms
+ GET /memory 200 in 12ms
+ GET /playground 200 in 13ms
+ GET / 200 in 12ms

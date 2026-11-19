@@ -87,10 +87,16 @@ export interface ServiceStatus {
   detail: string;
 }
 
+export interface SkillInfo {
+  name: string;
+  description: string;
+  path: string;
+}
+
 export interface SystemStatusResponse {
   services: ServiceStatus[];
   roles: Record<string, { provider: string; model: string; description?: string }>;
-  skills: string[];
+  skills: Array<string | SkillInfo>;
 }
 
 export interface QueueLaneStat {

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { cn, normalizeSkills } from "@/lib/utils";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import type { ModelTier, RawGraph, SystemStatusResponse } from "@/types";
 import { consumeSsePost } from "./sse-client";
@@ -128,9 +128,10 @@ export function PlaygroundWorkbench() {
           setMetaError(statusRes.data.error || "Could not load system tiers");
         }
         if (skillsRes.ok && Array.isArray(skillsRes.data.skills)) {
-          setSkills(skillsRes.data.skills);
-          if (skillsRes.data.skills.length > 0) {
-            setSelectedSkill((prev) => prev || skillsRes.data.skills[0].name);
+          const normalized = normalizeSkills(skillsRes.data.skills);
+          setSkills(normalized);
+          if (normalized.length > 0) {
+            setSelectedSkill((prev) => prev || normalized[0].name);
           }
         }
       } catch (err) {
@@ -639,8 +640,8 @@ export function PlaygroundWorkbench() {
                     onChange={(e) => setSelectedSkill(e.target.value)}
                     className="h-8 w-full rounded-md border border-border-subtle bg-canvas px-2 font-mono text-[12px] text-text-primary focus-visible:border-accent focus-visible:outline-none"
                   >
-                    {skills.map((s) => (
-                      <option key={s.name} value={s.name}>
+                    {skills.map((s, idx) => (
+                      <option key={s.path || `${s.name}-${idx}`} value={s.name}>
                         {s.name}
                       </option>
                     ))}
