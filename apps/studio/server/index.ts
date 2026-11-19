@@ -13,6 +13,7 @@ import { createOpenApiRoutes } from "./openapi.ts";
 import { createEventsRoutes } from "./routes/events.ts";
 import { createMemoryRoutes } from "./routes/memory.ts";
 import { createMusicRoutes } from "./routes/music.ts";
+import { createPlaygroundRoutes } from "./routes/playground.ts";
 import { createRunsRoutes } from "./routes/runs.ts";
 import { createSkillsRoutes } from "./routes/skills.ts";
 import { createSystemRoutes } from "./routes/system.ts";
@@ -153,6 +154,9 @@ export function createStudioServer(options: StudioServerOptions = {}): {
       "/api/memory",
       "/api/skills",
       "/api/music/jobs",
+      "/api/playground/chat",
+      "/api/playground/compare",
+      "/api/playground/skill",
       "/api/events",
       "/api/openapi.json",
       "/api/docs",
@@ -167,6 +171,7 @@ export function createStudioServer(options: StudioServerOptions = {}): {
   app.route("/api/runs", createRunsRoutes(ctx));
   app.route("/api/memory", createMemoryRoutes(ctx));
   app.route("/api/music", createMusicRoutes(ctx));
+  app.route("/api/playground", createPlaygroundRoutes(ctx));
   app.route("/api/system", createSystemRoutes(ctx));
   app.route("/api/skills", createSkillsRoutes(ctx));
   app.route("/api/events", createEventsRoutes(ctx));

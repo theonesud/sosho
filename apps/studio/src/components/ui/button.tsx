@@ -16,8 +16,7 @@ const buttonVariants = cva(
         ghost: "text-text-secondary hover:text-text-primary hover:bg-elevated active:bg-zinc-800",
         danger:
           "bg-error/15 text-red-400 border border-error/30 hover:bg-error/25 hover:border-error/50 active:bg-error/30",
-        warning:
-          "bg-warning/15 text-amber-300 border border-warning/35 hover:bg-warning/25 hover:border-warning/50",
+        warning: "bg-warning/15 text-amber-300 border border-warning/35 hover:bg-warning/25 hover:border-warning/50",
       },
       size: {
         xs: "h-6 px-2 text-[11px]",

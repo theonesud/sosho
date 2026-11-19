@@ -134,6 +134,27 @@ export const STUDIO_OPENAPI_SPEC = {
     "/api/skills": {
       get: { summary: "List .pi/skills with parsed SKILL.md frontmatter", responses: { "200": { description: "Skills list" } } },
     },
+    "/api/playground/chat": {
+      post: {
+        summary: "Stream a single-role LLM chat completion via SSE",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "SSE stream (delta, done, error)" }, "400": { description: "Validation error" } },
+      },
+    },
+    "/api/playground/compare": {
+      post: {
+        summary: "Stream two LLM roles side-by-side via multiplexed SSE",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Multiplexed SSE stream tagged with slot and role" }, "400": { description: "Validation error" } },
+      },
+    },
+    "/api/playground/skill": {
+      post: {
+        summary: "Execute a Sosho skill with a prompt and return output and duration",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Skill output and durationMs" }, "400": { description: "Validation error" } },
+      },
+    },
     "/api/events": {
       get: { summary: "Subscribe to unified Server-Sent Events stream", responses: { "200": { description: "SSE stream" } } },
       post: {

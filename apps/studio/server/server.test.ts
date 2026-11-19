@@ -271,7 +271,29 @@ try {
   assert.ok(secondText.includes('"value":42'));
   ac.abort();
 
-  // 11. Delete workflow
+  // 11. Playground Zod validation
+  const badChat = await fetch(`${s2.baseUrl}/api/playground/chat`, {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({ role: "main", prompt: "" }), // empty prompt
+  });
+  assert.equal(badChat.status, 400);
+
+  const badCompare = await fetch(`${s2.baseUrl}/api/playground/compare`, {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({ roles: ["main"], prompt: "Hi" }), // requires 2 roles
+  });
+  assert.equal(badCompare.status, 400);
+
+  const badSkill = await fetch(`${s2.baseUrl}/api/playground/skill`, {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({ skillName: "" }), // missing prompt + empty skillName
+  });
+  assert.equal(badSkill.status, 400);
+
+  // 12. Delete workflow
   const wfDel = await fetch(`${s2.baseUrl}/api/workflows/test-wf`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${TOKEN}` },

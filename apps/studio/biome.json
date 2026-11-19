@@ -1,7 +1,16 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-  "organizeImports": {
-    "enabled": true
+  "$schema": "https://biomejs.dev/schemas/2.6.8/schema.json",
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
   },
   "linter": {
     "enabled": true,
@@ -11,6 +20,9 @@
         "useKeyWithClickEvents": "off",
         "noStaticElementInteractions": "off",
         "noLabelWithoutControl": "off"
+      },
+      "complexity": {
+        "noImportantStyles": "off"
       },
       "suspicious": {
         "noArrayIndexKey": "off"
@@ -24,6 +36,6 @@
     "lineWidth": 120
   },
   "files": {
-    "ignore": [".next", "dist", "node_modules"]
+    "includes": ["src/**", "server/**"]
   }
 }
