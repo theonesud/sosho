@@ -252,7 +252,8 @@ try {
   const ac = new AbortController();
   const sseRes = await fetch(`${s2.baseUrl}/api/events`, { signal: ac.signal });
   assert.equal(sseRes.status, 200);
-  const reader = sseRes.body!.getReader();
+  assert.ok(sseRes.body, "SSE response missing body");
+  const reader = sseRes.body.getReader();
   const decoder = new TextDecoder();
 
   const firstChunk = await reader.read();

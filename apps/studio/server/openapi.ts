@@ -5,7 +5,8 @@ export const STUDIO_OPENAPI_SPEC = {
   info: {
     title: "Sosho Studio API",
     version: "0.2.0",
-    description: "Local-first API for Sosho workflows, DAG runs, two-tier memory, YuE2 music, skills, and system health.",
+    description:
+      "Local-first API for Sosho workflows, DAG runs, two-tier memory, YuE2 music, skills, and system health.",
   },
   servers: [{ url: "http://127.0.0.1:4101" }],
   components: {
@@ -29,7 +30,10 @@ export const STUDIO_OPENAPI_SPEC = {
       },
     },
     "/api/workflows/{id}": {
-      get: { summary: "Get workflow graph by ID", responses: { "200": { description: "Workflow graph" }, "404": { description: "Not found" } } },
+      get: {
+        summary: "Get workflow graph by ID",
+        responses: { "200": { description: "Workflow graph" }, "404": { description: "Not found" } },
+      },
       delete: {
         summary: "Delete workflow graph by ID",
         security: [{ bearerAuth: [] }],
@@ -45,7 +49,10 @@ export const STUDIO_OPENAPI_SPEC = {
       },
     },
     "/api/runs/{id}": {
-      get: { summary: "Get run state and node outputs", responses: { "200": { description: "Run details" }, "404": { description: "Not found" } } },
+      get: {
+        summary: "Get run state and node outputs",
+        responses: { "200": { description: "Run details" }, "404": { description: "Not found" } },
+      },
     },
     "/api/runs/{id}/cancel": {
       post: {
@@ -102,7 +109,10 @@ export const STUDIO_OPENAPI_SPEC = {
       },
     },
     "/api/music/jobs/{id}/audio": {
-      get: { summary: "Stream generated audio with Range passthrough", responses: { "200": { description: "Audio stream" }, "206": { description: "Partial content" } } },
+      get: {
+        summary: "Stream generated audio with Range passthrough",
+        responses: { "200": { description: "Audio stream" }, "206": { description: "Partial content" } },
+      },
     },
     "/api/music/jobs/{id}/cancel": {
       post: {
@@ -112,10 +122,16 @@ export const STUDIO_OPENAPI_SPEC = {
       },
     },
     "/api/system/status": {
-      get: { summary: "Live health probes, model roles, providers, and skills", responses: { "200": { description: "System status" } } },
+      get: {
+        summary: "Live health probes, model roles, providers, and skills",
+        responses: { "200": { description: "System status" } },
+      },
     },
     "/api/system/gpu": {
-      get: { summary: "Query local NVIDIA GPU memory and utilization", responses: { "200": { description: "GPU state" } } },
+      get: {
+        summary: "Query local NVIDIA GPU memory and utilization",
+        responses: { "200": { description: "GPU state" } },
+      },
     },
     "/api/system/gpu/unload": {
       post: {
@@ -132,31 +148,46 @@ export const STUDIO_OPENAPI_SPEC = {
       },
     },
     "/api/skills": {
-      get: { summary: "List .pi/skills with parsed SKILL.md frontmatter", responses: { "200": { description: "Skills list" } } },
+      get: {
+        summary: "List .pi/skills with parsed SKILL.md frontmatter",
+        responses: { "200": { description: "Skills list" } },
+      },
     },
     "/api/playground/chat": {
       post: {
         summary: "Stream a single-role LLM chat completion via SSE",
         security: [{ bearerAuth: [] }],
-        responses: { "200": { description: "SSE stream (delta, done, error)" }, "400": { description: "Validation error" } },
+        responses: {
+          "200": { description: "SSE stream (delta, done, error)" },
+          "400": { description: "Validation error" },
+        },
       },
     },
     "/api/playground/compare": {
       post: {
         summary: "Stream two LLM roles side-by-side via multiplexed SSE",
         security: [{ bearerAuth: [] }],
-        responses: { "200": { description: "Multiplexed SSE stream tagged with slot and role" }, "400": { description: "Validation error" } },
+        responses: {
+          "200": { description: "Multiplexed SSE stream tagged with slot and role" },
+          "400": { description: "Validation error" },
+        },
       },
     },
     "/api/playground/skill": {
       post: {
         summary: "Execute a Sosho skill with a prompt and return output and duration",
         security: [{ bearerAuth: [] }],
-        responses: { "200": { description: "Skill output and durationMs" }, "400": { description: "Validation error" } },
+        responses: {
+          "200": { description: "Skill output and durationMs" },
+          "400": { description: "Validation error" },
+        },
       },
     },
     "/api/events": {
-      get: { summary: "Subscribe to unified Server-Sent Events stream", responses: { "200": { description: "SSE stream" } } },
+      get: {
+        summary: "Subscribe to unified Server-Sent Events stream",
+        responses: { "200": { description: "SSE stream" } },
+      },
       post: {
         summary: "Broadcast a custom event to SSE subscribers",
         security: [{ bearerAuth: [] }],

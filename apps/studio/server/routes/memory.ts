@@ -50,8 +50,7 @@ export function createMemoryRoutes(ctx: StudioContext): Hono {
   app.get("/", async (c) => {
     const q = c.req.query("q")?.trim() || "";
     const rawScope = c.req.query("scope") || "both";
-    const scope: MemoryScope | "both" =
-      rawScope === "global" || rawScope === "project" ? rawScope : "both";
+    const scope: MemoryScope | "both" = rawScope === "global" || rawScope === "project" ? rawScope : "both";
     const includeArchived = c.req.query("includeArchived") === "true";
     const types = parseTypesParam(c.req.query("types"));
     const rawLimit = Number(c.req.query("limit") || "25");

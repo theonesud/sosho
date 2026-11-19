@@ -22,10 +22,7 @@ import { SseHub } from "./sse.ts";
 
 export { isSafeWorkflowId };
 
-const DEFAULT_ALLOWED_ORIGINS = new Set([
-  "http://127.0.0.1:4100",
-  "http://localhost:4100",
-]);
+const DEFAULT_ALLOWED_ORIGINS = new Set(["http://127.0.0.1:4100", "http://localhost:4100"]);
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "DELETE"]);
 
@@ -47,7 +44,7 @@ function loadStudioToken(root: string): string {
 }
 
 function verifyBearerHeader(auth: string | undefined, expectedToken: string): boolean {
-  if (!auth || !auth.startsWith("Bearer ")) return false;
+  if (!auth?.startsWith("Bearer ")) return false;
   const provided = auth.slice("Bearer ".length).trim();
   const a = Buffer.from(provided, "utf8");
   const b = Buffer.from(expectedToken, "utf8");

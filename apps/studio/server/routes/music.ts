@@ -43,10 +43,7 @@ export function createMusicRoutes(ctx: StudioContext): Hono {
         headers: respHeaders,
       });
     } catch (err) {
-      return c.json(
-        { error: `YuE2 gateway unreachable: ${err instanceof Error ? err.message : String(err)}` },
-        502,
-      );
+      return c.json({ error: `YuE2 gateway unreachable: ${err instanceof Error ? err.message : String(err)}` }, 502);
     }
   });
 
@@ -70,10 +67,7 @@ export function createMusicRoutes(ctx: StudioContext): Hono {
         headers: { "Content-Type": ct },
       });
     } catch (err) {
-      return c.json(
-        { error: `YuE2 gateway unreachable: ${err instanceof Error ? err.message : String(err)}` },
-        502,
-      );
+      return c.json({ error: `YuE2 gateway unreachable: ${err instanceof Error ? err.message : String(err)}` }, 502);
     }
   });
 
@@ -110,10 +104,7 @@ export function createMusicRoutes(ctx: StudioContext): Hono {
         headers: { "Content-Type": ct },
       });
     } catch (err) {
-      return c.json(
-        { error: `YuE2 gateway unreachable: ${err instanceof Error ? err.message : String(err)}` },
-        502,
-      );
+      return c.json({ error: `YuE2 gateway unreachable: ${err instanceof Error ? err.message : String(err)}` }, 502);
     }
   });
 
@@ -141,10 +132,7 @@ export function createMusicRoutes(ctx: StudioContext): Hono {
         headers: { "Content-Type": ct },
       });
     } catch (err) {
-      return c.json(
-        { error: `YuE2 gateway unreachable: ${err instanceof Error ? err.message : String(err)}` },
-        502,
-      );
+      return c.json({ error: `YuE2 gateway unreachable: ${err instanceof Error ? err.message : String(err)}` }, 502);
     }
   });
 

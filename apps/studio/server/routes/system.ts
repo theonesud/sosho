@@ -41,10 +41,7 @@ export async function queryGpuState(): Promise<{
   try {
     const { stdout } = await execFileAsync(
       "nvidia-smi",
-      [
-        "--query-gpu=name,memory.used,memory.total,utilization.gpu,temperature.gpu",
-        "--format=csv,noheader,nounits",
-      ],
+      ["--query-gpu=name,memory.used,memory.total,utilization.gpu,temperature.gpu", "--format=csv,noheader,nounits"],
       { timeout: 3000 },
     );
     const gpus = stdout
@@ -82,9 +79,7 @@ export function createSystemRoutes(ctx: StudioContext): Hono {
     const llamaDecisionBase = stripApiSuffix(
       env.LLAMA_DECISION_URL || providerBase("llama-decision", "http://127.0.0.1:8081"),
     );
-    const llamaEmbedBase = stripApiSuffix(
-      env.LLAMA_EMBED_URL || providerBase("llama-embed", "http://127.0.0.1:8082"),
-    );
+    const llamaEmbedBase = stripApiSuffix(env.LLAMA_EMBED_URL || providerBase("llama-embed", "http://127.0.0.1:8082"));
     const langfuseBase = (env.LANGFUSE_BASE_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
     const yue2Base = (env.YUE2_GATEWAY_URL || "http://127.0.0.1:8021").replace(/\/+$/, "");
 
