@@ -1,0 +1,8 @@
+{
+  "name": "@sosho/memory",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/store.ts"
+  }
+}

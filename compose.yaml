@@ -9,6 +9,7 @@ name: sosho
 
 include:
   - path: docker/compose.langfuse.yaml
+  - path: docker/compose.temporal.yaml
 
 
 x-model: &model
@@ -110,6 +111,69 @@ services:
       - "900"
       - -fa
       - "on"
+
+  # Lightweight CPU-only decision/router model (0 GPU VRAM, ~1.5 GB RAM).
+  # Start with: docker compose --profile decision up -d
+  decision-model-download:
+    profiles: [decision]
+    image: python:3.12-slim
+    environment:
+      HF_REPO: unsloth/Qwen3-1.7B-GGUF
+      MODEL_SUBDIR: Qwen3-1.7B
+      MODEL_FILE: Qwen3-1.7B-Q4_K_M.gguf
+      HF_XET_HIGH_PERFORMANCE: "1"
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - ./models:/models
+      - hf-cache:/root/.cache/huggingface
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        dir=/models/$$MODEL_SUBDIR
+        if [ -e "$$dir/$$MODEL_FILE" ]; then
+          echo "Decision model present in $$dir"; exit 0
+        fi
+        pip install -q --root-user-action=ignore "huggingface_hub[cli,hf_xet]"
+        hf download "$$HF_REPO" "$$MODEL_FILE" --local-dir "$$dir"
+    restart: "no"
+
+  llama-decision:
+    profiles: [decision]
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: llama-decision
+    restart: unless-stopped
+    depends_on:
+      decision-model-download:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8081:8081"
+    networks: [webui-net]
+    volumes:
+      - ./models:/models:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8081/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    command:
+      - -m
+      - /models/Qwen3-1.7B/Qwen3-1.7B-Q4_K_M.gguf
+      - --alias
+      - Qwen3-1.7B
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8081"
+      - -c
+      - "16384"
+      - -np
+      - "4"
+      - -t
+      - "${DECISION_LLM_THREADS:-8}"
+      - --cache-prompt
 
 
 
@@ -246,6 +310,7 @@ services:
       - ${PWD}:${PWD}
       - ${PWD}/../worktrees:${PWD}/../worktrees
       - ${HOME}/.dokobot:${HOME}/.dokobot
+      - ${HOME}/.sosho/memory:${HOME}/.sosho/memory
       - ${HOME}/skills:${HOME}/skills:ro
       - ${HOME}/.gitconfig:${HOME}/.gitconfig:ro
     command: ["--approve"]

@@ -15,6 +15,47 @@
             "image"
           ],
           "reasoning": true
+        },
+        {
+          "id": "Qwen/Qwen3-32B",
+          "name": "Qwen3 32B (Subagent General)",
+          "contextWindow": 131072,
+          "maxTokens": 16384,
+          "input": [
+            "text"
+          ],
+          "reasoning": true
+        },
+        {
+          "id": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+          "name": "Qwen3 Coder 30B-A3B (Subagent Code)",
+          "contextWindow": 131072,
+          "maxTokens": 16384,
+          "input": [
+            "text"
+          ],
+          "reasoning": false
+        }
+      ]
+    },
+    "llama-decision": {
+      "baseUrl": "http://127.0.0.1:8081/v1",
+      "api": "openai-completions",
+      "apiKey": "local",
+      "models": [
+        {
+          "id": "Qwen3-1.7B",
+          "name": "Qwen3 1.7B (Local CPU Decision Router)",
+          "contextWindow": 16384,
+          "maxTokens": 1024,
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "samplingParams": {
+            "temperature": 0.1,
+            "top_p": 0.9
+          }
         }
       ]
     },

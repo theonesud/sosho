@@ -18,13 +18,21 @@
     "task_update",
     "task_status",
     "task_finish",
+    "subagent_run",
+    "subagent_parallel",
+    "memory_search",
+    "memory_save",
+    "memory_forget",
+    "memory_consolidate",
     "+codemode",
     "+tool_search"
   ],
   "extensions": [
     "-builtin:llama.cpp",
     "./extensions/langfuse/src/index.ts",
-    "./extensions/scratchpad/src/index.ts"
+    "./extensions/scratchpad/src/index.ts",
+    "./extensions/subagents/src/index.ts",
+    "./extensions/memory/src/index.ts"
   ],
   "lastChangelogVersion": "1.5.2",
   "extensionChangelogVersions": {

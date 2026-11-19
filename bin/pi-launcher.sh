@@ -100,6 +100,13 @@ fi
 if [ ! -f "$TARGET_PI/settings.json" ] && [ -f "$SOSHO_PI/settings.json" ]; then
     cp "$SOSHO_PI/settings.json" "$TARGET_PI/settings.json"
 fi
+if [ ! -f "$TARGET_PI/model-roles.json" ] && [ -f "$SOSHO_PI/model-roles.json" ]; then
+    cp "$SOSHO_PI/model-roles.json" "$TARGET_PI/model-roles.json"
+fi
+# Global output style: seed every new workspace. A project file takes precedence.
+if [ ! -f "$TARGET_PI/APPEND_SYSTEM.md" ] && [ -f "$SOSHO_PI/APPEND_SYSTEM.md" ]; then
+    cp "$SOSHO_PI/APPEND_SYSTEM.md" "$TARGET_PI/APPEND_SYSTEM.md"
+fi
 
 # 2a. Sync llama.cpp contextWindow in TARGET_PI/models.json with LLM_CTX_SIZE from .env if present
 # Only local llama.cpp/Qwen models follow local hardware autotune; remote providers are left unchanged.
@@ -222,7 +229,9 @@ WORKTREES_DIR="$(realpath "$WORKSPACE/../worktrees" 2>/dev/null || echo "$(dirna
 mkdir -p "$WORKTREES_DIR" 2>/dev/null || true
 [ -d "$WORKTREES_DIR" ] && MOUNTS+=(-v "$WORKTREES_DIR:$WORKTREES_DIR")
 
-# Mount Dokobot & Skills if they exist
+# Mount Dokobot, Skills & Global Memory
+mkdir -p "$HOME/.sosho/memory" 2>/dev/null || true
+[ -d "$HOME/.sosho/memory" ] && MOUNTS+=(-v "$HOME/.sosho/memory:$HOME/.sosho/memory")
 [ -d "$HOME/.dokobot" ] && MOUNTS+=(-v "$HOME/.dokobot:$HOME/.dokobot")
 [ -d "$HOME/skills" ] && MOUNTS+=(-v "$HOME/skills:$HOME/skills:ro")
 

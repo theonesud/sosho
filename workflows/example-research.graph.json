@@ -1,0 +1,77 @@
+{
+  "id": "example-research-checkpoint",
+  "name": "Memory-Backed Research with HITL Checkpoint",
+  "description": "Recalls Global & Project memory, routes via local CPU decision model, runs subagent research, pauses for human approval, then commits findings to long-term memory.",
+  "version": 1,
+  "entryNode": "recall_mem",
+  "maxSteps": 20,
+  "nodes": [
+    {
+      "id": "recall_mem",
+      "type": "memory",
+      "label": "Recall Relevant Memory",
+      "position": { "x": 80, "y": 140 },
+      "operation": "search",
+      "scope": "both",
+      "queryOrTitleTemplate": "{{topic}}",
+      "outputKey": "recalled_memory"
+    },
+    {
+      "id": "route_depth",
+      "type": "decision",
+      "label": "Route: Quick vs Deep",
+      "position": { "x": 360, "y": 140 },
+      "tier": "decision",
+      "promptTemplate": "Topic: {{topic}}\nExisting memory: {{recalled_memory}}\nChoose 'quick' if existing memory mostly answers it, or 'deep' if thorough synthesis is needed.",
+      "branches": ["quick", "deep"],
+      "outputKey": "route"
+    },
+    {
+      "id": "quick_answer",
+      "type": "subagent",
+      "label": "Quick Synthesis (Subagent)",
+      "position": { "x": 660, "y": 40 },
+      "role": "Quick Synthesizer",
+      "tier": "subagent",
+      "promptTemplate": "Synthesize a concise brief on {{topic}} using this memory:\n{{recalled_memory}}",
+      "outputKey": "draft_brief"
+    },
+    {
+      "id": "deep_research",
+      "type": "agent",
+      "label": "Deep Analysis (Main)",
+      "position": { "x": 660, "y": 240 },
+      "tier": "main",
+      "promptTemplate": "Produce a thorough, structured technical brief on {{topic}}. Existing context:\n{{recalled_memory}}",
+      "outputKey": "draft_brief"
+    },
+    {
+      "id": "hitl_review",
+      "type": "checkpoint",
+      "label": "Human Review & Approve",
+      "position": { "x": 960, "y": 140 },
+      "message": "Review draft_brief before committing to long-term Project memory.",
+      "allowStateEdit": true
+    },
+    {
+      "id": "save_mem",
+      "type": "memory",
+      "label": "Commit to Project Memory",
+      "position": { "x": 1240, "y": 140 },
+      "operation": "save",
+      "scope": "project",
+      "memoryType": "semantic",
+      "queryOrTitleTemplate": "Research Brief: {{topic}}",
+      "contentTemplate": "{{draft_brief}}",
+      "outputKey": "saved_memory"
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "recall_mem", "target": "route_depth" },
+    { "id": "e2", "source": "route_depth", "target": "quick_answer", "condition": "quick" },
+    { "id": "e3", "source": "route_depth", "target": "deep_research", "condition": "deep" },
+    { "id": "e4", "source": "quick_answer", "target": "hitl_review" },
+    { "id": "e5", "source": "deep_research", "target": "hitl_review" },
+    { "id": "e6", "source": "hitl_review", "target": "save_mem", "condition": "approve" }
+  ]
+}

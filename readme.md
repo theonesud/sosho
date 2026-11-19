@@ -4,226 +4,109 @@
 
 # Sosho
 
-**The unified, privacy-first local AI studio & autonomous agent workspace.**
+**Local-first AI studio, durable graph workflow engine, self-evolving two-tier memory, and multi-model autonomous agent workspace.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Docker Compose v2](https://img.shields.io/badge/Docker%20Compose-v2.0+-2496ED?logo=docker&logoColor=white)](compose.yaml)
-[![CUDA Accelerated](https://img.shields.io/badge/CUDA-NVIDIA%20GPU-76B900?logo=nvidia&logoColor=white)](bin/doctor.sh)
-[![llama.cpp Powered](https://img.shields.io/badge/Inference-llama.cpp-orange)](compose.yaml)
-[![Model: Refusal--Free](https://img.shields.io/badge/Model-Refusal--Free%20MoE-red)](compose.yaml)
+[![Temporal Workflows](https://img.shields.io/badge/Workflows-Temporal-6366f1)](docker/compose.temporal.yaml)
+[![React Flow Studio](https://img.shields.io/badge/Canvas-Sosho%20Studio-0ea5e9)](apps/studio/src/App.tsx)
 [![Observability: Langfuse](https://img.shields.io/badge/Telemetry-Langfuse%20v4-black)](docker/compose.langfuse.yaml)
-
----
+[![CUDA Accelerated](https://img.shields.io/badge/CUDA-NVIDIA%20GPU-76B900?logo=nvidia&logoColor=white)](bin/doctor.sh)
 
 </div>
 
-## 💡 What Can You Do with Sosho?
+---
 
-Sosho turns consumer or workstation GPUs into a full-fledged local AI lab without cloud lock-in, artificial censorship, recurring API bills, or data leakage.
+## How Sosho Works
 
-<table>
-<tr>
-<td width="50%" valign="top">
-
-### 💻 1. Autonomous Coding from Any Terminal
-Run state-of-the-art coding agents in any project directory with a single word: `pi`.
-- **Works Everywhere**: Navigate to any git repository and run `pi`—mounts cleanly into a sandboxed container.
-- **Git & Tool Aware**: Inherits host git identity, shell environment, and project context without manual setup.
-- **Zero API Bills**: Offloads reasoning and code editing to local MoE LLMs (`Qwen3.6-35B-A3B`) with zero telemetry leakage.
-
-</td>
-<td width="50%" valign="top">
-
-### 🔓 2. Refusal-Free AI & Security Research
-Powered by an aggressively uncensored MoE model (`Qwen3.6-35B-A3B`) that never refuses prompts:
-- **Zero Preachy Refusals**: Never declines, hedges, or lectures—executes all complex technical and creative instructions directly.
-- **Red-Teaming & SecOps**: Unrestricted exploit analysis, local device pentesting, and binary reverse engineering.
-- **Raw Analysis & Forensics**: Deep system diagnostics, memory inspection, and unfiltered creative writing.
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-### 🛠️ 3. Capability-First Skills & Logged-In Web
-Integrates your real authenticated Chrome session and deterministic helper scripts:
-- **Authenticated Chrome Access**: Live access to your real X.com timeline/likes, GitHub stars, and YouTube playlists via Dokobot.
-- **Sub-Second Media Ingestion**: Direct YouTube transcript extraction with timestamps via caption APIs.
-- **Version-Pinned Docs**: Pulls modern `llms.txt` documentation for Three.js, Next.js, and FastAPI to eliminate API hallucinations.
-
-</td>
-<td width="50%" valign="top">
-
-### 📊 4. Disk-First Persistence & Observability
-Engineered to operate reliably within bounded local context windows (32K–64K):
-- **Session-Isolated Scratchpads**: Dedicated per-session workspaces in `.pi/scratchpad/<session-id>/` with `ephemeral/` state and `permanent/` artifact sandboxes.
-- **Full Langfuse v4 Tracing**: Local telemetry at `localhost:3000` recording token usage, latency, tool calls, and trajectories.
-- **Automatic Compaction & Interruption Recovery**: Task queues and compaction snapshots persist in `ephemeral/state.json` via atomic CRUD tools (`task_plan`, `task_update`, `task_status`, `task_finish`).
-
-</td>
-</tr>
-</table>
-
-> *Looking for local AI music generation? YuE2 has been moved to a dedicated standalone module in [`yue2/`](yue2/README.md).*
+<p align="center">
+  <img src="./assets/architecture.svg" alt="How Sosho Works" width="100%" />
+</p>
 
 ---
 
-## ⚡ Quick Start (30 Seconds)
+## Core Capabilities
 
-### 1. Check Hardware & Dependencies
-Sosho includes a built-in diagnostic suite that tests GPU capabilities, drivers, port availability, and container runtimes:
+### 1. Durable Graph Workflows & Visual Canvas (`Sosho Studio`)
+* **Typed Graph Engine (`packages/workflow-engine/`):** Define workflows as versioned JSON (`workflows/*.graph.json`) with `agent`, `subagent`, `decision`, `tool`, `skill`, `checkpoint`, and `memory` nodes.
+* **Temporal Durability (`docker/compose.temporal.yaml`):** Reuses Langfuse's existing Postgres 17 instance (no extra DB or Elasticsearch). Supports crash recovery, retries, and **Human-in-the-Loop (HITL) checkpoints** via Temporal Signals (zero compute while waiting for approval or JSON state edits).
+* **VRAM-Aware Task Queues:** Automatically serializes `llama-cpp` and `yue2-gateway` on `local-gpu` (concurrency `1`), caps Chrome/Dokobot on `host-browser` (concurrency `2`), and runs cloud steps on `cloud-io` (concurrency `8`).
+* **Visual Canvas (`apps/studio/`):** React Flow editor on `:4100` with live SSE node status badges, inline HITL approval drawer, Memory Explorer, and direct links to Langfuse (`:3000`) and Temporal UI (`:8233`).
+
+### 2. Self-Evolving Two-Tier Memory (`packages/memory/` & `.pi/extensions/memory/`)
+* **Global Memory (`~/.sosho/memory/`):** Personal profile, preferences, cross-project habits, and playbooks (mounted into `pi` automatically with automatic secret redaction).
+* **Project Memory (`<repo>/.pi/memory/`):** Repo architecture, decisions, recurring fixes, and distilled session episodes.
+* **Merged with Session Scratchpad:** Your existing `.pi/scratchpad/<session-id>/{ephemeral,permanent}` remains your **session working memory** (task queues + artifact sandbox) and automatically feeds completed task summaries into `.pi/memory/inbox/` on `session_shutdown`.
+* **Hybrid Search & Bi-Temporal History:** Combines BM25 lexical matching, dense vector cosine similarity, and 1-hop entity graph boosts via Reciprocal Rank Fusion (RRF) with type-aware time decay. Updating a fact via `supersedes_id` archives the old version with `valid_to` and `superseded_by` instead of destroying history, with every change logged to `audit.jsonl`.
+
+### 3. Multi-Model Tiering & Native Pi Subagents (`.pi/extensions/subagents/`)
+Configured in `.pi/models.json` and `.pi/model-roles.json`:
+
+| Role Tier | Model | Where It Runs | Purpose |
+| :--- | :--- | :--- | :--- |
+| **`main`** | `deepseek-ai/DeepSeek-V4.1-Flash-1017` | DeepInfra (Cloud) | Primary orchestrator, 1M context, complex synthesis |
+| **`subagent`** | `Qwen/Qwen3-32B` | DeepInfra (Cloud) | Bang-for-the-buck parallel research & summarization |
+| **`subagent-code`** | `Qwen/Qwen3-Coder-30B-A3B-Instruct` | DeepInfra (Cloud) | Fast MoE coding & repo exploration subagents |
+| **`decision`** | `Qwen3-1.7B` (Q4_K_M) | Local CPU (`:8081`, 0 VRAM) | Ultra-fast routing/classification with automatic cloud fallback |
+| **`local-uncensored`** | `Qwen3.6-35B-A3B` | Local GPU (`:8080`, `-np 1`) | Private personal chats, security lab, refusal-free local inference |
+
+* **`subagent_run` & `subagent_parallel`:** Spawns isolated `pi --print` child processes with tier-based model routing, concurrency caps (`3` cloud / `1` local GPU), isolated logs in `$SOSHO_PERMANENT_DIR/subagents/`, and automatic `LANGFUSE_PI_PARENT_*` trace nesting.
+
+### 4. Modular Capability Skills (`.pi/skills/`)
+Self-contained skills with deterministic scripts (`scripts/`) to prevent context bloat:
+`social-x`, `github-scout`, `youtube-digest`, `libdocs`, `data-lab`, `creative-canvas`, `web-craft`, `security-lab`, `lean-proofs`, `sys-admin`, `dokobot`, and `yue2-music`.
+
+---
+
+## Quick Start
+
+### 1. Core Stack (`llama.cpp` + Langfuse + CLI)
 ```bash
-git clone https://github.com/theonesud/sosho.git && cd sosho
-make doctor
+make doctor        # Verify GPU, drivers, Docker, ports
+make autotune      # Generate hardware-tuned .env
+make install-cli   # Install global `pi` launcher into ~/.local/bin
+make up            # Start llama-cpp (:8080) and Langfuse (:3000)
 ```
 
-### 2. Auto-Tune Hardware & Install CLI
+### 2. Workflow Engine, Local Decision Router & Visual Canvas
 ```bash
-make autotune      # Benchmarks CPU/GPU/RAM and auto-generates optimal .env
-make install-cli   # Links global CLI launcher into ~/.local/bin
-```
-> **Tip**: This links `pi` into your `~/.local/bin` so you can call it from anywhere.
+# Start Temporal (:7233 / UI :8233) and local CPU decision model (:8081, 0 GPU VRAM)
+make workflow-up
+make decision-up
 
-### 3. Launch Services
-```bash
-make up
-```
-*✨ Done! The model downloader auto-provisions weights on first boot, spinning up `llama.cpp` (`:8080`) and Langfuse (`:3000`).*
+# Install Node dependencies once
+(cd packages/workflow-engine && npm install)
+(cd apps/studio && npm install)
 
----
-
-## 🧰 Modular Capabilities & Skills (`.pi/skills/`)
-
-Every capability is self-contained with its own deterministic helper scripts in `scripts/`, preventing token bloat on small context windows:
-
-| Capability Skill | Embedded Scripts | What It Does |
-|---|---|---|
-| **`social-x`** | `scripts/x-harvest.sh` | Extracts X.com timeline, likes, bookmarks, and search feeds using your logged-in Chrome session. |
-| **`github-scout`** | `scripts/gh-stars.sh`, `scripts/gh-analyze.sh` | Browses your starred repositories and produces feasibility & architecture briefs. |
-| **`youtube-digest`**| `scripts/yt-feed.sh`, `scripts/yt-transcribe.py` | Extracts video queues and pulls full timestamped transcripts sub-second without downloading media. |
-| **`libdocs`** | `scripts/pull-llms-txt.sh`, `scripts/find-doc.sh` | Downloads standardized `llms.txt` and searches API signatures to prevent version hallucinations. |
-| **`data-lab`** | `scripts/eda.py`, `scripts/quick-plot.py` | Fast exploratory data analysis (<35 lines) and zero-boilerplate plotting saved to the session's permanent plots directory. |
-| **`creative-canvas`**| `scripts/preview.sh`, `scripts/kill-preview.sh` | Builds and serves Three.js 3D scenes, generative canvas art, and HTML5/Pygame simulations locally. |
-| **`web-craft`** | `scripts/dev.sh`, `scripts/stop.sh`, `scripts/test-api.sh` | Background dev servers for Next.js, FastAPI, and interactive website presentations (Reveal.js). |
-| **`security-lab`** | `scripts/net-probe.sh`, `scripts/bin-triage.sh` | Safe local subnet device probes, binary reverse engineering triage, and steganography scans. |
-| **`lean-proofs`** | `scripts/verify.sh` | Formal theorem verification in Lean 4 with concise error reporting. |
-| **`sys-admin`** | `scripts/host-status.sh` | Single-command health snapshot of CPU, RAM, disk, RTX GPU thermals, and failed systemd units. |
-| **`dokobot`** | `scripts/doko-fetch.sh` | Core web browser bridge using host Chrome with output redirection to disk. |
-
----
-
-## 📁 Session-Driven Scratchpad (`.pi/scratchpad/<session-id>/`)
-
-To keep the agent's context clean, prevent cross-session state leaks, and survive interruptions or auto-compaction, every session operates inside its own isolated directory:
-
-```
-.pi/scratchpad/<session-id>/
-├── ephemeral/
-│   └── state.json   # Managed exclusively via CRUD tools (task_plan, task_update, task_status, task_finish)
-└── permanent/       # Unmanaged session sandbox for scripts, web dumps, research, plots, and artifacts
+# Launch Worker + Studio API (:4101) + Studio Canvas (:4100)
+SOSHO_STUDIO_EVENT_URL=http://127.0.0.1:4101/api/events make worker
+make studio-api
+make studio-ui
 ```
 
----
-
-## 🚀 Interactive Workflows
-
-<details open>
-<summary><b>🛠️ Workflow A: Terminal Coding Agent (<code>pi</code>)</b></summary>
-<br>
-
-Invoke `pi` inside **any directory or code repository**:
+### 3. Interactive Terminal Agent (`pi`)
+Run `pi` inside any project directory:
 ```bash
 cd ~/projects/my-app
 pi
 ```
-- **Context-Lean Execution**: Built-in sliding-chunk inspection (`bin/chunk-read.sh`) and UNIX pipelines prevent context bloat.
-- **Targeted Skills**: Modular on-demand capabilities without context-heavy agent swarms.
-- **Uncensored Execution**: Zero refusal friction—the agent faithfully investigates low-level system internals, security bugs, and sensitive edge cases without hallucinating policy warnings.
-- **Skip Warmup**: `pi --no-warmup` (bypasses initial server probe).
-- **Hybrid APIs**: Drop a `.env` with `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in any folder to temporarily route queries to cloud models.
-</details>
-
-<details open>
-<summary><b>📈 Workflow B: Real-Time Tracing (Langfuse)</b></summary>
-<br>
-
-Open **[http://127.0.0.1:3000](http://127.0.0.1:3000)** in your browser:
-- **Default Login**: `admin@local.dev` / `password123`
-- **Pre-configured Project**: `Pi-Agent`
-</details>
+* **Langfuse UI:** `http://127.0.0.1:3000` (`admin@local.dev` / `password123`)
+* **Sosho Studio Canvas:** `http://127.0.0.1:4100`
+* **Temporal UI:** `http://127.0.0.1:8233`
 
 ---
 
-## 🏛️ Tech Stack & Architecture
+## Make Commands
 
-```
-                      Host Terminal & Global CLI
-                                  │
-                                  ▼
-                           pi (pi-sandbox)
-                                  │
-                     ┌────────────┴────────────┐
-        OpenAI API   │                         │ Telemetry
-        :8080        ▼                         ▼ :3000
-              ┌──────────────┐          ┌──────────────┐
-              │  llama.cpp   │          │   Langfuse   │
-              │ (MoE / GGUF) │          │ (ClickHouse) │
-              └──────────────┘          └──────────────┘
-```
-
-| Layer | Technology | Key Capabilities |
-|---|---|---|
-| **Inference Engine** | [llama.cpp](https://github.com/ggerganov/llama.cpp) | CUDA-accelerated MoE GGUF execution, KV cache quantization (`q8_0`/`q4_0`), low-latency C++ server |
-| **Agent Environment** | [Pi Agent](docker/Dockerfile.pi) | Ephemeral Docker sandbox, host git pass-through, centralized cache (`~/.local/share/sosho`) |
-| **Observability** | [Langfuse v4](docker/compose.langfuse.yaml) | ClickHouse analytical store, token tracking, tool latency tracing, session replay |
-| **Orchestration** | Docker Compose v2 + Make | Localhost (`127.0.0.1`) security isolation, disk-first task persistence |
-
----
-
-## 🧰 Make Commands
-
-Sosho uses a streamlined `Makefile` for zero-friction control:
-
-```bash
-# Core Lifecycle
-make up            # Start llama.cpp inference + Langfuse stack
-make down          # Stop all containers across all profiles
-make status        # Inspect health status and ports
-make restart       # Quick restart of LLM inference service
-
-# Diagnostics & Logs
-make autotune      # Auto-benchmark & generate max-performance .env
-make doctor        # Run hardware, GPU, driver & port diagnostics
-make test          # Execute automated integration & unit tests
-make logs-llm      # Stream llama.cpp logs
-make logs-langfuse # Stream telemetry logs
-
-# Tooling
-make install-cli   # Symlink global CLI launcher into ~/.local/bin
-make clean-cache   # Flush stale agent cache & sessions
-```
-
----
-
-## ⚙️ Key Configuration Options
-
-All inference, runtime, and agent settings are configurable via `.env` (generated automatically with `make autotune`):
-
-| Category | Variable | Default | Description |
-|---|---|---|---|
-| **Context & Memory** | `LLM_CTX_SIZE` | `32768` | Active context window (32K/64K). Automatically synced with `.pi` compaction settings. |
-| | `LLM_KV_CACHE_TYPE` | `q4_0` | KV cache quantization (`q4_0`, `q8_0`, `f16`). `q4_0` halves VRAM consumption. |
-| **Compute & Batching**| `LLM_THREADS` | `Auto` | Dedicated CPU threads for MoE matrix evaluation (tuned to physical core count). |
-| | `LLM_THREADS_BATCH` | `Auto` | Dedicated CPU threads for prompt ingestion & KV cache generation. |
-| | `LLM_BATCH` | `2048` | Logical batch size for prompt evaluation and token prefill. |
-| | `LLM_UBATCH` | `512` | Physical compute micro-batch size to keep GPU utilization saturated. |
-| **Observability** | `LANGFUSE_BASE_URL` | `http://127.0.0.1:3000` | Local telemetry endpoint recording agent thoughts, tool calls, and latencies. |
-| **Cloud & Downloads** | `HF_TOKEN` | *(optional)* | Hugging Face user access token for high-bandwidth model weights downloading. |
-| | `OPENAI_API_KEY` | *(optional)* | Drop in `.env` inside any project folder to temporarily route queries to OpenAI models. |
-| | `ANTHROPIC_API_KEY` | *(optional)* | Drop in `.env` inside any project folder to route queries to Claude models. |
-
----
-
-<div align="center">
-  <sub>Built for private, high-performance local AI engineering.</sub>
-</div>
+| Command | Description |
+| :--- | :--- |
+| `make up` | Start `llama-cpp` (`:8080`) and Langfuse v4 (`:3000`) |
+| `make workflow-up` | Start Temporal server (`:7233`) and Temporal UI (`:8233`) |
+| `make decision-up` | Start local CPU `Qwen3-1.7B` decision router (`:8081`, 0 GPU VRAM) |
+| `make worker` | Run the Temporal workflow & memory worker |
+| `make studio-api` | Run Sosho Studio API & SSE gateway (`:4101`) |
+| `make studio-ui` | Run Sosho Studio React Flow visual canvas (`:4100`) |
+| `make music-up` | Start YuE2 local music generation (`:8021`) |
+| `make test-memory` | Run two-tier memory unit tests |
+| `make down` | Stop all containers across all profiles |
+| `make install-cli` | Install `pi` launcher into `~/.local/bin` |
