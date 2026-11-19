@@ -379,7 +379,7 @@ def to_flac(wav: bytes, dest: Path) -> Path:
 # ---------------------------------------------------------------------- worker
 
 
-async def run_job(job_id: str) -> None:
+async def run_job(job_id: str, *, manage_llm: bool = True) -> None:
     row = db_one("SELECT * FROM jobs WHERE id = ?", (job_id,))
     if row is None or row["status"] in TERMINAL:
         return
@@ -405,7 +405,8 @@ async def run_job(job_id: str) -> None:
 
     paused = False
     try:
-        paused = await docker_ctl.pause()
+        if manage_llm:
+            paused = await docker_ctl.pause()
         async with httpx.AsyncClient(timeout=ENGINE_TIMEOUT) as client:
             resp = await client.post(f"{ENGINE_URL}/v1/tasks/run", json=body)
         if resp.status_code != 200:
@@ -465,9 +466,10 @@ async def run_job(job_id: str) -> None:
         )
     finally:
         prune_artifacts()
-        await unload_engine_model()
-        if paused:
-            await docker_ctl.resume()
+        if manage_llm:
+            await unload_engine_model()
+            if paused:
+                await docker_ctl.resume()
 
 
 def _dir_size_bytes(path: Path) -> int:
@@ -504,12 +506,22 @@ def prune_artifacts() -> None:
 
 async def worker_loop() -> None:
     assert _queue is not None
+    llm_paused = False
     while True:
         job_id = await _queue.get()
         try:
-            await run_job(job_id)
+            row = db_one("SELECT status, cancel_requested FROM jobs WHERE id = ?", (job_id,))
+            should_run = row is not None and row["status"] not in TERMINAL and not row["cancel_requested"]
+            if should_run and not llm_paused:
+                llm_paused = await docker_ctl.pause()
+            await run_job(job_id, manage_llm=False)
         finally:
             _queue.task_done()
+            if _queue.empty():
+                await unload_engine_model()
+                if llm_paused:
+                    await docker_ctl.resume()
+                    llm_paused = False
 
 
 # ------------------------------------------------------------------------ auth

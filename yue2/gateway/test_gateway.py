@@ -98,3 +98,60 @@ def test_to_flac_does_not_block_event_loop(tmp_path: Path, monkeypatch: pytest.M
         assert elapsed_ms < 50.0, f"/health/live blocked during to_flac: {elapsed_ms:.1f}ms"
 
     asyncio.run(_run())
+
+
+def test_worker_loop_pauses_and_resumes_once_across_queued_jobs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _run() -> None:
+        monkeypatch.setattr(gw, "DATA_DIR", tmp_path)
+        monkeypatch.setattr(gw, "UNLOAD_AFTER_JOB", False)
+        monkeypatch.setattr(gw, "_db", None)
+        gw.init_db()
+
+        for jid in ("job-1", "job-2"):
+            gw.db_exec(
+                "INSERT INTO jobs (id, status, stage, created_at, request) VALUES (?, 'queued', 'pending', ?, ?)",
+                (jid, time.time(), json.dumps({"style": "synthwave", "lyrics": ""})),
+            )
+
+        pause_calls = 0
+        resume_calls = 0
+        ran_jobs: list[str] = []
+
+        async def fake_pause() -> bool:
+            nonlocal pause_calls
+            pause_calls += 1
+            return True
+
+        async def fake_resume() -> None:
+            nonlocal resume_calls
+            resume_calls += 1
+
+        async def fake_run_job(job_id: str, *, manage_llm: bool = True) -> None:
+            assert manage_llm is False
+            ran_jobs.append(job_id)
+            gw.db_exec("UPDATE jobs SET status='succeeded', finished_at=? WHERE id=?", (time.time(), job_id))
+
+        monkeypatch.setattr(gw.docker_ctl, "pause", fake_pause)
+        monkeypatch.setattr(gw.docker_ctl, "resume", fake_resume)
+        monkeypatch.setattr(gw, "run_job", fake_run_job)
+
+        q: asyncio.Queue[str] = asyncio.Queue()
+        q.put_nowait("job-1")
+        q.put_nowait("job-2")
+        monkeypatch.setattr(gw, "_queue", q)
+
+        worker = asyncio.create_task(gw.worker_loop())
+        await asyncio.wait_for(q.join(), timeout=2.0)
+        worker.cancel()
+        try:
+            await worker
+        except asyncio.CancelledError:
+            pass
+
+        assert ran_jobs == ["job-1", "job-2"]
+        assert pause_calls == 1, f"Expected single pause across queued jobs, got {pause_calls}"
+        assert resume_calls == 1, f"Expected single resume after queue drains, got {resume_calls}"
+
+    asyncio.run(_run())
