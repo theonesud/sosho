@@ -468,6 +468,10 @@ async def run_job(job_id: str) -> None:
             await docker_ctl.resume()
 
 
+def _dir_size_bytes(path: Path) -> int:
+    return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+
+
 def prune_artifacts() -> None:
     cutoff = time.time() - RETENTION_SECONDS
     old = db_all("SELECT id FROM jobs WHERE finished_at IS NOT NULL AND finished_at < ?", (cutoff,))
@@ -483,7 +487,7 @@ def prune_artifacts() -> None:
     if not jobs_root.exists():
         return
     entries = sorted(
-        ((p.stat().st_size, p) for p in jobs_root.iterdir() if p.is_dir()),
+        ((_dir_size_bytes(p), p) for p in jobs_root.iterdir() if p.is_dir()),
         key=lambda t: t[1].stat().st_mtime,
     )
     total = sum(size for size, _ in entries)
