@@ -69,7 +69,10 @@ interface WorkflowState {
 
   setGraph: (graph: RawGraph | null, dirty?: boolean) => void;
   updateGraphMeta: (patch: Partial<Pick<RawGraph, "id" | "name" | "description" | "entryNode" | "maxSteps">>) => void;
-  addNode: (kind: NodeKind) => RawGraphNode | null;
+  addNode: (
+    kind: NodeKind,
+    options?: { position?: { x: number; y: number }; connectFromId?: string },
+  ) => RawGraphNode | null;
   updateNode: (nodeId: string, patch: Record<string, unknown>) => void;
   setNodePositions: (updates: Array<{ id: string; position: { x: number; y: number } }>) => void;
   removeNodes: (nodeIds: string[]) => void;
@@ -107,7 +110,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       };
     }),
 
-  addNode: (kind) => {
+  addNode: (kind, options) => {
     const current = get().graph;
     if (!current) return null;
     let idx = current.nodes.length + 1;
@@ -115,12 +118,24 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       idx += 1;
     }
     const created = defaultNodeProps(kind, idx);
+    if (options?.position) {
+      created.position = {
+        x: Math.round(options.position.x),
+        y: Math.round(options.position.y),
+      };
+    }
     const entryNode = current.entryNode || created.id;
+    const nextEdges = [...current.edges];
+    if (options?.connectFromId && current.nodes.some((n) => n.id === options.connectFromId)) {
+      const edgeId = `e_${options.connectFromId}_${created.id}_${Date.now().toString(36).slice(-4)}`;
+      nextEdges.push({ id: edgeId, source: options.connectFromId, target: created.id });
+    }
     set({
       graph: {
         ...current,
         entryNode,
         nodes: [...current.nodes, created],
+        edges: nextEdges,
       },
       isDirty: true,
       selectedNodeId: created.id,

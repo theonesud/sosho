@@ -14,7 +14,7 @@ import {
   type WorkflowSummary,
 } from "@/types";
 import { CheckpointBar } from "./CheckpointBar";
-import { WaterfallStage } from "./WaterfallStage";
+import { ObsidianGraphStage } from "./ObsidianGraphStage";
 import { WorkflowSidebar } from "./WorkflowSidebar";
 
 interface WorkflowsWorkbenchProps {
@@ -256,7 +256,7 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
           />
         ) : null}
 
-        <WaterfallStage
+        <ObsidianGraphStage
           graph={displayedGraph}
           runDetail={runDetail}
           readOnly={isReadOnly}
