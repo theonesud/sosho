@@ -107,8 +107,16 @@ try {
   const profile = readCoreProfile("global", fakeProject);
   assert.ok(profile.includes("Preferred Audio Target"));
 
-  // 6. Archive / forget
+  // 6. Archive / forget + verify zero active duplicates and no leftover .tmp files
   assert.equal(archiveMemory(g1.record.id, "global", "test_cleanup", fakeProject), true);
+  assert.equal(loadScopeMemories("global", fakeProject, false).length, 0);
+  const archivedGlobal = loadScopeMemories("global", fakeProject, true);
+  assert.equal(archivedGlobal.length, 1);
+  assert.equal(archivedGlobal[0].status, "archived");
+  assert.equal(
+    loadScopeMemories("project", fakeProject, false).filter((m) => m.id === p1.record.id).length,
+    0,
+  );
   console.log("ALL MEMORY TESTS PASSED");
 } finally {
   rmSync(tmp, { recursive: true, force: true });

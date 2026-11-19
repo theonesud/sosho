@@ -1,15 +1,20 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
   appendFileSync,
+  closeSync,
   existsSync,
+  fsyncSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   renameSync,
+  unlinkSync,
   writeFileSync,
+  writeSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 export type MemoryScope = "global" | "project";
 export type MemoryType = "semantic" | "procedural" | "episodic" | "entity";
@@ -116,16 +121,29 @@ export function getScopeRoot(scope: MemoryScope, cwd: string = process.cwd()): s
   return scope === "global" ? getGlobalMemoryRoot() : getProjectMemoryRoot(cwd);
 }
 
+function atomicWriteFileSync(targetPath: string, content: string): void {
+  const dir = dirname(targetPath);
+  mkdirSync(dir, { recursive: true });
+  const tmpPath = join(dir, `.tmp.${process.pid}.${randomBytes(6).toString("hex")}`);
+  const fd = openSync(tmpPath, "w", 0o644);
+  try {
+    writeSync(fd, content, 0, "utf8");
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  renameSync(tmpPath, targetPath);
+}
+
 export function ensureMemoryDirs(root: string): void {
   for (const sub of SUBDIRS) {
     mkdirSync(join(root, sub), { recursive: true });
   }
   const profilePath = join(root, "core", "profile.md");
   if (!existsSync(profilePath)) {
-    writeFileSync(
+    atomicWriteFileSync(
       profilePath,
       "# Core Memory Profile\n\n*(Auto-maintained compact summary of highest-importance active memories.)*\n",
-      "utf8",
     );
   }
 }
@@ -285,12 +303,9 @@ export function upsertMemory(input: UpsertMemoryInput, cwd: string = process.cwd
       existing.valid_to = now;
       existing.superseded_by = id;
       const archivePath = join(root, "archive", `${existing.id}_${slugify(existing.title)}.md`);
-      writeFileSync(archivePath, serializeMemoryMarkdown(existing), "utf8");
-      try {
-        renameSync(existing.filePath, archivePath);
-        writeFileSync(archivePath, serializeMemoryMarkdown(existing), "utf8");
-      } catch {
-        // Already written to archivePath
+      atomicWriteFileSync(archivePath, serializeMemoryMarkdown(existing));
+      if (existsSync(existing.filePath)) {
+        unlinkSync(existing.filePath);
       }
       superseded = existing.id;
     }
@@ -304,7 +319,7 @@ export function upsertMemory(input: UpsertMemoryInput, cwd: string = process.cwd
 
   const filePath = join(targetDir, `${id}_${slugify(record.title)}.md`);
   record.filePath = filePath;
-  writeFileSync(filePath, serializeMemoryMarkdown(record), "utf8");
+  atomicWriteFileSync(filePath, serializeMemoryMarkdown(record));
 
   appendAudit(root, {
     action: superseded ? "SUPERSEDE" : "ADD",
@@ -332,12 +347,10 @@ export function archiveMemory(
   existing.status = "archived";
   existing.valid_to = now;
   const archivePath = join(root, "archive", `${existing.id}_${slugify(existing.title)}.md`);
-  try {
-    renameSync(existing.filePath, archivePath);
-  } catch {
-    // Fallback to direct write
+  atomicWriteFileSync(archivePath, serializeMemoryMarkdown(existing));
+  if (existsSync(existing.filePath)) {
+    unlinkSync(existing.filePath);
   }
-  writeFileSync(archivePath, serializeMemoryMarkdown(existing), "utf8");
   appendAudit(root, { action: "ARCHIVE", id, reason });
   return true;
 }
@@ -546,7 +559,7 @@ export function rebuildCoreProfile(scope: MemoryScope, cwd: string = process.cwd
     }
   }
   const text = `${lines.join("\n")}\n`;
-  writeFileSync(join(root, "core", "profile.md"), text, "utf8");
+  atomicWriteFileSync(join(root, "core", "profile.md"), text);
   return text;
 }
 
