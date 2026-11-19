@@ -12,8 +12,9 @@ while [ -h "$SCRIPT_SOURCE" ]; do
     [[ $SCRIPT_SOURCE != /* ]] && SCRIPT_SOURCE="$SCRIPT_DIR/$SCRIPT_SOURCE"
 done
 RESOLVED_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" 2>/dev/null && pwd)"
-SOSHO_ROOT="${SOSHO_ROOT:-$RESOLVED_DIR}"
-[ ! -d "$SOSHO_ROOT/.pi" ] && SOSHO_ROOT="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || echo "$HOME/sosho")"
+RESOLVED_ROOT="$(cd -P "$RESOLVED_DIR/.." 2>/dev/null && pwd)"
+SOSHO_ROOT="${SOSHO_ROOT:-$RESOLVED_ROOT}"
+[ ! -d "$SOSHO_ROOT/.pi" ] && SOSHO_ROOT="$HOME/sosho"
 SOSHO_PI="$SOSHO_ROOT/.pi"
 
 # Filter out our custom launcher flags from arguments
@@ -51,11 +52,20 @@ mkdir -p "$TARGET_PI/.cache" "$TARGET_PI/.config" "$TARGET_PI/scratchpad"
 # Format argument ordering (subcommands require their options before --approve)
 SUBCOMMANDS=("update" "auth" "install" "remove" "list")
 IS_SUBCOMMAND=0
+SKIP_AUTO_UPDATE=0
 for sub in "${SUBCOMMANDS[@]}"; do
     if [ "${FORWARD_ARGS[0]:-}" = "$sub" ]; then
         IS_SUBCOMMAND=1
+        SKIP_AUTO_UPDATE=1
         break
     fi
+done
+for arg in "${FORWARD_ARGS[@]}"; do
+    case "$arg" in
+        -h|--help|-v|--version)
+            SKIP_AUTO_UPDATE=1
+            ;;
+    esac
 done
 
 # 2. Automatic background updater (checks once every 24h or when requested)
@@ -65,8 +75,8 @@ AUTO_UPDATE_STAMP="$TARGET_PI/.cache/.last_ext_update"
 NOW=$(date +%s)
 LAST_UPDATE=0
 [ -f "$AUTO_UPDATE_STAMP" ] && LAST_UPDATE=$(cat "$AUTO_UPDATE_STAMP" 2>/dev/null || echo 0)
-# Update if older than 24 hours (86400s) and not running a sub-command
-if [ $((NOW - LAST_UPDATE)) -gt 86400 ] && [ "$IS_SUBCOMMAND" -eq 0 ]; then
+# Update if older than 24 hours (86400s) and not running a sub-command or help/version
+if [ $((NOW - LAST_UPDATE)) -gt 86400 ] && [ "$SKIP_AUTO_UPDATE" -eq 0 ]; then
     echo "Checking and updating Pi packages & extensions..."
 
     # Rebuild the sandbox image if the baked-in pi is older than the npm latest.
@@ -103,9 +113,41 @@ fi
 if [ ! -f "$TARGET_PI/model-roles.json" ] && [ -f "$SOSHO_PI/model-roles.json" ]; then
     cp "$SOSHO_PI/model-roles.json" "$TARGET_PI/model-roles.json"
 fi
+if [ ! -f "$TARGET_PI/SYSTEM.md" ] && [ -f "$SOSHO_PI/SYSTEM.md" ]; then
+    cp "$SOSHO_PI/SYSTEM.md" "$TARGET_PI/SYSTEM.md"
+fi
+if [ ! -f "$TARGET_PI/langfuse.json" ] && [ -f "$SOSHO_PI/langfuse.json" ]; then
+    cp "$SOSHO_PI/langfuse.json" "$TARGET_PI/langfuse.json"
+fi
 # Global output style: seed every new workspace. A project file takes precedence.
 if [ ! -f "$TARGET_PI/APPEND_SYSTEM.md" ] && [ -f "$SOSHO_PI/APPEND_SYSTEM.md" ]; then
     cp "$SOSHO_PI/APPEND_SYSTEM.md" "$TARGET_PI/APPEND_SYSTEM.md"
+fi
+
+# 2a-0. For external workspaces without local extensions, rewrite relative ./extensions/* paths to /opt/sosho/.pi/extensions/*
+if [ "$TARGET_PI" != "$SOSHO_PI" ] && [ -f "$TARGET_PI/settings.json" ]; then
+    python3 - "$TARGET_PI/settings.json" "$TARGET_PI" <<'PY' 2>/dev/null || true
+import json, os, sys
+settings_path, target_pi = sys.argv[1], sys.argv[2]
+with open(settings_path, "r") as f:
+    data = json.load(f)
+exts = data.get("extensions")
+if isinstance(exts, list):
+    changed = False
+    new_exts = []
+    for ext in exts:
+        if isinstance(ext, str) and ext.startswith("./extensions/"):
+            local_path = os.path.join(target_pi, ext[2:])
+            if not os.path.exists(local_path):
+                new_exts.append("/opt/sosho/.pi/" + ext[2:])
+                changed = True
+                continue
+        new_exts.append(ext)
+    if changed:
+        data["extensions"] = new_exts
+        with open(settings_path, "w") as f:
+            json.dump(data, f, indent=2)
+PY
 fi
 
 # 2a. Sync llama.cpp contextWindow in TARGET_PI/models.json with LLM_CTX_SIZE from .env if present
@@ -135,25 +177,45 @@ PY
     fi
 fi
 
-# 2a-2. Sync compaction in TARGET_PI/settings.json with LLM_CTX_SIZE from .env if present
-if [ -f "$WORKSPACE_ENV" ] && [ -f "$TARGET_PI/settings.json" ]; then
-    ENV_CTX=$(grep -E '^[[:space:]]*LLM_CTX_SIZE=' "$WORKSPACE_ENV" | tail -n 1 | cut -d= -f2 | tr -d ' "\r\n')
-    if [ -n "$ENV_CTX" ] && [ "$ENV_CTX" -gt 0 ] 2>/dev/null; then
-        python3 - "$TARGET_PI/settings.json" "$ENV_CTX" <<'PY' 2>/dev/null || true
+# 2a-2. Sync compaction in TARGET_PI/settings.json with active default model contextWindow from models.json
+if [ -f "$TARGET_PI/settings.json" ] && [ -f "$TARGET_PI/models.json" ]; then
+    python3 - "$TARGET_PI/settings.json" "$TARGET_PI/models.json" <<'PY' 2>/dev/null || true
 import json, sys
-path, ctx = sys.argv[1], int(sys.argv[2])
-with open(path, "r") as f:
-    data = json.load(f)
-compaction = data.setdefault("compaction", {})
-reserve = min(8192, max(2048, ctx // 8))
-keep_recent = max(4096, int(ctx * 0.25))
-compaction["enabled"] = True
-compaction["reserveTokens"] = reserve
-compaction["keepRecentTokens"] = keep_recent
-with open(path, "w") as f:
-    json.dump(data, f, indent=2)
+settings_path, models_path = sys.argv[1], sys.argv[2]
+with open(settings_path, "r") as f:
+    settings = json.load(f)
+with open(models_path, "r") as f:
+    models_cfg = json.load(f)
+
+provider_name = settings.get("defaultProvider")
+model_id = settings.get("defaultModel")
+ctx = None
+providers = models_cfg.get("providers", {})
+if provider_name and provider_name in providers:
+    for m in providers[provider_name].get("models", []):
+        if m.get("id") == model_id and isinstance(m.get("contextWindow"), int):
+            ctx = m["contextWindow"]
+            break
+    if ctx is None:
+        models_list = providers[provider_name].get("models", [])
+        if models_list and isinstance(models_list[0].get("contextWindow"), int):
+            ctx = models_list[0]["contextWindow"]
+
+if ctx and ctx > 0:
+    compaction = settings.setdefault("compaction", {})
+    reserve = min(16384, max(2048, ctx // 8))
+    keep_recent = min(32768, max(4096, int(ctx * 0.25)))
+    if (
+        compaction.get("enabled") is not True
+        or compaction.get("reserveTokens") != reserve
+        or compaction.get("keepRecentTokens") != keep_recent
+    ):
+        compaction["enabled"] = True
+        compaction["reserveTokens"] = reserve
+        compaction["keepRecentTokens"] = keep_recent
+        with open(settings_path, "w") as f:
+            json.dump(settings, f, indent=2)
 PY
-    fi
 fi
 
 
@@ -219,7 +281,13 @@ fi
 MOUNTS=(
     -v "$WORKSPACE:$WORKSPACE"
     -v "$TARGET_PI:$TARGET_PI"
+    -v "$SOSHO_ROOT:/opt/sosho:ro"
 )
+
+# Mount Sosho skills read-only if workspace has no local skills directory
+if [ "$TARGET_PI" != "$SOSHO_PI" ] && [ ! -d "$TARGET_PI/skills" ] && [ -d "$SOSHO_PI/skills" ]; then
+    MOUNTS+=(-v "$SOSHO_PI/skills:$TARGET_PI/skills:ro")
+fi
 
 # Mount user git config if present (so commits have author name/email)
 [ -f "$HOME/.gitconfig" ] && MOUNTS+=(-v "$HOME/.gitconfig:$HOME/.gitconfig:ro")
@@ -260,6 +328,7 @@ exec docker run "${DOCKER_INTERACTIVE_FLAGS[@]}" --rm \
     --pid host \
     --user "$(id -u):$(id -g)" \
     -e "HOME=$HOME" \
+    -e "SOSHO_ROOT=/opt/sosho" \
     -e "LLAMA_BASE_URL=http://127.0.0.1:8080" \
     -e "PI_CODING_AGENT_DIR=$TARGET_PI" \
     -e "XDG_CACHE_HOME=$TARGET_PI/.cache" \
