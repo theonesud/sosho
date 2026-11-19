@@ -138,9 +138,73 @@ export interface NodeExecutionLog {
 export interface WorkflowRunState {
   runId: string;
   graphId: string;
-  status: "running" | "waiting_checkpoint" | "completed" | "failed";
+  status: "running" | "waiting_checkpoint" | "completed" | "failed" | "cancelled";
   currentNodeId: string | null;
+  activeNodeIds?: string[];
   stepCount: number;
   data: Record<string, unknown>;
   history: NodeExecutionLog[];
+  error?: string;
+}
+
+export class GraphValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GraphValidationError";
+  }
+}
+
+export function validateGraph(raw: unknown): GraphDefinition {
+  const parsed = GraphDefinitionSchema.safeParse(raw);
+  if (!parsed.success) {
+    const details = parsed.error.issues
+      .map((i) => `${i.path.join(".") || "root"}: ${i.message}`)
+      .join("; ");
+    throw new GraphValidationError(`Invalid workflow schema: ${details}`);
+  }
+
+  const graph = parsed.data;
+  const nodeMap = new Map<string, GraphNode>();
+  for (const node of graph.nodes) {
+    if (nodeMap.has(node.id)) {
+      throw new GraphValidationError(`Duplicate node id: '${node.id}'`);
+    }
+    nodeMap.set(node.id, node);
+  }
+
+  if (!nodeMap.has(graph.entryNode)) {
+    throw new GraphValidationError(`entryNode '${graph.entryNode}' does not exist in nodes`);
+  }
+
+  for (const edge of graph.edges) {
+    const src = nodeMap.get(edge.source);
+    if (!src) {
+      throw new GraphValidationError(`Edge '${edge.id}' references unknown source node '${edge.source}'`);
+    }
+    if (!nodeMap.has(edge.target)) {
+      throw new GraphValidationError(`Edge '${edge.id}' references unknown target node '${edge.target}'`);
+    }
+    if (edge.condition !== undefined && edge.condition.trim() !== "") {
+      const cond = edge.condition.trim();
+      if (src.type === "decision") {
+        if (!src.branches.includes(cond)) {
+          throw new GraphValidationError(
+            `Edge '${edge.id}' condition '${cond}' is not in decision node '${src.id}' branches [${src.branches.join(", ")}]`,
+          );
+        }
+      } else if (src.type === "checkpoint") {
+        if (cond !== "approve" && cond !== "reject") {
+          throw new GraphValidationError(
+            `Edge '${edge.id}' condition '${cond}' on checkpoint '${src.id}' must be 'approve' or 'reject'`,
+          );
+        }
+      } else {
+        throw new GraphValidationError(
+          `Edge '${edge.id}' defines condition '${cond}' on non-branching node '${src.id}' (type: ${src.type})`,
+        );
+      }
+    }
+  }
+
+  return graph;
 }

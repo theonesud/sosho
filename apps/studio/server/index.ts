@@ -12,6 +12,7 @@ import {
   searchMemory,
   upsertMemory,
 } from "../../../packages/memory/src/store.ts";
+import { GraphValidationError, validateGraph } from "../../../packages/workflow-engine/src/schema.ts";
 
 const DEFAULT_ALLOWED_ORIGINS = new Set([
   "http://127.0.0.1:4100",
@@ -222,9 +223,10 @@ export function createStudioServer(options: StudioServerOptions = {}): { server:
           return;
         }
         graph.id = rawId;
-        const outPath = join(WORKFLOWS_DIR, `${rawId}.graph.json`);
-        writeFileSync(outPath, `${JSON.stringify(graph, null, 2)}\n`, "utf8");
-        sendJson(req, res, 200, { ok: true, id: rawId, path: outPath });
+        const validated = validateGraph(graph);
+        const outPath = join(WORKFLOWS_DIR, `${validated.id}.graph.json`);
+        writeFileSync(outPath, `${JSON.stringify(validated, null, 2)}\n`, "utf8");
+        sendJson(req, res, 200, { ok: true, id: validated.id, path: outPath });
         return;
       }
 
@@ -241,7 +243,8 @@ export function createStudioServer(options: StudioServerOptions = {}): { server:
 
       // 4. Workflow Run Control & HITL Checkpoints (wired to SQLite engine in Phase 6)
       if (req.method === "POST" && path === "/api/runs") {
-        await readBody(req);
+        const body = await readBody(req);
+        validateGraph(body.graph);
         const runId = `sosho-run-${randomBytes(3).toString("hex")}`;
         sendJson(req, res, 503, { error: "SQLite workflow engine not yet wired", runId });
         return;
@@ -310,6 +313,10 @@ export function createStudioServer(options: StudioServerOptions = {}): { server:
     } catch (err) {
       if (err instanceof HttpError) {
         sendJson(req, res, err.status, { error: err.message });
+        return;
+      }
+      if (err instanceof GraphValidationError) {
+        sendJson(req, res, 400, { error: err.message });
         return;
       }
       sendJson(req, res, 500, { error: err instanceof Error ? err.message : String(err) });
