@@ -155,3 +155,37 @@ def test_worker_loop_pauses_and_resumes_once_across_queued_jobs(
         assert resume_calls == 1, f"Expected single resume after queue drains, got {resume_calls}"
 
     asyncio.run(_run())
+
+
+def test_require_key_and_atomic_max_pending(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _run() -> None:
+        monkeypatch.setattr(gw, "DATA_DIR", tmp_path)
+        monkeypatch.setattr(gw, "API_KEY", "super-secret-key")
+        monkeypatch.setattr(gw, "MAX_PENDING", 3)
+        monkeypatch.setattr(gw, "_db", None)
+        gw.init_db()
+        monkeypatch.setattr(gw, "_queue", asyncio.Queue())
+
+        transport = httpx.ASGITransport(app=gw.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            # Wrong token rejected with 401
+            bad = await client.post(
+                "/v1/jobs",
+                json={"style": "jazz", "lyrics": ""},
+                headers={"Authorization": "Bearer wrong-key"},
+            )
+            assert bad.status_code == 401
+
+            # Concurrent MAX_PENDING + 4 requests enforce exact 429 cap
+            headers = {"Authorization": "Bearer super-secret-key"}
+            resps = await asyncio.gather(
+                *[
+                    client.post("/v1/jobs", json={"style": f"jazz {i}", "lyrics": ""}, headers=headers)
+                    for i in range(gw.MAX_PENDING + 4)
+                ]
+            )
+            codes = sorted(r.status_code for r in resps)
+            assert codes.count(202) == gw.MAX_PENDING
+            assert codes.count(429) == 4
+
+    asyncio.run(_run())

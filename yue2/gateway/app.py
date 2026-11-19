@@ -531,7 +531,8 @@ async def require_key(request: Request) -> None:
     if not API_KEY:
         return
     header = request.headers.get("authorization", "")
-    if header != f"Bearer {API_KEY}":
+    expected = f"Bearer {API_KEY}"
+    if not secrets.compare_digest(header, expected):
         raise HTTPException(status_code=401, detail="invalid or missing bearer token")
 
 
@@ -632,17 +633,6 @@ async def models() -> Response:
 @app.post("/v1/jobs", status_code=202, dependencies=[Depends(require_key)])
 async def create_job(body: JobRequest, request: Request) -> JSONResponse:
     idem = request.headers.get("idempotency-key")
-    if idem:
-        existing = db_one("SELECT * FROM jobs WHERE idempotency_key = ?", (idem,))
-        if existing:
-            return JSONResponse(job_json(existing), status_code=202,
-                                headers={"Idempotent-Replay": "true"})
-
-    queued = db_one("SELECT COUNT(*) AS n FROM jobs WHERE status IN ('queued','running')")["n"]
-    if queued >= MAX_PENDING:
-        raise HTTPException(status_code=429, detail="queue full",
-                            headers={"Retry-After": "30"})
-
     unknown = sorted(set(body.options) - REQUEST_OPTIONS)
     if unknown:
         raise HTTPException(status_code=422, detail=f"unknown model option(s): {unknown}")
@@ -654,20 +644,35 @@ async def create_job(body: JobRequest, request: Request) -> JSONResponse:
     if payload.get("seed") is None:
         # Variety by default, while keeping the chosen seed in the job record.
         payload["seed"] = secrets.randbelow(2**31)
-    try:
-        db_exec(
-            "INSERT INTO jobs (id, status, stage, created_at, request, idempotency_key) "
-            "VALUES (?, 'queued', 'pending', ?, ?, ?)",
-            (job_id, time.time(), json.dumps(payload), idem),
-        )
-    except sqlite3.IntegrityError:
-        existing = db_one("SELECT * FROM jobs WHERE idempotency_key = ?", (idem,))
-        return JSONResponse(job_json(existing), status_code=202,
-                            headers={"Idempotent-Replay": "true"})
+
+    with _db_lock:
+        assert _db is not None
+        if idem:
+            existing = _db.execute("SELECT * FROM jobs WHERE idempotency_key = ?", (idem,)).fetchone()
+            if existing:
+                return JSONResponse(job_json(existing), status_code=202,
+                                    headers={"Idempotent-Replay": "true"})
+
+        queued = _db.execute("SELECT COUNT(*) AS n FROM jobs WHERE status IN ('queued','running')").fetchone()["n"]
+        if queued >= MAX_PENDING:
+            raise HTTPException(status_code=429, detail="queue full",
+                                headers={"Retry-After": "30"})
+
+        try:
+            _db.execute(
+                "INSERT INTO jobs (id, status, stage, created_at, request, idempotency_key) "
+                "VALUES (?, 'queued', 'pending', ?, ?, ?)",
+                (job_id, time.time(), json.dumps(payload), idem),
+            )
+            _db.commit()
+        except sqlite3.IntegrityError:
+            existing = _db.execute("SELECT * FROM jobs WHERE idempotency_key = ?", (idem,)).fetchone()
+            return JSONResponse(job_json(existing), status_code=202,
+                                headers={"Idempotent-Replay": "true"})
+        row = _db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
 
     assert _queue is not None
     _queue.put_nowait(job_id)
-    row = db_one("SELECT * FROM jobs WHERE id=?", (job_id,))
     return JSONResponse(job_json(row), status_code=202,
                         headers={"Location": f"/v1/jobs/{job_id}"})
 
