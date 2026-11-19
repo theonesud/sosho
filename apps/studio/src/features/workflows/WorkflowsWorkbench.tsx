@@ -215,7 +215,7 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
     if (id === runId) void refetchRun();
   };
 
-  const displayedGraph = runId ? (runDetail?.graph ?? graph) : graph;
+  const displayedGraph = runId ? (runDetail?.graph ?? null) : graph;
   const isReadOnly = Boolean(runId);
 
   return (
@@ -232,8 +232,7 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
         isSaving={isSaving}
         isStartingRun={isStartingRun}
         onSelectWorkflow={(id) => {
-          void loadWorkflowById(id);
-          if (runId) router.push(`/?workflow=${encodeURIComponent(id)}`);
+          router.push(`/?workflow=${encodeURIComponent(id)}`);
         }}
         onLoadTemplate={handleLoadTemplate}
         onNewWorkflow={handleNewWorkflow}
@@ -257,6 +256,7 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
         ) : null}
 
         <ObsidianGraphStage
+          key={displayedGraph?.id ?? "empty"}
           graph={displayedGraph}
           runDetail={runDetail}
           readOnly={isReadOnly}

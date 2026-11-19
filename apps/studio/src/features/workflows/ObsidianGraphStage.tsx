@@ -4,27 +4,21 @@ import {
   Bot,
   Brain,
   Clock,
-  Crosshair,
   GitFork,
   Link2,
-  Maximize2,
+  LogIn,
+  LogOut,
   Minus,
   PauseCircle,
   Plus,
-  RotateCcw,
-  Search,
-  Settings2,
-  SlidersHorizontal,
   Sparkles,
+  Trash2,
   Users,
-  Workflow,
   Wrench,
-  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import {
@@ -37,7 +31,6 @@ import {
   type RunDetail,
   type SkillInfo,
 } from "@/types";
-import { GraphInspectorDrawer } from "./GraphInspectorDrawer";
 import {
   type BezierGeometry,
   type CanvasRipple,
@@ -126,6 +119,7 @@ export function ObsidianGraphStage({
   const selectNode = useWorkflowStore((s) => s.selectNode);
   const selectEdge = useWorkflowStore((s) => s.selectEdge);
   const addNode = useWorkflowStore((s) => s.addNode);
+  const updateNode = useWorkflowStore((s) => s.updateNode);
   const addEdge = useWorkflowStore((s) => s.addEdge);
   const removeNodes = useWorkflowStore((s) => s.removeNodes);
   const removeEdges = useWorkflowStore((s) => s.removeEdges);
@@ -724,6 +718,7 @@ export function ObsidianGraphStage({
             const isSelected = node.id === selNodeId;
             const isHovered = node.id === ptr.hoveredNodeId;
             const isEntry = node.id === currentGraph.entryNode;
+            const isOutput = Boolean(node.isOutput);
             const r = sim.radius * sim.scale;
 
             ctx.save();
@@ -752,8 +747,19 @@ export function ObsidianGraphStage({
             if (isEntry) {
               ctx.beginPath();
               ctx.arc(sim.x, sim.y, r + 5.5, 0, Math.PI * 2);
-              ctx.strokeStyle = "rgba(16, 185, 129, 0.45)";
-              ctx.lineWidth = 1;
+              ctx.strokeStyle = "rgba(16, 185, 129, 0.55)";
+              ctx.lineWidth = 1.2;
+              ctx.setLineDash([3, 3]);
+              ctx.stroke();
+              ctx.setLineDash([]);
+            }
+
+            // Output orbit dashed ring
+            if (isOutput) {
+              ctx.beginPath();
+              ctx.arc(sim.x, sim.y, r + (isEntry ? 9 : 5.5), 0, Math.PI * 2);
+              ctx.strokeStyle = "rgba(56, 189, 248, 0.55)";
+              ctx.lineWidth = 1.2;
               ctx.setLineDash([3, 3]);
               ctx.stroke();
               ctx.setLineDash([]);
@@ -1074,19 +1080,34 @@ export function ObsidianGraphStage({
     }
   };
 
+  // Double-click focuses a node without creating random nodes
   const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (readOnly || !graph) return;
+    if (!graph) return;
     const { x: wx, y: wy } = screenToWorld(e.clientX, e.clientY);
     const hit = hitTestNode(wx, wy);
     if (hit) {
       focusNode(hit.id);
-      return;
-    }
-    const created = addNode("agent", { position: { x: wx, y: wy } });
-    if (created) {
-      setInspectorPinnedOpen(true);
     }
   };
+
+  // Keep graph fitted only when container dimensions actually change
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    let lastW = wrapper.clientWidth;
+    let lastH = wrapper.clientHeight;
+    const ro = new ResizeObserver(() => {
+      const w = wrapper.clientWidth;
+      const h = wrapper.clientHeight;
+      if (Math.abs(w - lastW) > 4 || Math.abs(h - lastH) > 4) {
+        lastW = w;
+        lastH = h;
+        fitView(true);
+      }
+    });
+    ro.observe(wrapper);
+    return () => ro.disconnect();
+  }, [fitView]);
 
   // Native non-passive wheel listener for smooth cursor-anchored zoom without console warnings
   useEffect(() => {
@@ -1175,27 +1196,14 @@ export function ObsidianGraphStage({
 
   const doneCount = runDetail?.history.filter((l) => l.status === "done").length ?? 0;
   const failedCount = runDetail?.history.filter((l) => l.status === "failed").length ?? 0;
-  const drawerOpen = inspectorPinnedOpen || Boolean(selectedNodeId || selectedEdgeId);
+  const selectedNode = selectedNodeId ? (graph.nodes.find((n) => n.id === selectedNodeId) ?? null) : null;
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-canvas">
       {/* Compact Precision Header */}
       <header className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-border-subtle bg-surface px-4">
         <div className="flex min-w-0 items-center gap-2.5">
-          {readOnly ? (
-            <h2 className="truncate text-[13px] font-semibold text-text-primary">{graph.name}</h2>
-          ) : (
-            <input
-              aria-label="Workflow name"
-              value={graph.name}
-              onChange={(e) => updateGraphMeta({ name: e.target.value })}
-              className="w-[260px] max-w-[380px] truncate rounded px-1.5 py-0.5 text-[13px] font-semibold text-text-primary bg-transparent hover:bg-elevated focus:bg-canvas focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          )}
-
-          <span className="shrink-0 font-mono text-[11px] text-text-muted tabular-nums">
-            {graph.nodes.length} nodes · {graph.edges.length} links
-          </span>
+          <h2 className="truncate text-[13px] font-semibold text-text-primary">{graph.name}</h2>
 
           {runDetail ? (
             <div className="flex items-center gap-2">
@@ -1226,70 +1234,6 @@ export function ObsidianGraphStage({
 
         {/* Right Controls */}
         <div className="flex shrink-0 items-center gap-1.5">
-          {/* Layout Mode Segmented Switch */}
-          <div className="flex items-center rounded-md border border-border-subtle bg-canvas p-0.5">
-            <button
-              type="button"
-              onClick={() => setLayoutMode("physics")}
-              className={cn(
-                "flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
-                physics.layoutMode === "physics"
-                  ? "bg-elevated text-text-primary"
-                  : "text-text-muted hover:text-text-secondary",
-              )}
-            >
-              <Crosshair className="h-3 w-3" />
-              Physics
-            </button>
-            <button
-              type="button"
-              onClick={() => setLayoutMode("flow")}
-              className={cn(
-                "flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
-                physics.layoutMode === "flow"
-                  ? "bg-elevated text-text-primary"
-                  : "text-text-muted hover:text-text-secondary",
-              )}
-            >
-              <Workflow className="h-3 w-3" />
-              Flow
-            </button>
-          </div>
-
-          <Button variant="ghost" size="xs" onClick={() => fitView(false)} title="Fit graph (F)">
-            <Maximize2 className="h-3 w-3" />
-            <span className="hidden sm:inline">Fit</span>
-          </Button>
-
-          <Button
-            variant={controlsOpen ? "secondary" : "ghost"}
-            size="xs"
-            onClick={() => setControlsOpen((v) => !v)}
-            title="Graph physics and display settings"
-          >
-            <SlidersHorizontal className="h-3 w-3" />
-            <span className="hidden sm:inline">Graph</span>
-          </Button>
-
-          {!readOnly ? (
-            <Button
-              variant={drawerOpen && !selectedNodeId && !selectedEdgeId ? "secondary" : "ghost"}
-              size="xs"
-              onClick={() => {
-                if (drawerOpen && !selectedNodeId && !selectedEdgeId) {
-                  setInspectorPinnedOpen(false);
-                } else {
-                  selectNode(null);
-                  selectEdge(null);
-                  setInspectorPinnedOpen(true);
-                }
-              }}
-              title="Workflow settings"
-            >
-              <Settings2 className="h-3 w-3" />
-            </Button>
-          ) : null}
-
           {readOnly ? (
             <>
               {onEditGraph ? (
@@ -1321,275 +1265,52 @@ export function ObsidianGraphStage({
             className="block h-full w-full touch-none"
           />
 
-          {/* Collapsible Obsidian Graph Controls Panel (Top-Right) */}
-          {controlsOpen ? (
-            <div className="absolute right-3 top-3 z-20 w-[264px] rounded-xl border border-border-strong bg-surface/95 p-3 shadow-[0_12px_32px_rgba(0,0,0,0.55)] backdrop-blur-sm">
-              <div className="mb-2.5 flex items-center justify-between">
-                <span className="text-[12px] font-semibold text-text-primary">Graph Controls</span>
-                <button
-                  type="button"
-                  onClick={() => setControlsOpen(false)}
-                  className="rounded p-0.5 text-text-muted hover:bg-elevated hover:text-text-primary"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              {/* Filter Search */}
-              <div className="relative mb-3">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter nodes..."
-                  className="h-7 pl-8 pr-7 text-[11px]"
-                />
-                {searchQuery ? (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                ) : null}
-              </div>
-
-              {/* Node Type Groups */}
-              <div className="mb-3 space-y-1.5 border-b border-border-subtle pb-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-text-muted">Groups</span>
-                  {filterKind ? (
-                    <button
-                      type="button"
-                      onClick={() => setFilterKind(null)}
-                      className="text-[10px] text-accent hover:underline"
-                    >
-                      Clear
-                    </button>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {DOCK_NODES.filter((item) => (kindCounts.get(item.kind) ?? 0) > 0).map((item) => {
-                    const active = filterKind === item.kind;
-                    return (
-                      <button
-                        key={item.kind}
-                        type="button"
-                        onClick={() => setFilterKind(active ? null : item.kind)}
-                        className={cn(
-                          "flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
-                          active
-                            ? "border-accent/60 bg-accent/15 text-text-primary"
-                            : "border-border-subtle bg-canvas text-text-secondary hover:border-border-strong",
-                        )}
-                      >
-                        <span
-                          className="h-1.5 w-1.5 rounded-full"
-                          style={{ backgroundColor: NODE_META[item.kind].color }}
-                        />
-                        <span>{item.label}</span>
-                        <span className="font-mono text-[9px] text-text-muted">{kindCounts.get(item.kind)}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Display Toggles */}
-              <div className="mb-3 space-y-1.5 border-b border-border-subtle pb-3">
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-text-muted">Display</span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {(
-                    [
-                      ["showLabels", "Labels"],
-                      ["showConditions", "Conditions"],
-                      ["showMetadata", "Metadata"],
-                      ["showArrows", "Arrows"],
-                      ["showParticles", "Flow Pulse"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <label
-                      key={key}
-                      className="flex cursor-pointer items-center gap-1.5 text-[11px] text-text-secondary hover:text-text-primary"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={display[key]}
-                        onChange={(e) => setDisplay((prev) => ({ ...prev, [key]: e.target.checked }))}
-                        className="accent-emerald-500"
-                      />
-                      <span>{label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Physics Force Sliders */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-text-muted">Forces</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPhysics(DEFAULT_PHYSICS_PARAMS);
-                      reheatPhysics();
-                    }}
-                    className="flex items-center gap-1 text-[10px] text-text-muted hover:text-text-primary"
-                  >
-                    <RotateCcw className="h-2.5 w-2.5" />
-                    Reset
-                  </button>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex justify-between font-mono text-[10px] text-text-secondary">
-                    <span>Repulsion</span>
-                    <span className="tabular-nums text-text-muted">{physics.repelStrength}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={1200}
-                    max={12000}
-                    step={200}
-                    value={physics.repelStrength}
-                    onChange={(e) => setPhysics((p) => ({ ...p, repelStrength: Number(e.target.value) }))}
-                    className="h-1 w-full cursor-pointer accent-emerald-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex justify-between font-mono text-[10px] text-text-secondary">
-                    <span>Link Distance</span>
-                    <span className="tabular-nums text-text-muted">{physics.linkDistance}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={100}
-                    max={300}
-                    step={5}
-                    value={physics.linkDistance}
-                    onChange={(e) => setPhysics((p) => ({ ...p, linkDistance: Number(e.target.value) }))}
-                    className="h-1 w-full cursor-pointer accent-emerald-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex justify-between font-mono text-[10px] text-text-secondary">
-                    <span>Link Tension</span>
-                    <span className="tabular-nums text-text-muted">{physics.linkStrength.toFixed(3)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0.015}
-                    max={0.16}
-                    step={0.005}
-                    value={physics.linkStrength}
-                    onChange={(e) => setPhysics((p) => ({ ...p, linkStrength: Number(e.target.value) }))}
-                    className="h-1 w-full cursor-pointer accent-emerald-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex justify-between font-mono text-[10px] text-text-secondary">
-                    <span>Center Gravity</span>
-                    <span className="tabular-nums text-text-muted">{physics.centerStrength.toFixed(3)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={0.06}
-                    step={0.002}
-                    value={physics.centerStrength}
-                    onChange={(e) => setPhysics((p) => ({ ...p, centerStrength: Number(e.target.value) }))}
-                    className="h-1 w-full cursor-pointer accent-emerald-500"
-                  />
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {/* Bottom-Left Compact Zoom Pill */}
-          <div className="absolute bottom-3 left-3 z-10 flex items-center gap-0.5 rounded-lg border border-border-subtle bg-surface/90 p-1">
-            <button
-              type="button"
-              onClick={() => adjustZoom(0.84)}
-              title="Zoom out"
-              className="flex h-6 w-6 items-center justify-center rounded text-text-secondary hover:bg-elevated hover:text-text-primary"
-            >
-              <Minus className="h-3 w-3" />
-            </button>
-            <button
-              type="button"
-              onClick={() => fitView(false)}
-              title="Fit graph (F)"
-              className="min-w-[44px] rounded px-1.5 py-0.5 font-mono text-[10px] text-text-secondary tabular-nums hover:bg-elevated hover:text-text-primary"
-            >
-              {zoomPct}%
-            </button>
-            <button
-              type="button"
-              onClick={() => adjustZoom(1.18)}
-              title="Zoom in"
-              className="flex h-6 w-6 items-center justify-center rounded text-text-secondary hover:bg-elevated hover:text-text-primary"
-            >
-              <Plus className="h-3 w-3" />
-            </button>
-          </div>
-
-          {/* Bottom-Center Tactile Add-Node & Connect Dock */}
-          {!readOnly ? (
-            <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-border-strong bg-surface/95 p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.55)]">
-              {DOCK_NODES.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.kind}
-                    type="button"
-                    onClick={() => handleSpawnNodeFromDock(item.kind)}
-                    title={`Add ${item.label}: ${NODE_META[item.kind].hint}`}
-                    className="flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-text-secondary transition-colors duration-150 hover:bg-elevated hover:text-text-primary active:scale-95"
-                  >
-                    <Icon className="h-3.5 w-3.5" style={{ color: NODE_META[item.kind].color }} />
-                    <span className="hidden xl:inline">{item.label}</span>
-                  </button>
-                );
-              })}
-
-              <div className="mx-0.5 h-4 w-px bg-border-subtle" />
-
+          {/* Selected Node Quick Actions (Input / Output / Delete) */}
+          {selectedNode && !readOnly ? (
+            <div className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-xl border border-border-strong bg-surface/95 px-2.5 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
+              <span className="max-w-[160px] truncate px-1 text-[11px] font-medium text-text-primary">
+                {selectedNode.label}
+              </span>
+              <div className="h-3.5 w-px bg-border-subtle" />
               <button
                 type="button"
-                onClick={() => setConnectMode((v) => !v)}
-                title="Drag between nodes to link (or hold Shift + Drag)"
+                onClick={() => updateGraphMeta({ entryNode: selectedNode.id })}
                 className={cn(
-                  "flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors duration-150",
-                  connectMode
+                  "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
+                  graph.entryNode === selectedNode.id
                     ? "bg-accent/15 text-accent"
                     : "text-text-secondary hover:bg-elevated hover:text-text-primary",
                 )}
               >
-                <Link2 className="h-3.5 w-3.5" />
-                <span className="hidden lg:inline">Link</span>
+                <LogIn className="h-3 w-3" />
+                <span>Input Node</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => updateNode(selectedNode.id, { isOutput: !selectedNode.isOutput })}
+                className={cn(
+                  "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
+                  selectedNode.isOutput
+                    ? "bg-info/15 text-info"
+                    : "text-text-secondary hover:bg-elevated hover:text-text-primary",
+                )}
+              >
+                <LogOut className="h-3 w-3" />
+                <span>Output Node</span>
+              </button>
+              <div className="h-3.5 w-px bg-border-subtle" />
+              <button
+                type="button"
+                onClick={() => removeNodes([selectedNode.id])}
+                title="Delete node"
+                className="rounded-md p-1 text-text-muted transition-colors hover:bg-elevated hover:text-error"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
           ) : null}
-        </div>
 
-        {/* Right Slide-Over Inspector Drawer */}
-        <GraphInspectorDrawer
-          graph={graph}
-          runDetail={runDetail}
-          readOnly={readOnly}
-          availableSkills={availableSkills}
-          open={drawerOpen}
-          onClose={() => {
-            setInspectorPinnedOpen(false);
-            selectNode(null);
-            selectEdge(null);
-          }}
-          onFocusNode={focusNode}
-        />
+        </div>
       </div>
     </div>
   );

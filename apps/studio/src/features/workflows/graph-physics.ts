@@ -17,7 +17,7 @@ export const DEFAULT_PHYSICS_PARAMS: PhysicsParams = {
   linkStrength: 0.06,
   centerStrength: 0.012,
   damping: 0.85,
-  layoutMode: "physics",
+  layoutMode: "flow",
 };
 
 export interface SimNode {
@@ -184,14 +184,14 @@ export function syncSimNodes(prevNodes: Map<string, SimNode>, graph: RawGraph): 
 
       next.set(n.id, {
         id: n.id,
-        x,
-        y,
-        vx: (Math.random() - 0.5) * 1.5,
-        vy: (Math.random() - 0.5) * 1.5,
+        x: anchor.x,
+        y: anchor.y,
+        vx: 0,
+        vy: 0,
         radius,
         degree,
-        scale: isFreshGraph ? 0.65 : 0.2,
-        scaleVel: isFreshGraph ? 0.08 : 0.16,
+        scale: isFreshGraph ? 0.85 : 0.4,
+        scaleVel: isFreshGraph ? 0.04 : 0.12,
         alpha: 1,
         glow: isFreshGraph ? 0 : 1,
         level: anchor.level,
@@ -225,97 +225,99 @@ export function stepPhysics(
   const nodes = Array.from(nodesMap.values());
   const count = nodes.length;
 
-  // 1. Pairwise Coulomb repulsion + soft collision separation
-  for (let i = 0; i < count; i++) {
-    const a = nodes[i];
-    for (let j = i + 1; j < count; j++) {
-      const b = nodes[j];
-      let dx = b.x - a.x;
-      let dy = b.y - a.y;
-      let distSq = dx * dx + dy * dy;
-      if (distSq < 1) {
-        dx = (Math.random() - 0.5) * 2;
-        dy = (Math.random() - 0.5) * 2;
-        distSq = dx * dx + dy * dy;
-      }
-      const dist = Math.sqrt(distSq);
-      const nx = dx / dist;
-      const ny = dy / dist;
+  // 1 & 2. Pairwise Coulomb repulsion + Hooke spring edges (physics mode only; flow mode uses clean topological anchors)
+  if (params.layoutMode === "physics") {
+    for (let i = 0; i < count; i++) {
+      const a = nodes[i];
+      for (let j = i + 1; j < count; j++) {
+        const b = nodes[j];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let distSq = dx * dx + dy * dy;
+        if (distSq < 1) {
+          dx = (Math.random() - 0.5) * 2;
+          dy = (Math.random() - 0.5) * 2;
+          distSq = dx * dx + dy * dy;
+        }
+        const dist = Math.sqrt(distSq);
+        const nx = dx / dist;
+        const ny = dy / dist;
 
-      // Smooth repulsion force
-      const repel = (params.repelStrength / (distSq + 900)) * stepScale;
-      const fx = nx * repel;
-      const fy = ny * repel;
+        // Smooth repulsion force
+        const repel = (params.repelStrength / (distSq + 900)) * stepScale;
+        const fx = nx * repel;
+        const fy = ny * repel;
 
-      if (a.id !== options.draggedNodeId) {
-        a.vx -= fx;
-        a.vy -= fy;
-      }
-      if (b.id !== options.draggedNodeId) {
-        b.vx += fx;
-        b.vy += fy;
-      }
-
-      // Soft personal-space boundary so orbs and labels never overlap
-      const minDist = a.radius + b.radius + 115;
-      if (dist < minDist) {
-        const push = (minDist - dist) * 0.095 * stepScale;
         if (a.id !== options.draggedNodeId) {
-          a.vx -= nx * push;
-          a.vy -= ny * push;
+          a.vx -= fx;
+          a.vy -= fy;
         }
         if (b.id !== options.draggedNodeId) {
-          b.vx += nx * push;
-          b.vy += ny * push;
+          b.vx += fx;
+          b.vy += fy;
+        }
+
+        // Soft personal-space boundary so orbs and labels never overlap
+        const minDist = a.radius + b.radius + 115;
+        if (dist < minDist) {
+          const push = (minDist - dist) * 0.095 * stepScale;
+          if (a.id !== options.draggedNodeId) {
+            a.vx -= nx * push;
+            a.vy -= ny * push;
+          }
+          if (b.id !== options.draggedNodeId) {
+            b.vx += nx * push;
+            b.vy += ny * push;
+          }
         }
       }
     }
-  }
 
-  // 2. Hooke spring edges (pulling a node naturally tugs its neighbors)
-  for (const edge of edges) {
-    const src = nodesMap.get(edge.source);
-    const tgt = nodesMap.get(edge.target);
-    if (!src || !tgt || src === tgt) continue;
+    // 2. Hooke spring edges (pulling a node naturally tugs its neighbors)
+    for (const edge of edges) {
+      const src = nodesMap.get(edge.source);
+      const tgt = nodesMap.get(edge.target);
+      if (!src || !tgt || src === tgt) continue;
 
-    const dx = tgt.x - src.x;
-    const dy = tgt.y - src.y;
-    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-    const isLoop = tgt.level <= src.level;
-    const restLength = isLoop ? params.linkDistance * 1.45 : params.linkDistance;
-    const strength = isLoop ? params.linkStrength * 0.35 : params.linkStrength;
-    const displacement = dist - restLength;
-    const force = displacement * strength * stepScale;
-    const fx = (dx / dist) * force;
-    const fy = (dy / dist) * force;
+      const dx = tgt.x - src.x;
+      const dy = tgt.y - src.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const isLoop = tgt.level <= src.level;
+      const restLength = isLoop ? params.linkDistance * 1.45 : params.linkDistance;
+      const strength = isLoop ? params.linkStrength * 0.35 : params.linkStrength;
+      const displacement = dist - restLength;
+      const force = displacement * strength * stepScale;
+      const fx = (dx / dist) * force;
+      const fy = (dy / dist) * force;
 
-    if (src.id !== options.draggedNodeId) {
-      src.vx += fx;
-      src.vy += fy;
-    }
-    if (tgt.id !== options.draggedNodeId) {
-      tgt.vx -= fx;
-      tgt.vy -= fy;
-    }
+      if (src.id !== options.draggedNodeId) {
+        src.vx += fx;
+        src.vy += fy;
+      }
+      if (tgt.id !== options.draggedNodeId) {
+        tgt.vx -= fx;
+        tgt.vy -= fy;
+      }
 
-    // Gentle forward directional hint in physics mode so flow reads left-to-right
-    if (params.layoutMode === "physics" && !isLoop) {
-      const desiredDx = restLength * 0.55;
-      if (dx < desiredDx) {
-        const nudge = (desiredDx - dx) * 0.0045 * stepScale;
-        if (src.id !== options.draggedNodeId) src.vx -= nudge;
-        if (tgt.id !== options.draggedNodeId) tgt.vx += nudge;
+      // Gentle forward directional hint in physics mode so flow reads left-to-right
+      if (!isLoop) {
+        const desiredDx = restLength * 0.55;
+        if (dx < desiredDx) {
+          const nudge = (desiredDx - dx) * 0.0045 * stepScale;
+          if (src.id !== options.draggedNodeId) src.vx -= nudge;
+          if (tgt.id !== options.draggedNodeId) tgt.vx += nudge;
+        }
       }
     }
   }
 
   // 3. Center gravity or Flow DAG spring anchors + velocity integration + spring scale
-  const dampingFactor = params.damping ** stepScale;
+  const dampingFactor = (params.layoutMode === "flow" ? 0.72 : params.damping) ** stepScale;
   for (const n of nodes) {
     if (n.id !== options.draggedNodeId) {
       if (params.layoutMode === "flow") {
-        n.vx += (n.flowAnchorX - n.x) * 0.072 * stepScale;
-        n.vy += (n.flowAnchorY - n.y) * 0.072 * stepScale;
+        n.vx += (n.flowAnchorX - n.x) * 0.12 * stepScale;
+        n.vy += (n.flowAnchorY - n.y) * 0.12 * stepScale;
       } else {
         n.vx += -n.x * params.centerStrength * stepScale;
         n.vy += -n.y * params.centerStrength * stepScale;
@@ -377,9 +379,9 @@ export function computeEdgeBezier(
   const isLoop = tgt.level <= src.level;
   let curveOffset = 0;
   if (isLoop) {
-    // Sweep loop-back edges outward away from the graph center so they frame the constellation cleanly
+    // Sweep loop-back edges consistently below the centerline so they never flip when nodes sit near y = 0
     const avgY = (src.y + tgt.y) / 2;
-    const preferDown = avgY >= graphCenterY;
+    const preferDown = avgY >= graphCenterY - 24;
     if ((preferDown && ny < 0) || (!preferDown && ny > 0)) {
       nx = -nx;
       ny = -ny;

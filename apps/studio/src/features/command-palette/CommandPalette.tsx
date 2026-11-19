@@ -132,11 +132,11 @@ export function CommandPalette() {
       <DialogContent className="p-0">
         <DialogTitle className="sr-only">Command Palette</DialogTitle>
         <Command className="flex flex-col bg-elevated text-text-primary">
-          <div className="flex items-center gap-2 border-b border-border-subtle px-3">
-            <Search className="h-3.5 w-3.5 text-text-muted shrink-0" />
+          <div className="flex items-center gap-2.5 border-b border-border-subtle px-3.5 py-0.5">
+            <Search className="h-4 w-4 shrink-0 text-text-muted" />
             <Command.Input
               placeholder="Jump to workflow, run, skill, route, or action..."
-              className="h-10 w-full bg-transparent text-[13px] text-text-primary placeholder:text-text-muted outline-none"
+              className="h-11 w-full bg-transparent text-[13px] text-text-primary placeholder:text-text-muted outline-none focus-visible:outline-none"
             />
             <kbd className="rounded border border-border-subtle bg-canvas px-1.5 py-0.5 font-mono text-[10px] text-text-muted">
               ESC

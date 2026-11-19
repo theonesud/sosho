@@ -92,18 +92,6 @@ export function NodeInspector({ graph, readOnly = false, availableSkills = [] }:
             ))}
           </select>
         </div>
-        <div className="space-y-1.5">
-          <label className="block text-[11px] font-medium text-text-secondary">Max Steps</label>
-          <Input
-            type="number"
-            min={1}
-            max={200}
-            value={graph.maxSteps}
-            disabled={readOnly}
-            onChange={(e) => updateGraphMeta({ maxSteps: Math.max(1, Number(e.target.value) || 1) })}
-            className="font-mono"
-          />
-        </div>
         <p className="pt-1 text-[11px] text-text-muted">Click any node or edge on the canvas to edit its fields.</p>
       </div>
     );
@@ -430,19 +418,6 @@ export function NodeInspector({ graph, readOnly = false, availableSkills = [] }:
                 </div>
               </div>
             )}
-
-            <div className="space-y-1">
-              <label className="block text-[11px] font-medium text-text-secondary">Graph Max Steps</label>
-              <Input
-                type="number"
-                min={1}
-                max={200}
-                value={graph.maxSteps}
-                disabled={readOnly}
-                onChange={(e) => updateGraphMeta({ maxSteps: Math.max(1, Number(e.target.value) || 1) })}
-                className="font-mono"
-              />
-            </div>
           </AccordionContent>
         </AccordionItem>
       </Accordion>

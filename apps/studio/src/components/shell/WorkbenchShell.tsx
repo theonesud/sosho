@@ -9,7 +9,6 @@ import {
   ExternalLink,
   FlaskConical,
   GitBranch,
-  KeyRound,
   Music,
   Search,
   Server,
@@ -170,35 +169,9 @@ function TopStatusBar() {
           className={cn("h-1.5 w-1.5 rounded-full", sseConnected ? "bg-accent" : "bg-text-muted")}
           title={sseConnected ? "Live SSE connected" : "SSE reconnecting"}
         />
-
-        <div className="hidden items-center gap-1.5 sm:flex">
-          <Badge variant="neutral" className="font-mono">
-            <Cpu className="h-3 w-3 text-text-muted" />
-            <span>GPU: {gpuLabel}</span>
-          </Badge>
-
-          <Badge variant="neutral" className="font-mono">
-            <span>cloud-io</span>
-            <span className="text-text-primary">
-              {queueStats["cloud-io"].active}/{queueStats["cloud-io"].queued}
-            </span>
-          </Badge>
-          <Badge variant="neutral" className="font-mono">
-            <span>local-gpu</span>
-            <span className="text-text-primary">
-              {queueStats["local-gpu"].active}/{queueStats["local-gpu"].queued}
-            </span>
-          </Badge>
-          <Badge variant="neutral" className="font-mono">
-            <span>host-browser</span>
-            <span className="text-text-primary">
-              {queueStats["host-browser"].active}/{queueStats["host-browser"].queued}
-            </span>
-          </Badge>
-        </div>
       </div>
 
-      {/* Right: HITL alert, Service Health, Auth, Ctrl+K */}
+      {/* Right: HITL alert, Service Health, Ctrl+K */}
       <div className="flex items-center gap-2">
         {pausedRun ? (
           <Button
@@ -291,47 +264,6 @@ function TopStatusBar() {
               >
                 MinIO <ExternalLink className="h-2.5 w-2.5" />
               </a>
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="xs" className="gap-1.5">
-              <KeyRound className={cn("h-3.5 w-3.5", hasToken ? "text-accent" : "text-text-muted")} />
-              <span className="hidden md:inline">{hasToken ? "Auth" : "Token"}</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-72">
-            <div className="space-y-2">
-              <div className="text-[12px] font-semibold">Studio API Token</div>
-              <p className="text-[11px] text-text-secondary">
-                Stored in localStorage as <code className="font-mono text-text-primary">sosho_studio_token</code> for
-                write routes.
-              </p>
-              <Input
-                type="password"
-                value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value)}
-                placeholder="Paste bearer token..."
-                className="font-mono"
-              />
-              <div className="flex justify-end gap-1.5">
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => {
-                    setTokenInput("");
-                    setStoredToken("");
-                    setHasToken(false);
-                  }}
-                >
-                  Clear
-                </Button>
-                <Button variant="primary" size="xs" onClick={saveToken}>
-                  Save
-                </Button>
-              </div>
             </div>
           </PopoverContent>
         </Popover>

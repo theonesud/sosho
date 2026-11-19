@@ -388,3 +388,492 @@ Import trace for requested module:
  GET /?workflow=parallel-critique 200 in 42ms
  GET /?workflow=parallel-critique 200 in 105ms
  GET /?workflow=parallel-critique 200 in 62ms
+ ✓ Compiled in 309ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 63ms
+ ✓ Compiled in 182ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 64ms
+ ✓ Compiled in 153ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 46ms
+ ✓ Compiled in 160ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 58ms
+ ✓ Compiled in 478ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 86ms
+ ✓ Compiled in 191ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 85ms
+ ✓ Compiled in 192ms (1046 modules)
+ GET /?workflow=parallel-critique 200 in 44ms
+ ✓ Compiled in 242ms (1046 modules)
+ GET /?workflow=parallel-critique 200 in 38ms
+ ✓ Compiled in 179ms (1046 modules)
+ GET /?workflow=parallel-critique 200 in 40ms
+ ✓ Compiled in 179ms (1046 modules)
+ GET /?workflow=parallel-critique 200 in 42ms
+ ✓ Compiled in 163ms (1046 modules)
+ GET /?workflow=parallel-critique 200 in 52ms
+ ✓ Compiled in 179ms (1046 modules)
+ GET /?workflow=parallel-critique 200 in 40ms
+ ✓ Compiled in 330ms (1046 modules)
+ GET /?workflow=parallel-critique 200 in 39ms
+ ✓ Compiled in 313ms (1046 modules)
+ GET /?workflow=parallel-critique 200 in 75ms
+ ✓ Compiled in 193ms (1046 modules)
+ GET /?workflow=parallel-critique 200 in 60ms
+ ✓ Compiled in 431ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 43ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /?workflow=parallel-critique 200 in 153ms
+ ✓ Compiled in 203ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 163ms
+ ✓ Compiled in 172ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 121ms
+ ✓ Compiled in 175ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 122ms
+ ✓ Compiled in 185ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 128ms
+ ✓ Compiled in 168ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 123ms
+ ✓ Compiled in 172ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 120ms
+ ✓ Compiled in 180ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 155ms
+ ✓ Compiled in 177ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 39ms
+ ✓ Compiled in 164ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 39ms
+ GET /?workflow=parallel-critique 200 in 114ms
+ GET /?workflow=parallel-critique 200 in 54ms
+ ✓ Compiled in 779ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 63ms
+ GET /?workflow=parallel-critique 200 in 147ms
+ ✓ Compiled in 283ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 66ms
+ ⨯ ./src/features/workflows/graph-physics.ts
+Error:   [31mx[0m 'import', and 'export' cannot be used outside of module code
+     ,-[[36;1;4m/home/vegeta/sosho/apps/studio/src/features/workflows/graph-physics.ts[0m:362:1]
+ [2m359[0m |  * Compute quadratic Bezier curve geometry between two nodes, trimming endpoints
+ [2m360[0m |  * to node perimeters and bowing loop-back or bidirectional edges cleanly.
+ [2m361[0m |  */
+ [2m362[0m | export function computeEdgeBezier(
+     : [35;1m^^^^^^[0m
+ [2m363[0m |   src: SimNode,
+ [2m364[0m |   tgt: SimNode,
+ [2m365[0m |   hasReverseEdge: boolean,
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/features/workflows/graph-physics.ts
+./src/features/workflows/ObsidianGraphStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+ ✓ Compiled in 149ms (1042 modules)
+ GET /?workflow=parallel-critique 200 in 45ms
+ ✓ Compiled in 234ms (1032 modules)
+ GET /?workflow=parallel-critique 200 in 43ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:61:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  59 |   { kind: "agent", label: "Agent", icon: Bot },
+  60 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 61 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  62 |   { kind: "tool", label: "Tool", icon: Wrench },
+  63 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  64 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '1487815057'
+}
+ GET /?workflow=parallel-critique 200 in 367ms
+ ✓ Compiled in 189ms (1032 modules)
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '1487815057'
+}
+ GET /?workflow=parallel-critique 200 in 311ms
+ ✓ Compiled in 206ms (1032 modules)
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '1487815057'
+}
+ GET /?workflow=parallel-critique 200 in 290ms
+ ✓ Compiled in 161ms (1032 modules)
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '1487815057'
+}
+ GET /?workflow=parallel-critique 200 in 270ms
+ ✓ Compiled in 226ms (1032 modules)
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '1487815057'
+}
+ GET /?workflow=parallel-critique 200 in 272ms
+ ✓ Compiled in 141ms (1032 modules)
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '1487815057'
+}
+ GET /?workflow=parallel-critique 200 in 262ms
+ ✓ Compiled in 524ms (1032 modules)
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '1487815057'
+}
+ GET /?workflow=parallel-critique 200 in 276ms
+ ✓ Compiled in 182ms (1032 modules)
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '1487815057'
+}
+ GET /?workflow=parallel-critique 200 in 257ms
+ ✓ Compiled in 198ms (1032 modules)
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '1487815057'
+}
+ GET /?workflow=parallel-critique 200 in 336ms
+ ✓ Compiled in 163ms (1032 modules)
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '1487815057'
+}
+ GET /?workflow=parallel-critique 200 in 254ms
+ ✓ Compiled in 194ms (1034 modules)
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '1487815057'
+}
+ GET /?workflow=parallel-critique 200 in 270ms
+ ✓ Compiled in 459ms (1032 modules)
+ ⨯ ReferenceError: KeyRound is not defined
+    at TopStatusBar (src/components/shell/WorkbenchShell.tsx:300:16)
+  298 |           <PopoverTrigger asChild>
+  299 |             <Button variant="ghost" size="xs" className="gap-1.5">
+> 300 |               <KeyRound className={cn("h-3.5 w-3.5", hasToken ? "text-accent" : "text-text-muted")} />
+      |                ^
+  301 |               <span className="hidden md:inline">{hasToken ? "Auth" : "Token"}</span>
+  302 |             </Button>
+  303 |           </PopoverTrigger> {
+  digest: '2321016210'
+}
+ GET /?workflow=parallel-critique 500 in 163ms
+ ✓ Compiled in 564ms (1032 modules)
+ ⨯ ReferenceError: KeyRound is not defined
+    at TopStatusBar (src/components/shell/WorkbenchShell.tsx:274:16)
+  272 |           <PopoverTrigger asChild>
+  273 |             <Button variant="ghost" size="xs" className="gap-1.5">
+> 274 |               <KeyRound className={cn("h-3.5 w-3.5", hasToken ? "text-accent" : "text-text-muted")} />
+      |                ^
+  275 |               <span className="hidden md:inline">{hasToken ? "Auth" : "Token"}</span>
+  276 |             </Button>
+  277 |           </PopoverTrigger> {
+  digest: '804617105'
+}
+ GET /?workflow=parallel-critique 500 in 175ms
+ ✓ Compiled in 162ms (1032 modules)
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '738278963'
+}
+ GET /?workflow=parallel-critique 200 in 271ms
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '738278963'
+}
+ GET /?workflow=parallel-critique 200 in 172ms
+ ✓ Compiled in 248ms (1032 modules)
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '738278963'
+}
+ GET /?workflow=parallel-critique 200 in 260ms
+ ✓ Compiled in 152ms (1032 modules)
+ ⨯ ReferenceError: GitFork is not defined
+    at eval (src/features/workflows/ObsidianGraphStage.tsx:60:48)
+    at (ssr)/./src/features/workflows/ObsidianGraphStage.tsx (.next/server/app/page.js:335:1)
+    at eval (webpack-internal:///(ssr)/./src/features/workflows/WorkflowsWorkbench.tsx:16:77)
+    at (ssr)/./src/features/workflows/WorkflowsWorkbench.tsx (.next/server/app/page.js:357:1)
+  58 |   { kind: "agent", label: "Agent", icon: Bot },
+  59 |   { kind: "subagent", label: "Subagent", icon: Users },
+> 60 |   { kind: "decision", label: "Decision", icon: GitFork },
+     |                                                ^
+  61 |   { kind: "tool", label: "Tool", icon: Wrench },
+  62 |   { kind: "skill", label: "Skill", icon: Sparkles },
+  63 |   { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle }, {
+  digest: '738278963'
+}
+ GET /?workflow=parallel-critique 200 in 265ms
+ ✓ Compiled in 454ms (1034 modules)
+ GET /?workflow=parallel-critique 200 in 189ms
+ GET /?workflow=parallel-critique 200 in 52ms
+ GET /?workflow=parallel-critique 200 in 50ms
+ ✓ Compiled in 209ms (1034 modules)
+ GET /?workflow=parallel-critique 200 in 83ms
+ ✓ Compiled in 188ms (1034 modules)
+ GET /?workflow=parallel-critique 200 in 39ms
+ ✓ Compiled in 204ms (1034 modules)
+ GET /?workflow=parallel-critique 200 in 70ms
+ ✓ Compiled in 254ms (1032 modules)
+ GET /?workflow=parallel-critique 200 in 44ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /?workflow=parallel-critique 200 in 149ms
+ ✓ Compiled in 178ms (1001 modules)
+ GET /?workflow=parallel-critique 200 in 172ms
+ ✓ Compiled in 159ms (1001 modules)
+ GET /?workflow=parallel-critique 200 in 120ms
+ ✓ Compiled in 162ms (1001 modules)
+ GET /?workflow=parallel-critique 200 in 111ms
+ ✓ Compiled in 151ms (1001 modules)
+ GET /?workflow=parallel-critique 200 in 110ms
+ ✓ Compiled in 165ms (1001 modules)
+ GET /?workflow=parallel-critique 200 in 122ms
+ ✓ Compiled in 166ms (1001 modules)
+ GET /?workflow=parallel-critique 200 in 122ms
+ ✓ Compiled in 173ms (1005 modules)
+ GET /?workflow=parallel-critique 200 in 116ms
+ ✓ Compiled in 161ms (1005 modules)
+ GET /?workflow=parallel-critique 200 in 124ms
+ GET /?workflow=parallel-critique 200 in 60ms
+ GET /?workflow=parallel-critique 200 in 52ms
+ ✓ Compiled in 219ms (1005 modules)
+ GET /?workflow=parallel-critique 200 in 44ms
+ GET /?workflow=parallel-critique 200 in 115ms
+ GET /?workflow=parallel-critique 200 in 51ms
+ ✓ Compiled in 284ms (1005 modules)
+ GET /?workflow=parallel-critique 200 in 41ms
+ GET /?workflow=parallel-critique 200 in 101ms
+ GET /?workflow=parallel-critique 200 in 49ms
+ GET /?workflow=parallel-critique 200 in 48ms
+ GET /?workflow=parallel-critique 200 in 55ms
+ GET /?workflow=parallel-critique 200 in 53ms
+ GET /?workflow=parallel-critique 200 in 75ms
+ ✓ Compiled in 638ms (1005 modules)
+ GET /?workflow=parallel-critique 200 in 68ms
+ ✓ Compiled in 167ms (1005 modules)
+ GET /?workflow=parallel-critique 200 in 102ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ ReferenceError: useMemo is not defined
+    at WorkflowSidebar (src/features/workflows/WorkflowSidebar.tsx:54:24)
+  52 |   const [editingWorkflowId, setEditingWorkflowId] = useState<string | null>(null);
+  53 |   const updateGraphMeta = useWorkflowStore((s) => s.updateGraphMeta);
+> 54 |   const templateVars = useMemo(() => extractTemplateVariables(activeGraph), [activeGraph]);
+     |                        ^
+  55 |
+  56 |   const handleRunClick = () => {
+  57 |     const payload: Record<string, unknown> = {}; {
+  digest: '1523482054'
+}
+ GET /?workflow=parallel-critique 200 in 141ms
+ ✓ Compiled in 163ms (1005 modules)
+ ⨯ ReferenceError: templateVars is not defined
+    at WorkflowSidebar (src/features/workflows/WorkflowSidebar.tsx:171:10)
+  169 |       {/* Run Trigger */}
+  170 |       <div className="space-y-2 border-b border-border-subtle p-3">
+> 171 |         {templateVars.map((v) => (
+      |          ^
+  172 |           <div key={v} className="space-y-1">
+  173 |             <label className="block font-mono text-[10px] text-text-muted">{v}</label>
+  174 |             <Input {
+  digest: '1051469641'
+}
+ GET /?workflow=parallel-critique 200 in 167ms
+ ✓ Compiled in 158ms (1005 modules)
+ ⨯ ReferenceError: templateVars is not defined
+    at WorkflowSidebar (src/features/workflows/WorkflowSidebar.tsx:186:10)
+  184 |       {/* Run Trigger */}
+  185 |       <div className="space-y-2 border-b border-border-subtle p-3">
+> 186 |         {templateVars.map((v) => (
+      |          ^
+  187 |           <div key={v} className="space-y-1">
+  188 |             <label className="block font-mono text-[10px] text-text-muted">{v}</label>
+  189 |             <Input {
+  digest: '1051469641'
+}
+ GET /?workflow=parallel-critique 200 in 119ms
+ ✓ Compiled in 134ms (1005 modules)
+ GET /?workflow=parallel-critique 200 in 110ms
+ ✓ Compiled in 311ms (1003 modules)
+ GET /?workflow=parallel-critique 200 in 42ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /?workflow=parallel-critique 200 in 97ms
+ ✓ Compiled in 158ms (1003 modules)
+ GET /?workflow=parallel-critique 200 in 119ms
+ ✓ Compiled in 179ms (1003 modules)
+ GET /?workflow=parallel-critique 200 in 39ms
+ GET /?workflow=parallel-critique 200 in 88ms
+ GET /?workflow=parallel-critique 200 in 46ms
+ GET /?workflow=example-research-checkpoint 200 in 16ms
+ GET /?workflow=research-to-music 200 in 21ms
+ GET /?workflow=parallel-critique 200 in 26ms
+ GET /?workflow=parallel-critique 200 in 13ms
+ GET /?workflow=parallel-critique 200 in 12ms
+ GET /?workflow=example-research-checkpoint 200 in 11ms
+ GET /?workflow=research-to-music 200 in 9ms
+ GET /?workflow=parallel-critique 200 in 12ms
+ GET /?workflow=example-research-checkpoint 200 in 14ms
+ GET /?workflow=research-to-music 200 in 14ms
+ GET /runs/sosho-example-research-checkpoint-4ddb8e 200 in 37ms
+ GET /runs/sosho-example-research-checkpoint-01570f 200 in 26ms
+ GET /runs/sosho-example-research-checkpoint-dd487d 200 in 28ms
+ GET /runs/sosho-example-research-checkpoint-c382ce 200 in 26ms
+ GET /?workflow=example-research-checkpoint 200 in 17ms
+ ✓ Compiled in 367ms (1003 modules)
+ GET /?workflow=example-research-checkpoint 200 in 91ms
+ ✓ Compiled in 218ms (1003 modules)
+ GET /?workflow=example-research-checkpoint 200 in 64ms
+ ✓ Compiled in 192ms (1003 modules)
+ GET /?workflow=example-research-checkpoint 200 in 39ms
+ ✓ Compiled in 174ms (1003 modules)
+ GET /?workflow=example-research-checkpoint 200 in 38ms
+ ✓ Compiled in 329ms (999 modules)
+ GET /?workflow=example-research-checkpoint 200 in 81ms
+ ✓ Compiled in 379ms (999 modules)
+ GET /?workflow=example-research-checkpoint 200 in 47ms
+ GET /?workflow=parallel-critique 200 in 148ms
+ GET /?workflow=parallel-critique 200 in 56ms
+ GET /?workflow=example-research-checkpoint 200 in 56ms
+ GET /?workflow=parallel-critique 200 in 16ms
+ GET /?workflow=research-to-music 200 in 18ms
+ GET /?workflow=parallel-critique 200 in 17ms
+ GET /?workflow=example-research-checkpoint 200 in 13ms
+ ✓ Compiled in 377ms (999 modules)
+ GET /?workflow=example-research-checkpoint 200 in 40ms
+ ✓ Compiled in 228ms (999 modules)
+ GET /?workflow=example-research-checkpoint 200 in 64ms
+ ✓ Compiled in 149ms (999 modules)
+ GET /?workflow=example-research-checkpoint 200 in 40ms
+ ✓ Compiled in 242ms (999 modules)
+ GET /?workflow=example-research-checkpoint 200 in 40ms
