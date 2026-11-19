@@ -4,7 +4,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { apiJson, authHeaders } from "@/api";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import {
   type RawGraph,
@@ -14,10 +13,8 @@ import {
   WORKFLOW_TEMPLATES,
   type WorkflowSummary,
 } from "@/types";
-import { CanvasStage } from "./CanvasStage";
 import { CheckpointBar } from "./CheckpointBar";
-import { NodeInspector } from "./NodeInspector";
-import { RunTimeline } from "./RunTimeline";
+import { WaterfallStage } from "./WaterfallStage";
 import { WorkflowSidebar } from "./WorkflowSidebar";
 
 interface WorkflowsWorkbenchProps {
@@ -32,14 +29,11 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
   const graph = useWorkflowStore((s) => s.graph);
   const isDirty = useWorkflowStore((s) => s.isDirty);
   const saveStatus = useWorkflowStore((s) => s.saveStatus);
-  const selectedNodeId = useWorkflowStore((s) => s.selectedNodeId);
   const setGraph = useWorkflowStore((s) => s.setGraph);
   const markSaved = useWorkflowStore((s) => s.markSaved);
   const setSaveStatus = useWorkflowStore((s) => s.setSaveStatus);
   const forkSnapshot = useWorkflowStore((s) => s.forkSnapshot);
-  const selectNode = useWorkflowStore((s) => s.selectNode);
 
-  const [rightTab, setRightTab] = useState<"inspector" | "timeline">(runId ? "timeline" : "inspector");
   const [isSaving, setIsSaving] = useState(false);
   const [isStartingRun, setIsStartingRun] = useState(false);
 
@@ -262,10 +256,11 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
           />
         ) : null}
 
-        <CanvasStage
+        <WaterfallStage
           graph={displayedGraph}
           runDetail={runDetail}
           readOnly={isReadOnly}
+          availableSkills={systemData?.skills ?? []}
           onEditGraph={
             runDetail?.graph
               ? () => {
@@ -282,40 +277,8 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
                 }
               : undefined
           }
-          onNodeClick={(nodeId) => {
-            if (isReadOnly) setRightTab("timeline");
-            selectNode(nodeId);
-          }}
         />
       </div>
-
-      {/* Right Inspector / Run Timeline Drawer */}
-      <aside className="flex h-full w-[320px] shrink-0 flex-col border-l border-border-subtle bg-surface overflow-hidden">
-        <Tabs
-          value={rightTab}
-          onValueChange={(v) => setRightTab(v as "inspector" | "timeline")}
-          className="flex h-full flex-col overflow-hidden"
-        >
-          <div className="flex items-center justify-between border-b border-border-subtle px-3 py-2">
-            <TabsList>
-              <TabsTrigger value="inspector">Inspector</TabsTrigger>
-              <TabsTrigger value="timeline">Run Timeline</TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="inspector" className="mt-0 flex-1 overflow-y-auto">
-            <NodeInspector graph={displayedGraph} readOnly={isReadOnly} availableSkills={systemData?.skills ?? []} />
-          </TabsContent>
-
-          <TabsContent value="timeline" className="mt-0 flex-1 overflow-hidden">
-            <RunTimeline
-              run={runDetail}
-              selectedNodeId={selectedNodeId}
-              onSelectStepNode={(nodeId) => selectNode(nodeId)}
-            />
-          </TabsContent>
-        </Tabs>
-      </aside>
     </div>
   );
 }

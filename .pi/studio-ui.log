@@ -92,3 +92,235 @@ Error: connect ECONNREFUSED 127.0.0.1:4101
  GET /memory 200 in 12ms
  GET /playground 200 in 13ms
  GET / 200 in 12ms
+ ✓ Compiled in 195ms (661 modules)
+ GET / 200 in 16ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 597ms (1387 modules)
+ ⨯ ReferenceError: CanvasStage is not defined
+    at WorkflowsWorkbench (src/features/workflows/WorkflowsWorkbench.tsx:262:10)
+  260 |         ) : null}
+  261 |
+> 262 |         <CanvasStage
+      |          ^
+  263 |           graph={displayedGraph}
+  264 |           runDetail={runDetail}
+  265 |           readOnly={isReadOnly} {
+  digest: '3528146398'
+}
+ GET / 200 in 620ms
+ ✓ Compiled in 237ms (1387 modules)
+ ⚠ ./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+
+./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+
+./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+
+./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+ ⚠ ./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+
+./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+
+./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+
+./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+ ⚠ ./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+
+./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+
+./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+
+./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+ ⚠ ./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+
+./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+
+./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+
+./src/features/workflows/WaterfallStage.tsx
+Attempted import error: 'formatDuration' is not exported from '@/lib/utils' (imported as 'formatDuration').
+
+Import trace for requested module:
+./src/features/workflows/WaterfallStage.tsx
+./src/features/workflows/WorkflowsWorkbench.tsx
+ ✓ Compiled in 196ms (1405 modules)
+ ✓ Compiled in 195ms (1405 modules)
+ ✓ Compiled in 239ms (1405 modules)
+ ✓ Compiled in 213ms (1405 modules)
+ ✓ Compiled in 193ms (1405 modules)
+ ✓ Compiled in 224ms (1405 modules)
+ ✓ Compiled in 265ms (1405 modules)
+ ✓ Compiled in 239ms (1405 modules)
+ ✓ Compiled in 215ms (1405 modules)
+ ✓ Compiled in 197ms (1405 modules)
+ ✓ Compiled in 203ms (1405 modules)
+ ✓ Compiled in 208ms (1405 modules)
+ ✓ Compiled in 251ms (1405 modules)
+ ✓ Compiled in 186ms (1405 modules)
+ ✓ Compiled in 202ms (1405 modules)
+ ✓ Compiled in 270ms (1405 modules)
+ ✓ Compiled in 216ms (1405 modules)
+ GET / 200 in 238ms
+ ✓ Compiled in 231ms (1405 modules)
+ GET / 200 in 60ms
+ ✓ Compiled in 485ms (1405 modules)
+ GET / 200 in 89ms
+ ✓ Compiled in 515ms (1405 modules)
+ GET / 200 in 64ms
+ ✓ Compiled in 257ms (1405 modules)
+ GET / 200 in 66ms
+ GET / 200 in 152ms
+ GET / 200 in 53ms
+ ✓ Compiled in 273ms (1405 modules)
+ GET / 200 in 44ms
+ ✓ Compiled in 280ms (1405 modules)
+ GET / 200 in 38ms
+ ✓ Compiled in 218ms (1405 modules)
+ GET / 200 in 37ms
+ ✓ Compiled in 268ms (1405 modules)
+ GET / 200 in 66ms
+ GET / 200 in 164ms
+ GET / 200 in 61ms
+ ✓ Compiled in 464ms (1405 modules)
+ GET / 200 in 68ms
+ ✓ Compiled in 251ms (1405 modules)
+ GET / 200 in 61ms
+ ✓ Compiled in 220ms (1405 modules)
+ GET / 200 in 38ms
+ ✓ Compiled in 217ms (1405 modules)
+ GET / 200 in 39ms
+ ✓ Compiled in 195ms (1405 modules)
+ GET / 200 in 36ms
+ ✓ Compiled in 195ms (1405 modules)
+ GET / 200 in 40ms
+ GET / 200 in 168ms
+ ✓ Compiled in 291ms (1405 modules)
+ GET / 200 in 44ms
+ ✓ Compiled in 231ms (1405 modules)
+ GET / 200 in 41ms
+ GET / 200 in 144ms
+ ✓ Compiled in 419ms (1405 modules)
+ GET / 200 in 70ms
+ ⚠ Found a change in next.config.ts. Restarting the server to apply the changes...
+   ▲ Next.js 15.5.29
+   - Local:        http://127.0.0.1:3000
+   - Network:      http://127.0.0.1:3000
+
+ ✓ Starting...
+ ✓ Ready in 1157ms
+ ○ Compiling / ...
+ ✓ Compiled / in 2.9s (1015 modules)
+ GET / 200 in 3416ms
+ ✓ Compiled in 292ms (997 modules)
+ GET / 200 in 72ms
+ ✓ Compiled in 175ms (997 modules)
+ GET / 200 in 39ms
+ ✓ Compiled in 148ms (997 modules)
+ GET / 200 in 39ms
+ ✓ Compiled in 227ms (997 modules)
+ GET / 200 in 40ms
+ GET / 200 in 161ms
+ ⚠ Found a change in next.config.ts. Restarting the server to apply the changes...
+   ▲ Next.js 15.5.29
+   - Local:        http://127.0.0.1:3000
+   - Network:      http://127.0.0.1:3000
+
+ ✓ Starting...
+ ✓ Ready in 1171ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1250ms (997 modules)
+ GET / 200 in 1550ms
+ ✓ Compiled /runs/[id] in 418ms (999 modules)
+ GET /runs/sosho-example-research-checkpoint-4ddb8e 200 in 832ms
+ GET /runs/sosho-example-research-checkpoint-4ddb8e 200 in 32ms
+ ✓ Compiled in 343ms (999 modules)
+ GET /runs/sosho-example-research-checkpoint-4ddb8e 200 in 83ms
+ ✓ Compiled in 188ms (999 modules)
+ GET /runs/sosho-example-research-checkpoint-4ddb8e 200 in 69ms
+ GET / 200 in 23ms
+ GET /runs/sosho-example-research-checkpoint-01570f 200 in 38ms
+ GET /runs/sosho-example-research-checkpoint-dd487d 200 in 19ms
+ GET /runs/sosho-example-research-checkpoint-c382ce 200 in 19ms
+ GET /runs/sosho-example-research-checkpoint-dd487d 200 in 20ms
+ GET /runs/sosho-example-research-checkpoint-01570f 200 in 20ms
+ GET /runs/sosho-example-research-checkpoint-4ddb8e 200 in 19ms
+ GET /runs/sosho-example-research-checkpoint-01570f 200 in 19ms
+ GET /runs/sosho-example-research-checkpoint-dd487d 200 in 20ms
+ GET /runs/sosho-example-research-checkpoint-c382ce 200 in 20ms
+ GET /?workflow=parallel-critique 200 in 12ms
+ GET /?workflow=parallel-critique 200 in 165ms
+ GET /?workflow=parallel-critique 200 in 59ms
