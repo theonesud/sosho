@@ -92,11 +92,14 @@ export const GraphNodeSchema = z.discriminatedUnion("type", [
   MemoryNodeSchema,
 ]);
 
+export const CHECKPOINT_ACTIONS = ["approve", "reject"] as const;
+export const MAX_STEPS_EXCEEDED_ERROR = "max_steps_exceeded";
+
 export const GraphEdgeSchema = z.object({
   id: z.string().min(1),
   source: z.string().min(1),
   target: z.string().min(1),
-  condition: z.string().optional(), // Matches DecisionNode branch name or "approved" / "rejected" for CheckpointNode
+  condition: z.string().optional(), // Matches DecisionNode branch name or "approve" / "reject" for CheckpointNode
 });
 
 export const GraphDefinitionSchema = z.object({
