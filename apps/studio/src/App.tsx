@@ -218,9 +218,9 @@ export default function App() {
     const data = (await res.json()) as { runId?: string; error?: string };
     if (res.ok && data.runId) {
       setActiveRunId(data.runId);
-      setStatusBanner(`Started Temporal run: ${data.runId}`);
+      setStatusBanner(`Started workflow run: ${data.runId}`);
     } else {
-      setStatusBanner(`Run error: ${data.error || "Check Temporal server"}`);
+      setStatusBanner(`Run error: ${data.error || "Check Studio API server"}`);
     }
   };
 
@@ -351,16 +351,13 @@ export default function App() {
               ))}
             </select>
             <button onClick={handleSave} style={btnStyle(false)}>Save</button>
-            <button onClick={handleRun} style={{ ...btnStyle(true), background: "#10b981" }}>Run on Temporal</button>
+            <button onClick={handleRun} style={{ ...btnStyle(true), background: "#10b981" }}>Run Workflow</button>
           </>
         )}
 
         <div style={{ marginLeft: "auto", display: "flex", gap: 10, fontSize: 12 }}>
           <a href="http://127.0.0.1:3000" target="_blank" rel="noreferrer" style={{ color: "#93c5fd" }}>
             Langfuse :3000
-          </a>
-          <a href="http://127.0.0.1:8233" target="_blank" rel="noreferrer" style={{ color: "#c4b5fd" }}>
-            Temporal UI :8233
           </a>
         </div>
       </header>

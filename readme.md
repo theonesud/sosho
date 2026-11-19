@@ -8,7 +8,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Docker Compose v2](https://img.shields.io/badge/Docker%20Compose-v2.0+-2496ED?logo=docker&logoColor=white)](compose.yaml)
-[![Temporal Workflows](https://img.shields.io/badge/Workflows-Temporal-6366f1)](docker/compose.temporal.yaml)
+[![SQLite WAL Workflows](https://img.shields.io/badge/Workflows-SQLite%20WAL%20DAG-6366f1)](packages/workflow-engine/src/schema.ts)
 [![React Flow Studio](https://img.shields.io/badge/Canvas-Sosho%20Studio-0ea5e9)](apps/studio/src/App.tsx)
 [![Observability: Langfuse](https://img.shields.io/badge/Telemetry-Langfuse%20v4-black)](docker/compose.langfuse.yaml)
 [![CUDA Accelerated](https://img.shields.io/badge/CUDA-NVIDIA%20GPU-76B900?logo=nvidia&logoColor=white)](bin/doctor.sh)
@@ -29,9 +29,9 @@
 
 ### 1. Durable Graph Workflows & Visual Canvas (`Sosho Studio`)
 * **Typed Graph Engine (`packages/workflow-engine/`):** Define workflows as versioned JSON (`workflows/*.graph.json`) with `agent`, `subagent`, `decision`, `tool`, `skill`, `checkpoint`, and `memory` nodes.
-* **Temporal Durability (`docker/compose.temporal.yaml`):** Reuses Langfuse's existing Postgres 17 instance (no extra DB or Elasticsearch). Supports crash recovery, retries, and **Human-in-the-Loop (HITL) checkpoints** via Temporal Signals (zero compute while waiting for approval or JSON state edits).
-* **VRAM-Aware Task Queues:** Automatically serializes `llama-cpp` and `yue2-gateway` on `local-gpu` (concurrency `1`), caps Chrome/Dokobot on `host-browser` (concurrency `2`), and runs cloud steps on `cloud-io` (concurrency `8`).
-* **Visual Canvas (`apps/studio/`):** React Flow editor on `:4100` with live SSE node status badges, inline HITL approval drawer, Memory Explorer, and direct links to Langfuse (`:3000`) and Temporal UI (`:8233`).
+* **SQLite WAL Durability (`packages/workflow-engine/`):** Persists workflow runs, step logs, state payloads, and paused Human-in-the-Loop (HITL) checkpoints inside `.pi/workflows/runs.sqlite` in Write-Ahead Log mode inside the Studio server process. Supports crash recovery, retries, and parallel Directed Acyclic Graph branch joins with zero extra containers.
+* **VRAM-Aware Resource Queues:** Automatically serializes `llama-cpp` and `yue2-gateway` on `local-gpu` (concurrency `1`), caps Chrome/Dokobot on `host-browser` (concurrency `2`), and runs cloud steps on `cloud-io` (concurrency `8`).
+* **Visual Canvas (`apps/studio/`):** React Flow editor on `:4100` with live SSE node status badges, inline HITL approval drawer, Memory Explorer, and direct link to Langfuse (`:3000`).
 
 ### 2. Self-Evolving Two-Tier Memory (`packages/memory/` & `.pi/extensions/memory/`)
 * **Global Memory (`~/.sosho/memory/`):** Personal profile, preferences, cross-project habits, and playbooks (mounted into `pi` automatically with automatic secret redaction).
@@ -74,16 +74,17 @@ make up            # Start llama-cpp (:8080) and Langfuse (:3000)
 
 ### 2. Workflow Engine, Local Decision Router & Visual Canvas
 ```bash
-# Start Temporal (:7233 / UI :8233) and local CPU decision model (:8081, 0 GPU VRAM)
-make workflow-up
+# Optional: start local CPU decision model (:8081) and embeddinggemma (:8082) with 0 GPU VRAM
 make decision-up
+make embed-up
 
 # Install Node dependencies once
+(cd packages/llm && npm install)
+(cd packages/memory && npm install)
 (cd packages/workflow-engine && npm install)
 (cd apps/studio && npm install)
 
-# Launch Worker + Studio API (:4101) + Studio Canvas (:4100)
-SOSHO_STUDIO_EVENT_URL=http://127.0.0.1:4101/api/events make worker
+# Launch Studio API + embedded SQLite DAG engine (:4101) and Studio Canvas (:4100)
 make studio-api
 make studio-ui
 ```
@@ -96,7 +97,6 @@ pi
 ```
 * **Langfuse UI:** `http://127.0.0.1:3000` (`admin@local.dev` / `password123`)
 * **Sosho Studio Canvas:** `http://127.0.0.1:4100`
-* **Temporal UI:** `http://127.0.0.1:8233`
 
 ---
 
@@ -105,12 +105,12 @@ pi
 | Command | Description |
 | :--- | :--- |
 | `make up` | Start `llama-cpp` (`:8080`) and Langfuse v4 (`:3000`) |
-| `make workflow-up` | Start Temporal server (`:7233`) and Temporal UI (`:8233`) |
 | `make decision-up` | Start local CPU `Qwen3-1.7B` decision router (`:8081`, 0 GPU VRAM) |
-| `make worker` | Run the Temporal workflow & memory worker |
-| `make studio-api` | Run Sosho Studio API & SSE gateway (`:4101`) |
+| `make embed-up` | Start local CPU `embeddinggemma` memory vector server (`:8082`, 0 GPU VRAM) |
+| `make studio-api` | Run Sosho Studio API, SQLite DAG engine & SSE gateway (`:4101`) |
 | `make studio-ui` | Run Sosho Studio React Flow visual canvas (`:4100`) |
 | `make music-up` | Start YuE2 local music generation (`:8021`) |
 | `make test-memory` | Run two-tier memory unit tests |
+| `make test` | Run full automated test suite |
 | `make down` | Stop all containers across all profiles |
-| `make install-cli` | Install `pi` launcher into `~/.local/bin` |
+| `make install-cli` | Install `pi` and `yue2-music` symlinks into `~/.local/bin` |

@@ -9,7 +9,6 @@ name: sosho
 
 include:
   - path: docker/compose.langfuse.yaml
-  - path: docker/compose.temporal.yaml
 
 
 x-model: &model

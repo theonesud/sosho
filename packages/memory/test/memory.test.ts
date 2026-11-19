@@ -90,15 +90,15 @@ try {
   assert.ok(resGlobal.length >= 1);
   assert.equal(resGlobal[0].record.id, g1.record.id);
 
-  // 4. Supersede bi-temporal history
+  // 4. Supersede version history
   const p2 = upsertMemory(
     {
       scope: "project",
       type: "procedural",
-      title: "VRAM Handshake via Temporal Queue",
-      content: "Serialize llama-cpp and yue2-engine through the local-gpu Temporal task queue.",
-      tags: ["gpu", "temporal"],
-      entities: ["llama-cpp", "temporal"],
+      title: "VRAM Handshake via SQLite Queue",
+      content: "Serialize llama-cpp and yue2-engine through the local-gpu resource queue.",
+      tags: ["gpu", "queue"],
+      entities: ["llama-cpp", "sqlite-queue"],
       importance: 0.98,
       supersedes_id: p1.record.id,
     },
