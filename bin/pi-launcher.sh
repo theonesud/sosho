@@ -18,11 +18,14 @@ SOSHO_PI="$SOSHO_ROOT/.pi"
 
 # Filter out our custom launcher flags from arguments
 FORWARD_ARGS=()
-SKIP_WARMUP="${PI_SKIP_WARMUP:-0}"
+WARMUP="${PI_WARMUP:-0}"
 for arg in "$@"; do
     case "$arg" in
+        --warmup)
+            WARMUP=1
+            ;;
         --no-warmup)
-            SKIP_WARMUP=1
+            WARMUP=0
             ;;
         *)
             FORWARD_ARGS+=("$arg")
@@ -45,6 +48,16 @@ mkdir -p "$TARGET_PI/.cache" "$TARGET_PI/.config" "$TARGET_PI/scratchpad"
 
 
 
+# Format argument ordering (subcommands require their options before --approve)
+SUBCOMMANDS=("update" "auth" "install" "remove" "list")
+IS_SUBCOMMAND=0
+for sub in "${SUBCOMMANDS[@]}"; do
+    if [ "${FORWARD_ARGS[0]:-}" = "$sub" ]; then
+        IS_SUBCOMMAND=1
+        break
+    fi
+done
+
 # 2. Automatic background updater (checks once every 24h or when requested)
 #    pi is baked into the Docker image, so its self-updater cannot work inside
 #    the ephemeral container. Rebuild the image when a newer release exists.
@@ -53,7 +66,7 @@ NOW=$(date +%s)
 LAST_UPDATE=0
 [ -f "$AUTO_UPDATE_STAMP" ] && LAST_UPDATE=$(cat "$AUTO_UPDATE_STAMP" 2>/dev/null || echo 0)
 # Update if older than 24 hours (86400s) and not running a sub-command
-if [ $((NOW - LAST_UPDATE)) -gt 86400 ] && [ "$SKIP_WARMUP" != "1" ]; then
+if [ $((NOW - LAST_UPDATE)) -gt 86400 ] && [ "$IS_SUBCOMMAND" -eq 0 ]; then
     echo "Checking and updating Pi packages & extensions..."
 
     # Rebuild the sandbox image if the baked-in pi is older than the npm latest.
@@ -80,10 +93,12 @@ if [ $((NOW - LAST_UPDATE)) -gt 86400 ] && [ "$SKIP_WARMUP" != "1" ]; then
     echo "$NOW" > "$AUTO_UPDATE_STAMP" 2>/dev/null || true
 fi
 
-# 2. If target workspace does NOT have its own models.json, provide the default
-#    pointing to local llama.cpp from sosho without mutating online configs if present.
+# 2. If target workspace does NOT have its own configs, provide the defaults
 if [ ! -f "$TARGET_PI/models.json" ] && [ -f "$SOSHO_PI/models.json" ]; then
     cp "$SOSHO_PI/models.json" "$TARGET_PI/models.json"
+fi
+if [ ! -f "$TARGET_PI/settings.json" ] && [ -f "$SOSHO_PI/settings.json" ]; then
+    cp "$SOSHO_PI/settings.json" "$TARGET_PI/settings.json"
 fi
 
 # 2a. Sync llama.cpp contextWindow in TARGET_PI/models.json with LLM_CTX_SIZE from .env if present
@@ -136,14 +151,18 @@ fi
 
 
 
-# 3. Pre-warm the local model (unless skipped).
-if [ "$SKIP_WARMUP" != "1" ] && [ -f "$TARGET_PI/models.json" ] && command -v curl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+# 3. Optional local model pre-warm (only if explicitly requested via --warmup)
+if [ "$WARMUP" = "1" ] && [ -f "$TARGET_PI/models.json" ] && command -v curl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
     read -r BASE_URL MODEL_ID < <(python3 - "$TARGET_PI/models.json" <<'PY' 2>/dev/null
 import json, sys
 try:
     cfg = json.load(open(sys.argv[1]))
-    p = next(iter(cfg.get("providers", {}).values()), {})
-    print(p.get("baseUrl", "").rstrip("/"), (p.get("models") or [{}])[0].get("id", ""))
+    llama = cfg.get("providers", {}).get("llama.cpp", {})
+    if llama:
+        print(llama.get("baseUrl", "").rstrip("/"), (llama.get("models") or [{}])[0].get("id", ""))
+    else:
+        p = next(iter(cfg.get("providers", {}).values()), {})
+        print(p.get("baseUrl", "").rstrip("/"), (p.get("models") or [{}])[0].get("id", ""))
 except Exception:
     print("")
 PY
@@ -154,7 +173,7 @@ PY
                 HEALTH_URL="${BASE_URL%/v1}/health"
                 # Check if model server is reachable first
                 if curl -fsS -m 2 "$HEALTH_URL" >/dev/null 2>&1; then
-                    echo "Pre-warming local model $MODEL_ID (press Ctrl+C to skip, or use --no-warmup)..."
+                    echo "Pre-warming local model $MODEL_ID (press Ctrl+C to skip)..."
 WARM_PAYLOAD="$(python3 - "$MODEL_ID" "$SOSHO_PI/SYSTEM.md" "$SOSHO_PI/APPEND_SYSTEM.md" <<'PY'
 import json, sys, os
 model_id, primary_prompt, fallback_prompt = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -218,16 +237,6 @@ DOCKER_INTERACTIVE_FLAGS=()
 if [ -t 0 ] && [ -t 1 ]; then
     DOCKER_INTERACTIVE_FLAGS+=("-it")
 fi
-
-# Format argument ordering (subcommands require their options before --approve)
-SUBCOMMANDS=("update" "auth" "install" "remove" "list")
-IS_SUBCOMMAND=0
-for sub in "${SUBCOMMANDS[@]}"; do
-    if [ "${FORWARD_ARGS[0]:-}" = "$sub" ]; then
-        IS_SUBCOMMAND=1
-        break
-    fi
-done
 
 FINAL_ARGS=()
 if [ "$IS_SUBCOMMAND" -eq 1 ]; then

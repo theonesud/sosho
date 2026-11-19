@@ -1,5 +1,23 @@
 {
   "providers": {
+    "deepinfra": {
+      "baseUrl": "https://api.deepinfra.com/v1/openai",
+      "api": "openai-completions",
+      "apiKey": "!bash -lc 'set -a; [ -f ./.env ] && . ./.env 2>/dev/null; [ -f \"$HOME/sosho/.env\" ] && . \"$HOME/sosho/.env\" 2>/dev/null; set +a; printf %s \"${DEEPINFRA_API_KEY:-}\"'",
+      "models": [
+        {
+          "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+          "name": "DeepSeek V4.1 Flash 1017",
+          "contextWindow": 1048576,
+          "maxTokens": 1048576,
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true
+        }
+      ]
+    },
     "llama.cpp": {
       "baseUrl": "http://127.0.0.1:8080/v1",
       "api": "openai-completions",
@@ -28,7 +46,7 @@
     "refuseless": {
       "baseUrl": "https://api.refuseless.com/v1",
       "api": "openai-completions",
-      "apiKey": "!bash -lc 'set -a; . ./.env 2>/dev/null; set +a; printf %s \"$REFUSELESS_API_KEY\"'",
+      "apiKey": "!bash -lc 'set -a; [ -f ./.env ] && . ./.env 2>/dev/null; [ -f \"$HOME/sosho/.env\" ] && . \"$HOME/sosho/.env\" 2>/dev/null; set +a; printf %s \"${REFUSELESS_API_KEY:-}\"'",
       "models": [
         {
           "id": "deepseek-v4.1-flash-abliterated",
@@ -44,24 +62,6 @@
             "high": "high",
             "max": "max"
           }
-        }
-      ]
-    },
-    "deepinfra": {
-      "baseUrl": "https://api.deepinfra.com/v1/openai",
-      "api": "openai-completions",
-      "apiKey": "!bash -lc 'set -a; . ./.env 2>/dev/null; set +a; printf %s \"$DEEPINFRA_API_KEY\"'",
-      "models": [
-        {
-          "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
-          "name": "DeepSeek V4.1 Flash 1017",
-          "contextWindow": 1048576,
-          "maxTokens": 1048576,
-          "input": [
-            "text",
-            "image"
-          ],
-          "reasoning": true
         }
       ]
     }
