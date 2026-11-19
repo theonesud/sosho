@@ -63,7 +63,7 @@ services:
       retries: 20
       start_period: 10s
     volumes:
-      - ./models:/models:ro
+      - ./models/Qwen3.6-35B-A3B:/models/Qwen3.6-35B-A3B:ro
     deploy:
       resources:
         reservations:
@@ -151,7 +151,7 @@ services:
       - "127.0.0.1:8081:8081"
     networks: [webui-net]
     volumes:
-      - ./models:/models:ro
+      - ./models/Qwen3-1.7B:/models/Qwen3-1.7B:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://127.0.0.1:8081/health || exit 1"]
       interval: 5s
