@@ -1,8 +1,17 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type ExtensionAPI, type ExtensionContext, getAgentDir } from "@earendil-works/pi-coding-agent";
+import {
+  BoundedBuffer,
+  buildSubagentCliArgs,
+  getSubagentDepth,
+  getSubagentOutputDir,
+  MAX_STREAM_BUFFER_BYTES,
+  MAX_SUBAGENT_DEPTH,
+  TierSemaphoreRegistry,
+} from "../../../../packages/llm/src/subagent-runtime.ts";
 
 export type ModelRole = "main" | "subagent" | "subagent-code" | "decision" | "local-uncensored";
 
@@ -44,8 +53,9 @@ interface SubagentResult {
   summary: string;
 }
 
-const MAX_DEPTH = 3;
+const MAX_DEPTH = MAX_SUBAGENT_DEPTH;
 const MAX_SUMMARY_CHARS = 3500;
+const tierSemaphores = new TierSemaphoreRegistry();
 
 const DEFAULT_ROLES: Record<string, RoleConfig> = {
   main: { provider: "deepinfra", model: "deepseek-ai/DeepSeek-V4.1-Flash-1017", concurrency: 2 },
@@ -122,15 +132,6 @@ async function resolveModel(
   };
 }
 
-function getSubagentOutputDir(cwd: string): string {
-  const base =
-    process.env.SOSHO_PERMANENT_DIR ||
-    join(cwd, ".pi", "scratchpad", "subagents");
-  const dir = join(base, "subagents");
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
 function truncateSummary(text: string): string {
   const trimmed = text.trim();
   if (trimmed.length <= MAX_SUMMARY_CHARS) return trimmed;
@@ -142,7 +143,7 @@ async function executeSingleSubagent(
   ctx: ExtensionContext,
   abortSignal?: AbortSignal,
 ): Promise<SubagentResult> {
-  const currentDepth = Number(process.env.LANGFUSE_PI_PARENT_DEPTH ?? "0");
+  const currentDepth = getSubagentDepth(process.env);
   if (currentDepth >= MAX_DEPTH) {
     return {
       id: "depth-limit",
@@ -160,123 +161,121 @@ async function executeSingleSubagent(
 
   const cwd = ctx.cwd || process.cwd();
   const tier = params.tier || "subagent";
-  const { provider, model } = await resolveModel(tier, cwd);
-  const id = `${params.role.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}-${randomBytes(3).toString("hex")}`;
-  const outDir = getSubagentOutputDir(cwd);
-  const outputPath = join(outDir, `${id}.md`);
+  const { provider, model, concurrency } = await resolveModel(tier, cwd);
+  const semaphore = tierSemaphores.get(tier, concurrency);
 
-  const skillHint =
-    params.skills && params.skills.length > 0
-      ? `\nRelevant skills to consult if needed: ${params.skills.join(", ")}.`
-      : "";
+  return semaphore.run(async () => {
+    const id = `${params.role.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}-${randomBytes(3).toString("hex")}`;
+    const outDir = getSubagentOutputDir(cwd, process.env);
+    const outputPath = join(outDir, `${id}.md`);
 
-  const prompt = [
-    `You are a focused subagent with role: ${params.role}.`,
-    `Complete the task below concisely and accurately. Do not ask follow-up questions.`,
-    `Return a structured final summary (<40 lines) with key findings, file paths, or results.`,
-    skillHint,
-    "",
-    "### Task",
-    params.task,
-  ].join("\n");
+    const skillHint =
+      params.skills && params.skills.length > 0
+        ? `\nRelevant skills to consult if needed: ${params.skills.join(", ")}.`
+        : "";
 
-  const timeoutMs = Math.min(Math.max((params.timeout_seconds ?? 180) * 1000, 10_000), 600_000);
-  const start = Date.now();
-
-  const childEnv: NodeJS.ProcessEnv = {
-    ...process.env,
-    LANGFUSE_PI_PARENT_DEPTH: String(currentDepth + 1),
-    LANGFUSE_PI_PARENT_SESSION_ID:
-      process.env.LANGFUSE_PI_PARENT_SESSION_ID ||
-      ctx.sessionManager?.getSessionId?.() ||
-      process.env.SOSHO_SESSION_ID ||
+    const prompt = [
+      `You are a focused subagent with role: ${params.role}.`,
+      `Complete the task below concisely and accurately. Do not ask follow-up questions.`,
+      `Return a structured final summary (<40 lines) with key findings, file paths, or results.`,
+      skillHint,
       "",
-  };
+      "### Task",
+      params.task,
+    ].join("\n");
 
-  return new Promise<SubagentResult>((resolve) => {
-    const args = [
-      "--print",
-      "--approve",
-      "--provider",
-      provider,
-      "--model",
-      model,
-      prompt,
-    ];
+    const timeoutMs = Math.min(Math.max((params.timeout_seconds ?? 180) * 1000, 10_000), 600_000);
+    const start = Date.now();
 
-    const child = spawn("pi", args, {
-      cwd,
-      env: childEnv,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-    let finished = false;
-
-    const finish = (exitCode: number | null, timedOut = false) => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      const durationMs = Date.now() - start;
-      const body = timedOut
-        ? `Timed out after ${Math.round(timeoutMs / 1000)}s.\n\nPartial output:\n${stdout}\n${stderr}`
-        : stdout.trim() || stderr.trim() || "(no output)";
-
-      try {
-        writeFileSync(
-          outputPath,
-          `# Subagent: ${params.role} (${id})\n- Tier: ${tier}\n- Model: ${provider}/${model}\n- Exit: ${exitCode}\n- Duration: ${durationMs}ms\n\n## Task\n${params.task}\n\n## Output\n${body}\n`,
-          "utf8",
-        );
-      } catch {
-        // Ignore disk write error
-      }
-
-      resolve({
-        id,
-        role: params.role,
-        tier,
-        provider,
-        model,
-        ok: !timedOut && exitCode === 0,
-        exitCode,
-        durationMs,
-        outputPath,
-        summary: truncateSummary(body),
-      });
+    const childEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      SOSHO_SUBAGENT_DEPTH: String(currentDepth + 1),
+      LANGFUSE_PI_PARENT_SESSION_ID:
+        process.env.LANGFUSE_PI_PARENT_SESSION_ID ||
+        ctx.sessionManager?.getSessionId?.() ||
+        process.env.SOSHO_SESSION_ID ||
+        "",
     };
 
-    const timer = setTimeout(() => {
-      child.kill("SIGTERM");
-      setTimeout(() => child.kill("SIGKILL"), 2000).unref();
-      finish(null, true);
-    }, timeoutMs);
+    return new Promise<SubagentResult>((resolve) => {
+      const args = buildSubagentCliArgs(provider, model, prompt);
 
-    if (abortSignal) {
-      const onAbort = () => {
-        child.kill("SIGTERM");
-        finish(null, false);
+      const child = spawn("pi", args, {
+        cwd,
+        env: childEnv,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      const stdoutBuf = new BoundedBuffer(MAX_STREAM_BUFFER_BYTES);
+      const stderrBuf = new BoundedBuffer(MAX_STREAM_BUFFER_BYTES);
+      let finished = false;
+
+      const finish = (exitCode: number | null, timedOut = false) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        const durationMs = Date.now() - start;
+        const stdout = stdoutBuf.toString();
+        const stderr = stderrBuf.toString();
+        const body = timedOut
+          ? `Timed out after ${Math.round(timeoutMs / 1000)}s.\n\nPartial output:\n${stdout}\n${stderr}`
+          : stdout.trim() || stderr.trim() || "(no output)";
+
+        try {
+          writeFileSync(
+            outputPath,
+            `# Subagent: ${params.role} (${id})\n- Tier: ${tier}\n- Model: ${provider}/${model}\n- Exit: ${exitCode}\n- Duration: ${durationMs}ms\n\n## Task\n${params.task}\n\n## Output\n${body}\n`,
+            "utf8",
+          );
+        } catch {
+          // Ignore disk write error
+        }
+
+        resolve({
+          id,
+          role: params.role,
+          tier,
+          provider,
+          model,
+          ok: !timedOut && exitCode === 0,
+          exitCode,
+          durationMs,
+          outputPath,
+          summary: truncateSummary(body),
+        });
       };
-      if (abortSignal.aborted) {
-        onAbort();
-        return;
-      }
-      abortSignal.addEventListener("abort", onAbort, { once: true });
-    }
 
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf8");
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
-    });
-    child.on("error", (err) => {
-      stderr += `\nSpawn error: ${err.message}`;
-      finish(1, false);
-    });
-    child.on("close", (code) => {
-      finish(code, false);
+      const timer = setTimeout(() => {
+        child.kill("SIGTERM");
+        setTimeout(() => child.kill("SIGKILL"), 2000).unref();
+        finish(null, true);
+      }, timeoutMs);
+
+      if (abortSignal) {
+        const onAbort = () => {
+          child.kill("SIGTERM");
+          finish(null, false);
+        };
+        if (abortSignal.aborted) {
+          onAbort();
+          return;
+        }
+        abortSignal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      child.stdout.on("data", (chunk: Buffer) => {
+        stdoutBuf.append(chunk);
+      });
+      child.stderr.on("data", (chunk: Buffer) => {
+        stderrBuf.append(chunk);
+      });
+      child.on("error", (err) => {
+        stderrBuf.append(`\nSpawn error: ${err.message}`);
+        finish(1, false);
+      });
+      child.on("close", (code) => {
+        finish(code, false);
+      });
     });
   });
 }
@@ -331,6 +330,7 @@ export default function subagentsExtension(pi: ExtensionAPI): void {
       const params = rawParams as SubagentRunParams;
       const res = await executeSingleSubagent(params, ctx, signal);
       return {
+        isError: !res.ok,
         content: [
           {
             type: "text",
@@ -382,10 +382,9 @@ export default function subagentsExtension(pi: ExtensionAPI): void {
     } as any,
     async execute(_toolCallId, rawParams, signal, _onUpdate, ctx) {
       const { tasks } = rawParams as SubagentParallelParams;
-      const hasLocalGpu = tasks.some((t) => t.tier === "local-uncensored");
-      const concurrency = hasLocalGpu ? 1 : 3;
-      const results = await runWithConcurrency(tasks, concurrency, (t) =>
-        executeSingleSubagent(t, ctx, signal),
+      // Per-tier module-level semaphores enforce local-uncensored=1 while cloud tiers run concurrently
+      const results = await Promise.all(
+        tasks.map((t) => executeSingleSubagent(t, ctx, signal)),
       );
 
       const blocks = results.map(
@@ -396,6 +395,7 @@ export default function subagentsExtension(pi: ExtensionAPI): void {
       );
 
       return {
+        isError: results.some((r) => !r.ok),
         content: [{ type: "text", text: blocks.join("\n\n---\n\n") }],
         details: { count: results.length, results },
       };
