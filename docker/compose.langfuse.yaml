@@ -31,14 +31,14 @@ services:
       redis: { condition: service_healthy }
       clickhouse: { condition: service_healthy }
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3001:3000"
     environment: &langfuse-env
       NODE_OPTIONS: --max-old-space-size=1024
       DATABASE_URL: postgresql://${LANGFUSE_PG_USER:-postgres}:${LANGFUSE_PG_PASSWORD:-postgres}@postgres:5432/${LANGFUSE_PG_DB:-postgres}
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-local-dev-secret-change-me}
       SALT: ${LANGFUSE_SALT:-local-dev-salt-change-me}
       ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-736d927cc28b9ca18fc47a3c5f4a6ee5074deb57ba4f1b004b894e0c50f24144}
-      NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3001}
       TELEMETRY_ENABLED: "false"
       # ClickHouse
       CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000

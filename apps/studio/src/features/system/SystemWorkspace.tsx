@@ -323,7 +323,7 @@ export function SystemWorkspace() {
             </div>
             <div className="mt-3">
               <Button variant="secondary" size="sm" asChild className="w-full">
-                <a href={langfuseService?.url || "http://127.0.0.1:3000"} target="_blank" rel="noreferrer">
+                <a href={langfuseService?.url || "http://127.0.0.1:3001"} target="_blank" rel="noreferrer">
                   Open Langfuse Dashboard
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>

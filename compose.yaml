@@ -358,7 +358,7 @@ services:
       PI_CODING_AGENT_DIR: ${PWD}/.pi
       XDG_CACHE_HOME: ${PWD}/.pi/.cache
       XDG_CONFIG_HOME: ${PWD}/.pi/.config
-      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://127.0.0.1:3000}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://127.0.0.1:3001}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}
       YUE2_GATEWAY_URL: ${YUE2_GATEWAY_URL:-http://127.0.0.1:8021}

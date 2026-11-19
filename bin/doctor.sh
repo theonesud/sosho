@@ -94,9 +94,9 @@ check_port_service() {
 check_port_service 8080 "llama.cpp" "llama-cpp"
 check_port_service 8081 "llama-decision" "llama-decision"
 check_port_service 8082 "llama-embed" "llama-embed"
-check_port_service 3000 "Langfuse Web" "sosho-langfuse-web-1"
+check_port_service 3001 "Langfuse Web" "sosho-langfuse-web-1"
 check_port_service 8021 "YuE2 Gateway" "yue2-gateway"
-check_port_service 4100 "Sosho Studio UI" ""
+check_port_service 3000 "Sosho Studio UI" ""
 check_port_service 4101 "Sosho Studio API" ""
 
 # 5. Disk Space for Models

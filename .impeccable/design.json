@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-20T00:52:00+05:30",
+  "title": "Design System: Sosho Studio",
+  "extensions": {
+    "colorMeta": {
+      "accent-primary": {
+        "role": "primary",
+        "displayName": "Signal Emerald",
+        "canonical": "#10b981",
+        "tonalRamp": ["#042f24", "#064e3b", "#047857", "#059669", "#10b981", "#34d399", "#6ee7b7", "#a7f3d0"]
+      },
+      "state-info": {
+        "role": "secondary",
+        "displayName": "Telemetry Sky",
+        "canonical": "#38bdf8",
+        "tonalRamp": ["#082f49", "#0c4a6e", "#0369a1", "#0284c7", "#0ea5e9", "#38bdf8", "#7dd3fc", "#bae6fd"]
+      },
+      "state-warning": {
+        "role": "tertiary",
+        "displayName": "Checkpoint Amber",
+        "canonical": "#f59e0b",
+        "tonalRamp": ["#451a03", "#78350f", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fcd34d", "#fde68a"]
+      },
+      "state-error": {
+        "role": "tertiary",
+        "displayName": "Alert Crimson",
+        "canonical": "#ef4444",
+        "tonalRamp": ["#450a0a", "#7f1d1d", "#b91c1c", "#dc2626", "#ef4444", "#f87171", "#fca5a5", "#fecaca"]
+      },
+      "bg-canvas": {
+        "role": "neutral",
+        "displayName": "Obsidian Canvas",
+        "canonical": "#09090b",
+        "tonalRamp": ["#09090b", "#111114", "#18181c", "#27272a", "#3f3f46", "#71717a", "#a1a1aa", "#fafafa"]
+      },
+      "bg-surface": {
+        "role": "neutral",
+        "displayName": "Graphite Surface",
+        "canonical": "#111114",
+        "tonalRamp": ["#09090b", "#111114", "#18181c", "#27272a", "#3f3f46", "#71717a", "#a1a1aa", "#fafafa"]
+      },
+      "bg-elevated": {
+        "role": "neutral",
+        "displayName": "Slate Elevated",
+        "canonical": "#18181c",
+        "tonalRamp": ["#09090b", "#111114", "#18181c", "#27272a", "#3f3f46", "#71717a", "#a1a1aa", "#fafafa"]
+      }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "Workspace page titles." },
+      "title": { "displayName": "Title", "purpose": "Section and drawer headings." },
+      "body": { "displayName": "Body", "purpose": "Standard interface text and descriptions." },
+      "label": { "displayName": "Label", "purpose": "Buttons, inspector fields, and badges." },
+      "mono": { "displayName": "Mono", "purpose": "Code, JSON state, IDs, and tabular timings." }
+    },
+    "shadows": [
+      { "name": "canvas-controls", "value": "0 4px 16px rgba(0, 0, 0, 0.45)", "purpose": "Floating React Flow controls and overlay popovers." }
+    ],
+    "motion": [
+      { "name": "state-transition", "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Hover, focus, border, and accordion transitions." }
+    ],
+    "breakpoints": [
+      { "name": "desktop", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary action button for running workflows, saving graphs, and submitting forms.",
+      "html": "<button class=\"ds-btn-primary\">Run Workflow</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; height: 28px; padding: 0 10px; border-radius: 6px; border: none; background: var(--accent-primary, #10b981); color: #09090b; font-size: 12px; font-weight: 600; cursor: pointer; transition: background-color 150ms ease; } .ds-btn-primary:hover { background: #34d399; } .ds-btn-primary:focus-visible { outline: 1.5px solid #10b981; outline-offset: 1px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Default elevated button for secondary actions and toolbar controls.",
+      "html": "<button class=\"ds-btn-secondary\">Inspect Run</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border-subtle, #27272a); background: var(--bg-elevated, #18181c); color: var(--text-primary, #fafafa); font-size: 12px; font-weight: 500; cursor: pointer; transition: border-color 150ms ease, background-color 150ms ease; } .ds-btn-secondary:hover { border-color: var(--border-strong, #3f3f46); background: #27272a; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-neutral",
+      "description": "Compact status pill for queue depth, model tier, and execution state.",
+      "html": "<span class=\"ds-badge-accent\">completed · 420ms</span>",
+      "css": ".ds-badge-accent { display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-default",
+      "description": "Compact obsidian input field for inspector forms and search bars.",
+      "html": "<input class=\"ds-input\" placeholder=\"Filter workflows...\" />",
+      "css": ".ds-input { height: 32px; width: 100%; border-radius: 6px; border: 1px solid var(--border-subtle, #27272a); background: var(--bg-canvas, #09090b); color: var(--text-primary, #fafafa); padding: 4px 10px; font-size: 12px; transition: border-color 150ms ease; } .ds-input::placeholder { color: var(--text-muted, #71717a); } .ds-input:hover { border-color: var(--border-strong, #3f3f46); } .ds-input:focus-visible { outline: none; border-color: var(--accent-primary, #10b981); }"
+    },
+    {
+      "name": "Workflow Node Card",
+      "kind": "card",
+      "description": "Elevated node card rendered on the React Flow DAG canvas.",
+      "html": "<div class=\"ds-node-card\"><div class=\"ds-node-meta\">AGENT · cloud-io</div><div class=\"ds-node-title\">Deep Research</div></div>",
+      "css": ".ds-node-card { width: 220px; border-radius: 8px; border: 1px solid var(--border-subtle, #27272a); background: var(--bg-elevated, #18181c); padding: 10px 12px; color: var(--text-primary, #fafafa); } .ds-node-meta { font-family: monospace; font-size: 10px; color: var(--text-muted, #71717a); margin-bottom: 4px; } .ds-node-title { font-size: 12px; font-weight: 600; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Precision Workbench",
+    "overview": "Sosho Studio operates as a desktop-first local developer workbench where scanability, speed, and consistency outrank visual ornament. The interface uses a restrained obsidian palette with three distinct neutral surface layers so dense workflow graphs, model streams, memory records, and audio controls remain clear during long sessions.\n\nFamiliar developer patterns from code editors and node orchestrators anchor every screen. Primary controls stay visible while secondary engine parameters tuck inside collapsed accordions. Motion is brief and strictly communicates state changes, active execution, or focus.",
+    "keyCharacteristics": [
+      "Tonal neutral hierarchy: Obsidian canvas, surface rail, and elevated card layers separate work zones without heavy shadows.",
+      "Semantic state discipline: Emerald, sky, amber, and red accents appear only on primary actions, active selections, and live status indicators.",
+      "Progressive disclosure: Three primary controls lead each inspector or form, with advanced parameters collapsed by default."
+    ],
+    "rules": [
+      {
+        "name": "The State-Only Accent Rule",
+        "body": "Never apply accent-primary, state-info, state-warning, or state-error as static background decoration; reserve them for interactive actions and live status.",
+        "section": "colors"
+      },
+      {
+        "name": "The Fixed Scale Rule",
+        "body": "Use fixed rem sizes rather than fluid clamp() headings so sidebars and inspectors maintain uniform density across desktop monitors.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Keep panels, cards, and nodes flat at rest; express hierarchy through surface step and border contrast.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use skeleton placeholders for loading states instead of centered spinners.",
+      "Do render overlays, dropdowns, and tooltips in Radix portals so scroll containers never clip them.",
+      "Do show three primary controls first and place secondary knobs inside a collapsed Radix Accordion."
+    ],
+    "donts": [
+      "Don't open modal dialogs when an inline bar, accordion, or drawer solves the task.",
+      "Don't invent custom button shapes or mismatched form controls across screens.",
+      "Don't add decorative page-load animations or saturated accents on inactive elements."
+    ]
+  }
+}

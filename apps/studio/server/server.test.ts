@@ -61,14 +61,14 @@ try {
   assert.equal(evilOrigin.status, 403);
 
   const goodOrigin = await fetch(`${s1.baseUrl}/api/workflows`, {
-    headers: { Origin: "http://127.0.0.1:4100" },
+    headers: { Origin: "http://127.0.0.1:3000" },
   });
   assert.equal(goodOrigin.status, 200);
-  assert.equal(goodOrigin.headers.get("access-control-allow-origin"), "http://127.0.0.1:4100");
+  assert.equal(goodOrigin.headers.get("access-control-allow-origin"), "http://127.0.0.1:3000");
 
   const preflight = await fetch(`${s1.baseUrl}/api/workflows`, {
     method: "OPTIONS",
-    headers: { Origin: "http://localhost:4100" },
+    headers: { Origin: "http://localhost:3000" },
   });
   assert.equal(preflight.status, 204);
 

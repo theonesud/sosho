@@ -80,7 +80,7 @@ export function createSystemRoutes(ctx: StudioContext): Hono {
       env.LLAMA_DECISION_URL || providerBase("llama-decision", "http://127.0.0.1:8081"),
     );
     const llamaEmbedBase = stripApiSuffix(env.LLAMA_EMBED_URL || providerBase("llama-embed", "http://127.0.0.1:8082"));
-    const langfuseBase = (env.LANGFUSE_BASE_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
+    const langfuseBase = (env.LANGFUSE_BASE_URL || "http://127.0.0.1:3001").replace(/\/+$/, "");
     const yue2Base = (env.YUE2_GATEWAY_URL || "http://127.0.0.1:8021").replace(/\/+$/, "");
 
     const services = await Promise.all([

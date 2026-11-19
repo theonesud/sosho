@@ -6,6 +6,7 @@ import {
   Brain,
   CheckCircle2,
   Cpu,
+  ExternalLink,
   FlaskConical,
   GitBranch,
   KeyRound,
@@ -232,9 +233,12 @@ function TopStatusBar() {
                 <div className="text-[12px] text-text-muted">Checking service endpoints...</div>
               ) : (
                 services.map((svc) => (
-                  <div
+                  <a
                     key={svc.id}
-                    className="flex items-center justify-between rounded-md border border-border-subtle bg-canvas px-2.5 py-1.5"
+                    href={svc.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between rounded-md border border-border-subtle bg-canvas px-2.5 py-1.5 transition-colors hover:border-border-strong"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       {svc.ok ? (
@@ -244,12 +248,49 @@ function TopStatusBar() {
                       )}
                       <span className="truncate text-[12px] text-text-primary">{svc.name}</span>
                     </div>
-                    <span className="font-mono text-[11px] text-text-muted tabular-nums">
-                      {svc.ok ? `${svc.latencyMs}ms` : "offline"}
-                    </span>
-                  </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-[11px] text-text-muted tabular-nums">
+                        {svc.ok ? `${svc.latencyMs}ms` : "offline"}
+                      </span>
+                      <ExternalLink className="h-3 w-3 text-text-muted" />
+                    </div>
+                  </a>
                 ))
               )}
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-border-subtle pt-2.5">
+              <a
+                href="http://127.0.0.1:4101/api/docs"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded border border-border-subtle bg-canvas px-2 py-1 font-mono text-[10px] text-text-secondary hover:border-border-strong hover:text-text-primary"
+              >
+                API Docs <ExternalLink className="h-2.5 w-2.5" />
+              </a>
+              <a
+                href="http://127.0.0.1:3001"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded border border-border-subtle bg-canvas px-2 py-1 font-mono text-[10px] text-text-secondary hover:border-border-strong hover:text-text-primary"
+              >
+                Langfuse <ExternalLink className="h-2.5 w-2.5" />
+              </a>
+              <a
+                href="http://127.0.0.1:8021/docs"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded border border-border-subtle bg-canvas px-2 py-1 font-mono text-[10px] text-text-secondary hover:border-border-strong hover:text-text-primary"
+              >
+                YuE2 API <ExternalLink className="h-2.5 w-2.5" />
+              </a>
+              <a
+                href="http://127.0.0.1:9090"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded border border-border-subtle bg-canvas px-2 py-1 font-mono text-[10px] text-text-secondary hover:border-border-strong hover:text-text-primary"
+              >
+                MinIO <ExternalLink className="h-2.5 w-2.5" />
+              </a>
             </div>
           </PopoverContent>
         </Popover>

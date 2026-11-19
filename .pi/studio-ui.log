@@ -1,0 +1,37 @@
+
+> @sosho/studio@0.1.0 dev:ui
+> next dev -H 127.0.0.1 -p 3000
+
+   ▲ Next.js 15.5.29
+   - Local:        http://127.0.0.1:3000
+   - Network:      http://127.0.0.1:3000
+
+ ✓ Starting...
+ ✓ Ready in 1167ms
+ ○ Compiling / ...
+ ✓ Compiled / in 3.3s (1108 modules)
+ GET / 200 in 3638ms
+ ✓ Compiled /playground in 360ms (1101 modules)
+ GET /playground 200 in 421ms
+ GET /playground 200 in 13ms
+ ✓ Compiled /memory in 194ms (1107 modules)
+ GET /memory 200 in 241ms
+ ✓ Compiled /music in 289ms (1121 modules)
+ GET /music 200 in 326ms
+ GET / 200 in 30ms
+ ✓ Compiled /runs/[id] in 204ms (1123 modules)
+ GET /runs/sosho-example-research-checkpoint-01570f 200 in 526ms
+ GET /runs/sosho-example-research-checkpoint-01570f 200 in 19ms
+ GET / 200 in 205ms
+ ○ Compiling /system ...
+ ✓ Compiled /system in 805ms (1141 modules)
+ GET /system 200 in 875ms
+ GET /system 200 in 12ms
+ GET /system 200 in 10ms
+ GET /music 200 in 23ms
+ GET /system 200 in 14ms
+ GET / 200 in 30ms
+ GET /playground 200 in 21ms
+ GET /memory 200 in 18ms
+ GET /music 200 in 14ms
+ GET / 200 in 14ms
