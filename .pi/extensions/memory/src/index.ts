@@ -1,9 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
-  appendInboxEvent,
   archiveMemory,
+  captureCompletedTasksToInbox,
   drainInboxToEpisodic,
   type MemoryScope,
   type MemoryType,
@@ -48,31 +46,7 @@ export default function memoryExtension(pi: ExtensionAPI): void {
       const cwd = ctx.cwd || process.cwd();
       const ephemeralDir = process.env.SOSHO_EPHEMERAL_DIR;
       if (!ephemeralDir) return;
-      const statePath = join(ephemeralDir, "state.json");
-      if (!existsSync(statePath)) return;
-
-      const state = JSON.parse(readFileSync(statePath, "utf8")) as {
-        session_id?: string;
-        active_task?: { title?: string; goal?: string } | null;
-        history?: Array<{ title: string; goal: string; summary: string; completed: number; total: number }>;
-      };
-
-      const history = state.history || [];
-      if (history.length === 0) return;
-
-      const latest = history[history.length - 1];
-      appendInboxEvent(
-        {
-          timestamp: new Date().toISOString(),
-          scope: "project",
-          kind: "session_summary",
-          title: `Session task: ${latest.title}`,
-          content: `Goal: ${latest.goal}\nCompleted: ${latest.completed}/${latest.total}\nSummary: ${latest.summary}`,
-          tags: ["session", "scratchpad"],
-          source: { session_id: state.session_id || process.env.SOSHO_SESSION_ID },
-        },
-        cwd,
-      );
+      captureCompletedTasksToInbox(ephemeralDir, cwd);
     } catch {
       // Ignore shutdown capture errors
     }

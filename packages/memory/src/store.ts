@@ -1072,3 +1072,63 @@ export function drainInboxToEpisodic(
   rebuildCoreProfile(scope, cwd);
   return promoted;
 }
+
+export interface ScratchpadTaskHistoryItem {
+  title: string;
+  goal: string;
+  summary: string;
+  completed: number;
+  total: number;
+  finished_at?: string;
+}
+
+export function captureCompletedTasksToInbox(ephemeralDir: string, cwd: string = process.cwd()): number {
+  const statePath = join(ephemeralDir, "state.json");
+  if (!existsSync(statePath)) return 0;
+
+  const state = JSON.parse(readFileSync(statePath, "utf8")) as {
+    session_id?: string;
+    active_task?: { title?: string; goal?: string } | null;
+    history?: ScratchpadTaskHistoryItem[];
+  };
+
+  const history = Array.isArray(state.history) ? state.history : [];
+  if (history.length === 0) return 0;
+
+  const markerPath = join(ephemeralDir, ".memory-captured.json");
+  let capturedCount = 0;
+  if (existsSync(markerPath)) {
+    try {
+      const marker = JSON.parse(readFileSync(markerPath, "utf8")) as { capturedCount?: number };
+      if (typeof marker.capturedCount === "number" && marker.capturedCount >= 0) {
+        capturedCount = marker.capturedCount;
+      }
+    } catch {
+      capturedCount = 0;
+    }
+  }
+
+  if (capturedCount >= history.length) return 0;
+
+  const newlyCompleted = history.slice(capturedCount);
+  let captured = 0;
+  for (const item of newlyCompleted) {
+    if (!item || !item.title) continue;
+    appendInboxEvent(
+      {
+        timestamp: item.finished_at || new Date().toISOString(),
+        scope: "project",
+        kind: "session_summary",
+        title: `Session task: ${item.title}`,
+        content: `Goal: ${item.goal || ""}\nCompleted: ${item.completed ?? 0}/${item.total ?? 0}\nSummary: ${item.summary || ""}`,
+        tags: ["session", "scratchpad"],
+        source: { session_id: state.session_id || process.env.SOSHO_SESSION_ID },
+      },
+      cwd,
+    );
+    captured++;
+  }
+
+  atomicWriteFileSync(markerPath, JSON.stringify({ capturedCount: history.length }, null, 2));
+  return captured;
+}
