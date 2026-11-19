@@ -32,46 +32,46 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     environment: &langfuse-env
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
-      NEXTAUTH_SECRET: local-dev-secret-change-me
-      SALT: local-dev-salt-change-me
-      ENCRYPTION_KEY: "736d927cc28b9ca18fc47a3c5f4a6ee5074deb57ba4f1b004b894e0c50f24144" # 64 hex chars
-      NEXTAUTH_URL: http://localhost:3000
+      DATABASE_URL: postgresql://${LANGFUSE_PG_USER:-postgres}:${LANGFUSE_PG_PASSWORD:-postgres}@postgres:5432/${LANGFUSE_PG_DB:-postgres}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-local-dev-secret-change-me}
+      SALT: ${LANGFUSE_SALT:-local-dev-salt-change-me}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-736d927cc28b9ca18fc47a3c5f4a6ee5074deb57ba4f1b004b894e0c50f24144}
+      NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
       TELEMETRY_ENABLED: "false"
       # ClickHouse
       CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
       CLICKHOUSE_URL: http://clickhouse:8123
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse}
       CLICKHOUSE_CLUSTER_ENABLED: "false"
       # Redis
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_AUTH: localredis
+      REDIS_AUTH: ${LANGFUSE_REDIS_AUTH:-localredis}
       # MinIO (Local S3)
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
       LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
       LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_USER:-minio}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
       LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
       LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:9090
       LANGFUSE_S3_MEDIA_UPLOAD_INTERNAL_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_USER:-minio}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
       # Headless Auto-Initialization (Zero UI setup needed)
-      LANGFUSE_INIT_ORG_ID: local-org
-      LANGFUSE_INIT_ORG_NAME: Local
-      LANGFUSE_INIT_PROJECT_ID: pi-agent
-      LANGFUSE_INIT_PROJECT_NAME: Pi-Agent
-      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-local-pi
-      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-local-pi
-      LANGFUSE_INIT_USER_EMAIL: admin@local.dev
-      LANGFUSE_INIT_USER_NAME: Admin
-      LANGFUSE_INIT_USER_PASSWORD: password123
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-local-org}
+      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-Local}
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-pi-agent}
+      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-Pi-Agent}
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-admin@local.dev}
+      LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-Admin}
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-password123}
 
   langfuse-worker:
     image: docker.langfuse.com/langfuse/langfuse-worker:4
@@ -89,8 +89,8 @@ services:
     restart: unless-stopped
     environment:
       CLICKHOUSE_DB: default
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse}
     volumes:
       - langfuse_clickhouse:/var/lib/clickhouse
     healthcheck:
@@ -107,8 +107,8 @@ services:
     # Automatically ensures the 'langfuse' bucket exists before starting
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
     environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: miniosecret
+      MINIO_ROOT_USER: ${LANGFUSE_MINIO_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
     ports:
       - "127.0.0.1:9090:9000"
     volumes:
@@ -123,9 +123,9 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: --requirepass localredis --maxmemory 256mb --maxmemory-policy noeviction
+    command: --requirepass ${LANGFUSE_REDIS_AUTH:-localredis} --maxmemory 200mb --maxmemory-policy noeviction
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "localredis", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"${LANGFUSE_REDIS_AUTH:-localredis}\" ping"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -134,13 +134,13 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
+      POSTGRES_USER: ${LANGFUSE_PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${LANGFUSE_PG_PASSWORD:-postgres}
+      POSTGRES_DB: ${LANGFUSE_PG_DB:-postgres}
     volumes:
       - langfuse_postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${LANGFUSE_PG_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
