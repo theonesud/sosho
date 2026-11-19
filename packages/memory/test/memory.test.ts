@@ -242,6 +242,38 @@ try {
   );
   assert.ok(fallbackRes.some((r) => r.record.id === vecMem.record.id));
 
+  // 8b. Access count tracking and rank boost on repeated recall
+  const accProject = join(tmp, "access-project");
+  const mA = upsertMemory(
+    {
+      scope: "project",
+      type: "semantic",
+      title: "Alpha Cache Strategy",
+      content: "Use write-through caching for alpha workloads.",
+      importance: 0.7,
+    },
+    accProject,
+  );
+  const mB = upsertMemory(
+    {
+      scope: "project",
+      type: "semantic",
+      title: "Beta Cache Strategy",
+      content: "Use write-through caching for beta workloads.",
+      importance: 0.7,
+    },
+    accProject,
+  );
+  // Recall mB specifically several times so its access_count grows above mA
+  for (let i = 0; i < 4; i++) {
+    const r = searchMemory({ query: "Beta Cache Strategy", scope: "project", limit: 1 }, accProject);
+    assert.equal(r[0].record.id, mB.record.id);
+    assert.equal(r[0].record.access_count, i + 1);
+  }
+  const rankedBoth = searchMemory({ query: "write-through caching", scope: "project", limit: 5 }, accProject);
+  assert.equal(rankedBoth[0].record.id, mB.record.id, "Repeatedly recalled memory should rank higher");
+  assert.ok(rankedBoth.find((r) => r.record.id === mA.record.id));
+
   // 9. 500 synthetic memories latency benchmark (< 30ms warm indexed query)
   const benchProject = join(tmp, "bench-project");
   for (let i = 0; i < 500; i++) {

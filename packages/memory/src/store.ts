@@ -742,18 +742,23 @@ function runIndexedSearch(
 
     if (validIds.size === 0) continue;
 
-    // FTS5 BM25 lexical recall
+    // FTS5 BM25 lexical recall (ORDER BY bm25() ASC handles small-corpus positive IDF cleanly)
     if (ftsQuery) {
       try {
         const ftsRows = db
-          .prepare("SELECT id, bm25(memories_fts) AS rank FROM memories_fts WHERE memories_fts MATCH ? LIMIT 200")
+          .prepare(
+            "SELECT id, bm25(memories_fts) AS rank FROM memories_fts WHERE memories_fts MATCH ? ORDER BY rank ASC LIMIT 200",
+          )
           .all(ftsQuery);
+        let pos = 0;
         for (const fr of ftsRows) {
           const id = String(fr.id);
           if (!validIds.has(id)) continue;
-          // SQLite bm25() returns negative values where more negative = better match
-          const score = Math.max(0.001, -Number(fr.rank || 0));
+          const rawRank = Number(fr.rank ?? 0);
+          // Combine raw bm25 magnitude with monotonic position score so small corpora preserve exact ordering
+          const score = Math.max(0, -rawRank) + 1 / (1 + pos);
           lexicalMap.set(id, score);
+          pos++;
         }
       } catch {
         // Ignore FTS syntax issues on unusual queries
@@ -857,6 +862,9 @@ function runIndexedSearch(
   const maxTokens = options.maxTokens ?? 1200;
 
   const picked: MemorySearchResult[] = [];
+  const docDbMap = new Map<string, SqliteDb>();
+  for (const d of docs) docDbMap.set(d.record.id, d.db);
+
   let estTokens = 0;
   for (const item of scored) {
     if (picked.length >= limit) break;
@@ -865,6 +873,29 @@ function runIndexedSearch(
     if (picked.length > 0 && estTokens + itemTokens > maxTokens) break;
     picked.push(item);
     estTokens += itemTokens;
+  }
+
+  // Update access_count and last_accessed in the SQLite index for returned records
+  if (picked.length > 0) {
+    const now = new Date().toISOString();
+    const byDb = new Map<SqliteDb, MemorySearchResult[]>();
+    for (const item of picked) {
+      const db = docDbMap.get(item.record.id);
+      if (!db) continue;
+      const list = byDb.get(db) || [];
+      list.push(item);
+      byDb.set(db, list);
+    }
+    for (const [db, items] of byDb.entries()) {
+      const upd = db.prepare("UPDATE memories SET access_count = access_count + 1, last_accessed = ? WHERE id = ?");
+      runTx(db, () => {
+        for (const item of items) {
+          upd.run(now, item.record.id);
+          item.record.access_count += 1;
+          item.record.last_accessed = now;
+        }
+      });
+    }
   }
 
   return picked;
