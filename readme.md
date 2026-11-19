@@ -60,6 +60,10 @@ Self-contained skills with deterministic scripts (`scripts/`) to prevent context
 
 ## Quick Start
 
+### Prerequisites
+* **Node.js:** Version `20.18.0` or newer (Node 20 and Node 24 are both supported via `tsx`).
+* **Docker:** Docker Engine with Compose v2.
+
 ### 1. Core Stack (`llama.cpp` + Langfuse + CLI)
 ```bash
 make doctor        # Verify GPU, drivers, Docker, ports
