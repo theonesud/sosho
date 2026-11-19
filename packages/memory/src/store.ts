@@ -91,6 +91,11 @@ export interface InboxEvent {
 const SUBDIRS = ["core", "semantic", "procedural", "episodic", "entities", "inbox", "archive"] as const;
 
 const SECRET_PATTERNS: RegExp[] = [
+  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----/g,
+  /\b(AKIA[0-9A-Z]{16})\b/g,
+  /\b(github_pat_[A-Za-z0-9_]{20,})\b/g,
+  /\b(eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b/g,
+  /([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)([^:\s/@]+:[^@\s/]+@)/g,
   /\b(sk-[a-zA-Z0-9_-]{20,})\b/g,
   /\b(pk-lf-[a-zA-Z0-9_-]{8,})\b/g,
   /\b(sk-lf-[a-zA-Z0-9_-]{8,})\b/g,
@@ -104,7 +109,11 @@ const SECRET_PATTERNS: RegExp[] = [
 export function redactSecrets(text: string): string {
   let out = text;
   for (const re of SECRET_PATTERNS) {
-    out = out.replace(re, "[REDACTED_SECRET]");
+    if (re.source.includes(":\\/\\/")) {
+      out = out.replace(re, "$1[REDACTED_SECRET]@");
+    } else {
+      out = out.replace(re, "[REDACTED_SECRET]");
+    }
   }
   return out;
 }
@@ -272,8 +281,8 @@ export function upsertMemory(input: UpsertMemoryInput, cwd: string = process.cwd
   ensureMemoryDirs(root);
 
   const now = new Date().toISOString();
-  const safeContent = input.scope === "global" ? redactSecrets(input.content) : input.content;
-  const safeTitle = input.scope === "global" ? redactSecrets(input.title) : input.title;
+  const safeContent = redactSecrets(input.content);
+  const safeTitle = redactSecrets(input.title);
 
   const id = makeMemoryId(input.scope);
   const record: MemoryRecord = {
@@ -524,10 +533,11 @@ export function searchMemory(
 export function appendInboxEvent(event: InboxEvent, cwd: string = process.cwd()): void {
   const root = getScopeRoot(event.scope, cwd);
   ensureMemoryDirs(root);
-  const safeEvent: InboxEvent =
-    event.scope === "global"
-      ? { ...event, title: redactSecrets(event.title), content: redactSecrets(event.content) }
-      : event;
+  const safeEvent: InboxEvent = {
+    ...event,
+    title: redactSecrets(event.title),
+    content: redactSecrets(event.content),
+  };
   appendFileSync(join(root, "inbox", "events.jsonl"), `${JSON.stringify(safeEvent)}\n`, "utf8");
 }
 

@@ -20,10 +20,35 @@ const fakeProject = join(tmp, "project");
 process.env.SOSHO_GLOBAL_MEMORY_DIR = fakeGlobal;
 
 try {
-  // 1. Secret redaction
-  const redacted = redactSecrets("my key is sk-1234567890abcdefghij123456 and hf_abcdefghijklmnopqrstuv");
-  assert.ok(!redacted.includes("sk-123456"));
-  assert.ok(!redacted.includes("hf_abcdef"));
+  // 1. Secret redaction (all patterns across both global and project scopes)
+  const secretSamples = [
+    "sk-1234567890abcdefghij123456",
+    "hf_abcdefghijklmnopqrstuv",
+    "AKIAIOSFODNN7EXAMPLE",
+    "github_pat_11AAAAAA0123456789abcdef_GHIJKLMNOPQRSTUVWXYZ",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
+    "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----",
+    "postgresql://admin:s3cr3tpass@db.internal:5432/app",
+  ];
+  for (const sample of secretSamples) {
+    const out = redactSecrets(`leak: ${sample}`);
+    assert.ok(out.includes("[REDACTED_SECRET]"), `Expected redaction for: ${sample}`);
+    assert.ok(!out.includes("s3cr3tpass") && !out.includes("AKIAIOSFODNN7EXAMPLE") && !out.includes("github_pat_"));
+  }
+
+  // Verify project scope also redacts secrets
+  const pSecret = upsertMemory(
+    {
+      scope: "project",
+      type: "semantic",
+      title: "DB Note",
+      content: "Connect via postgresql://user:supersecret@localhost:5432/db with AKIAIOSFODNN7EXAMPLE",
+    },
+    fakeProject,
+  );
+  assert.ok(!pSecret.record.content.includes("supersecret"));
+  assert.ok(!pSecret.record.content.includes("AKIAIOSFODNN7EXAMPLE"));
+  assert.equal(archiveMemory(pSecret.record.id, "project", "cleanup", fakeProject), true);
 
   // 2. Global + Project save & secret redaction on global
   const g1 = upsertMemory(
@@ -84,7 +109,7 @@ try {
   assert.equal(activeProj[0].id, p2.record.id);
 
   const allProj = loadScopeMemories("project", fakeProject, true);
-  assert.equal(allProj.length, 2);
+  assert.equal(allProj.length, 3);
   const archivedOld = allProj.find((m) => m.id === p1.record.id);
   assert.equal(archivedOld?.status, "superseded");
   assert.equal(archivedOld?.superseded_by, p2.record.id);
