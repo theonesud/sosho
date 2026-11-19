@@ -22,14 +22,16 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { normalizeSkills } from "@/lib/utils";
 import { useStudioStore } from "@/stores/studio-store";
 import { useWorkflowStore } from "@/stores/workflow-store";
-import type { RunSummary, SystemStatusResponse, WorkflowSummary } from "@/types";
+import { NODE_META, type RunSummary, type SystemStatusResponse, type WorkflowSummary } from "@/types";
 
 export function CommandPalette() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const open = useStudioStore((s) => s.commandPaletteOpen);
   const setOpen = useStudioStore((s) => s.setCommandPaletteOpen);
+  const activeGraph = useWorkflowStore((s) => s.graph);
   const setGraph = useWorkflowStore((s) => s.setGraph);
+  const selectNode = useWorkflowStore((s) => s.selectNode);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -153,6 +155,34 @@ export function CommandPalette() {
             <Command.Empty className="py-8 text-center text-[12px] text-text-muted">
               No matching command or item.
             </Command.Empty>
+
+            {activeGraph && activeGraph.nodes.length > 0 ? (
+              <Command.Group
+                heading={`Nodes in ${activeGraph.name}`}
+                className="px-1 py-1 text-[11px] font-medium text-text-muted [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1"
+              >
+                {activeGraph.nodes.map((node) => (
+                  <Command.Item
+                    key={node.id}
+                    value={`node ${node.label} ${node.id} ${node.type}`}
+                    onSelect={() => {
+                      selectNode(node.id);
+                      setOpen(false);
+                    }}
+                    className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[12px] text-text-primary aria-selected:bg-elevated"
+                  >
+                    <span className="flex items-center gap-2 truncate">
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: NODE_META[node.type]?.color ?? "#6366f1" }}
+                      />
+                      <span className="truncate">{node.label}</span>
+                    </span>
+                    <span className="font-mono text-[10px] text-text-muted">{NODE_META[node.type]?.badge}</span>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            ) : null}
 
             <Command.Group
               heading="Actions"
@@ -280,6 +310,25 @@ export function CommandPalette() {
               </Command.Group>
             ) : null}
           </Command.List>
+
+          <div className="flex items-center justify-between border-t border-border-subtle bg-canvas/60 px-3.5 py-2 text-[10px] text-text-muted">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                <kbd className="rounded border border-border-subtle bg-surface px-1 py-0.5 font-mono text-[9px]">
+                  ↑↓
+                </kbd>
+                <span>Navigate</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <kbd className="rounded border border-border-subtle bg-surface px-1 py-0.5 font-mono text-[9px]">↵</kbd>
+                <span>Open</span>
+              </span>
+            </div>
+            <span className="flex items-center gap-1">
+              <kbd className="rounded border border-border-subtle bg-surface px-1 py-0.5 font-mono text-[9px]">ESC</kbd>
+              <span>Close</span>
+            </span>
+          </div>
         </Command>
       </DialogContent>
     </Dialog>

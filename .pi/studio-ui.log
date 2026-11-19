@@ -877,3 +877,67 @@ Import trace for requested module:
  GET /?workflow=example-research-checkpoint 200 in 40ms
  ✓ Compiled in 242ms (999 modules)
  GET /?workflow=example-research-checkpoint 200 in 40ms
+ ✓ Compiled in 695ms (999 modules)
+ GET /?workflow=example-research-checkpoint 200 in 99ms
+ ✓ Compiled in 162ms (999 modules)
+ GET /?workflow=example-research-checkpoint 200 in 63ms
+ ✓ Compiled in 151ms (999 modules)
+ GET /?workflow=example-research-checkpoint 200 in 41ms
+ ✓ Compiled in 171ms (999 modules)
+ GET /?workflow=example-research-checkpoint 200 in 60ms
+ ✓ Compiled in 212ms (999 modules)
+ GET /?workflow=example-research-checkpoint 200 in 44ms
+ ✓ Compiled in 145ms (429 modules)
+ GET /?workflow=example-research-checkpoint 200 in 42ms
+ GET /?workflow=example-research-checkpoint 200 in 145ms
+ ✓ Compiled in 1002ms (1034 modules)
+ GET /?workflow=example-research-checkpoint 200 in 92ms
+ ✓ Compiled in 206ms (1034 modules)
+ GET /?workflow=example-research-checkpoint 200 in 62ms
+ ✓ Compiled in 189ms (1034 modules)
+ GET /?workflow=example-research-checkpoint 200 in 68ms
+ ✓ Compiled in 233ms (1034 modules)
+ GET /?workflow=example-research-checkpoint 200 in 55ms
+ ✓ Compiled in 172ms (1034 modules)
+ GET /?workflow=example-research-checkpoint 200 in 40ms
+ ✓ Compiled in 242ms (1034 modules)
+ GET /?workflow=example-research-checkpoint 200 in 42ms
+ ✓ Compiled in 151ms (1034 modules)
+ GET /?workflow=example-research-checkpoint 200 in 39ms
+ ✓ Compiled in 176ms (1034 modules)
+ GET /?workflow=example-research-checkpoint 200 in 38ms
+ ✓ Compiled in 154ms (1034 modules)
+ GET /?workflow=example-research-checkpoint 200 in 39ms
+ ✓ Compiled in 243ms (1034 modules)
+ GET /?workflow=example-research-checkpoint 200 in 37ms
+ ✓ Compiled in 172ms (1034 modules)
+ GET /?workflow=example-research-checkpoint 200 in 53ms
+ GET /?workflow=parallel-critique 200 in 139ms
+ GET /?workflow=parallel-critique 200 in 49ms
+ GET /?workflow=example-research-checkpoint 200 in 66ms
+ GET /runs/sosho-example-research-checkpoint-01570f 200 in 38ms
+ GET /runs/sosho-example-research-checkpoint-dd487d 200 in 29ms
+ GET /runs/sosho-example-research-checkpoint-c382ce 200 in 28ms
+ GET /?workflow=parallel-critique 200 in 12ms
+ GET /?workflow=research-to-music 200 in 12ms
+ GET /runs/sosho-example-research-checkpoint-4ddb8e 200 in 25ms
+ GET /runs/sosho-example-research-checkpoint-01570f 200 in 24ms
+ GET /runs/sosho-example-research-checkpoint-4ddb8e 200 in 24ms
+ GET /runs/sosho-example-research-checkpoint-dd487d 200 in 30ms
+ GET /runs/sosho-example-research-checkpoint-c382ce 200 in 27ms
+ GET /?workflow=parallel-critique 200 in 13ms
+ GET /?workflow=example-research-checkpoint 200 in 10ms
+ GET /?workflow=parallel-critique 200 in 14ms
+ GET /?workflow=research-to-music 200 in 10ms
+ GET /runs/sosho-example-research-checkpoint-4ddb8e 200 in 23ms
+ GET /?workflow=example-research-checkpoint 200 in 14ms
+ GET / 200 in 10ms
+ GET / 200 in 15ms
+ GET /runs/sosho-example-research-checkpoint-c382ce 200 in 27ms
+ GET /runs/sosho-example-research-checkpoint-dd487d 200 in 36ms
+ GET /runs/sosho-example-research-checkpoint-01570f 200 in 26ms
+ GET /?workflow=research-to-music 200 in 18ms
+ GET /?workflow=parallel-critique 200 in 11ms
+ GET /?workflow=example-research-checkpoint 200 in 11ms
+ GET /?workflow=parallel-critique 200 in 11ms
+ GET /?workflow=research-to-music 200 in 11ms

@@ -17,10 +17,8 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { apiJson, getStoredToken, setStoredToken } from "@/api";
-import { Badge } from "@/components/ui/badge";
+import { apiJson } from "@/api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CommandPalette } from "@/features/command-palette/CommandPalette";
@@ -107,18 +105,7 @@ function GlobalSseBridge() {
 function TopStatusBar() {
   const router = useRouter();
   const sseConnected = useStudioStore((s) => s.sseConnected);
-  const queueStats = useStudioStore((s) => s.queueStats);
-  const gpuState = useStudioStore((s) => s.gpuState);
   const setCommandPaletteOpen = useStudioStore((s) => s.setCommandPaletteOpen);
-
-  const [tokenInput, setTokenInput] = useState("");
-  const [hasToken, setHasToken] = useState(false);
-
-  useEffect(() => {
-    const existing = getStoredToken();
-    setTokenInput(existing);
-    setHasToken(Boolean(existing));
-  }, []);
 
   const { data: systemData } = useQuery({
     queryKey: ["system-status"],
@@ -143,20 +130,9 @@ function TopStatusBar() {
   const services = systemData?.services ?? [];
   const healthyCount = services.filter((s) => s.ok).length;
 
-  const gpuLabel = gpuState.owner
-    ? gpuState.owner
-    : gpuState.available && gpuState.gpus[0]
-      ? `${gpuState.gpus[0].utilizationPct}%`
-      : "idle";
-
-  const saveToken = () => {
-    setStoredToken(tokenInput);
-    setHasToken(Boolean(tokenInput.trim()));
-  };
-
   return (
     <header className="flex h-11 shrink-0 items-center justify-between border-b border-border-subtle bg-surface px-3">
-      {/* Left: Brand + GPU owner */}
+      {/* Left: Brand */}
       <div className="flex items-center gap-3">
         <Link href="/" className="flex items-center gap-2 text-text-primary hover:opacity-90">
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/15 border border-accent/35 font-mono text-[11px] font-bold text-accent">

@@ -60,8 +60,17 @@ function defaultNodeProps(kind: NodeKind, index: number): RawGraphNode {
   }
 }
 
+const MAX_HISTORY = 40;
+
+function pushHistory(past: RawGraph[], current: RawGraph): RawGraph[] {
+  const next = [...past, structuredClone(current)];
+  return next.length > MAX_HISTORY ? next.slice(next.length - MAX_HISTORY) : next;
+}
+
 interface WorkflowState {
   graph: RawGraph | null;
+  past: RawGraph[];
+  future: RawGraph[];
   isDirty: boolean;
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
@@ -81,6 +90,8 @@ interface WorkflowState {
   removeEdges: (edgeIds: string[]) => void;
   selectNode: (nodeId: string | null) => void;
   selectEdge: (edgeId: string | null) => void;
+  undo: () => void;
+  redo: () => void;
   markSaved: (message?: string) => void;
   setSaveStatus: (message: string | null) => void;
   forkSnapshot: (snapshot: RawGraph) => RawGraph;
@@ -88,6 +99,8 @@ interface WorkflowState {
 
 export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   graph: null,
+  past: [],
+  future: [],
   isDirty: false,
   selectedNodeId: null,
   selectedEdgeId: null,
@@ -96,6 +109,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   setGraph: (graph, dirty = false) =>
     set({
       graph: graph ? structuredClone(graph) : null,
+      past: [],
+      future: [],
       isDirty: dirty,
       selectedNodeId: null,
       selectedEdgeId: null,
@@ -106,6 +121,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       if (!state.graph) return state;
       return {
         graph: { ...state.graph, ...patch },
+        past: pushHistory(state.past, state.graph),
+        future: [],
         isDirty: true,
       };
     }),
@@ -130,17 +147,19 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       const edgeId = `e_${options.connectFromId}_${created.id}_${Date.now().toString(36).slice(-4)}`;
       nextEdges.push({ id: edgeId, source: options.connectFromId, target: created.id });
     }
-    set({
+    set((state) => ({
       graph: {
         ...current,
         entryNode,
         nodes: [...current.nodes, created],
         edges: nextEdges,
       },
+      past: pushHistory(state.past, current),
+      future: [],
       isDirty: true,
       selectedNodeId: created.id,
       selectedEdgeId: null,
-    });
+    }));
     return created;
   },
 
@@ -152,6 +171,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
           ...state.graph,
           nodes: state.graph.nodes.map((n) => (n.id === nodeId ? { ...n, ...patch } : n)),
         },
+        past: pushHistory(state.past, state.graph),
+        future: [],
         isDirty: true,
       };
     }),
@@ -164,13 +185,17 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       const nodes = state.graph.nodes.map((n) => {
         const nextPos = map.get(n.id);
         if (!nextPos) return n;
-        if (n.position?.x === nextPos.x && n.position?.y === nextPos.y) return n;
+        const rx = Math.round(nextPos.x);
+        const ry = Math.round(nextPos.y);
+        if (n.position?.x === rx && n.position?.y === ry) return n;
         changed = true;
-        return { ...n, position: { x: Math.round(nextPos.x), y: Math.round(nextPos.y) } };
+        return { ...n, position: { x: rx, y: ry } };
       });
       if (!changed) return state;
       return {
         graph: { ...state.graph, nodes },
+        past: pushHistory(state.past, state.graph),
+        future: [],
         isDirty: true,
       };
     }),
@@ -184,6 +209,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       const entryNode = removeSet.has(state.graph.entryNode) ? (nodes[0]?.id ?? "") : state.graph.entryNode;
       return {
         graph: { ...state.graph, entryNode, nodes, edges },
+        past: pushHistory(state.past, state.graph),
+        future: [],
         isDirty: true,
         selectedNodeId: state.selectedNodeId && removeSet.has(state.selectedNodeId) ? null : state.selectedNodeId,
       };
@@ -203,6 +230,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
           ...state.graph,
           edges: [...state.graph.edges, nextEdge],
         },
+        past: pushHistory(state.past, state.graph),
+        future: [],
         isDirty: true,
         selectedEdgeId: id,
         selectedNodeId: null,
@@ -217,6 +246,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
           ...state.graph,
           edges: state.graph.edges.map((e) => (e.id === edgeId ? { ...e, ...patch } : e)),
         },
+        past: pushHistory(state.past, state.graph),
+        future: [],
         isDirty: true,
       };
     }),
@@ -230,6 +261,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
           ...state.graph,
           edges: state.graph.edges.filter((e) => !removeSet.has(e.id)),
         },
+        past: pushHistory(state.past, state.graph),
+        future: [],
         isDirty: true,
         selectedEdgeId: state.selectedEdgeId && removeSet.has(state.selectedEdgeId) ? null : state.selectedEdgeId,
       };
@@ -237,6 +270,35 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
   selectNode: (nodeId) => set({ selectedNodeId: nodeId, selectedEdgeId: null }),
   selectEdge: (edgeId) => set({ selectedEdgeId: edgeId, selectedNodeId: null }),
+
+  undo: () =>
+    set((state) => {
+      if (!state.graph || state.past.length === 0) return state;
+      const previous = state.past[state.past.length - 1];
+      return {
+        graph: previous,
+        past: state.past.slice(0, -1),
+        future: [structuredClone(state.graph), ...state.future].slice(0, MAX_HISTORY),
+        isDirty: true,
+        selectedNodeId: null,
+        selectedEdgeId: null,
+      };
+    }),
+
+  redo: () =>
+    set((state) => {
+      if (!state.graph || state.future.length === 0) return state;
+      const next = state.future[0];
+      return {
+        graph: next,
+        past: pushHistory(state.past, state.graph),
+        future: state.future.slice(1),
+        isDirty: true,
+        selectedNodeId: null,
+        selectedEdgeId: null,
+      };
+    }),
+
   markSaved: (message) => set({ isDirty: false, saveStatus: message ?? "Saved" }),
   setSaveStatus: (message) => set({ saveStatus: message }),
 

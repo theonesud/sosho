@@ -1,25 +1,10 @@
 "use client";
 
-import {
-  Bot,
-  Brain,
-  Clock,
-  GitFork,
-  Link2,
-  LogIn,
-  LogOut,
-  Minus,
-  PauseCircle,
-  Plus,
-  Sparkles,
-  Trash2,
-  Users,
-  Wrench,
-} from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Clock, LayoutGrid, Plus, Redo2, Undo2 } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import {
   formatLatency,
@@ -31,6 +16,7 @@ import {
   type RunDetail,
   type SkillInfo,
 } from "@/types";
+import { AnchoredEdgePopover, AnchoredNodePicker, AnchoredNodePopover } from "./AnchoredNodePopover";
 import {
   type BezierGeometry,
   type CanvasRipple,
@@ -38,8 +24,6 @@ import {
   DEFAULT_PHYSICS_PARAMS,
   distanceToBezier,
   drawNodeGlyph,
-  type GraphLayoutMode,
-  type PhysicsParams,
   pointOnQuadraticBezier,
   type SimNode,
   stepPhysics,
@@ -49,37 +33,12 @@ import {
 interface ObsidianGraphStageProps {
   graph: RawGraph | null;
   runDetail: RunDetail | null;
+  isLoading?: boolean;
   readOnly?: boolean;
   availableSkills?: Array<string | SkillInfo>;
   onEditGraph?: () => void;
   onForkSnapshot?: () => void;
 }
-
-const DOCK_NODES: Array<{ kind: NodeKind; label: string; icon: typeof Bot }> = [
-  { kind: "agent", label: "Agent", icon: Bot },
-  { kind: "subagent", label: "Subagent", icon: Users },
-  { kind: "decision", label: "Decision", icon: GitFork },
-  { kind: "tool", label: "Tool", icon: Wrench },
-  { kind: "skill", label: "Skill", icon: Sparkles },
-  { kind: "checkpoint", label: "Checkpoint", icon: PauseCircle },
-  { kind: "memory", label: "Memory", icon: Brain },
-];
-
-interface DisplaySettings {
-  showLabels: boolean;
-  showConditions: boolean;
-  showMetadata: boolean;
-  showArrows: boolean;
-  showParticles: boolean;
-}
-
-const DEFAULT_DISPLAY: DisplaySettings = {
-  showLabels: true,
-  showConditions: true,
-  showMetadata: true,
-  showArrows: true,
-  showParticles: true,
-};
 
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${Math.max(0, Math.round(ms))}ms`;
@@ -109,6 +68,7 @@ function hexToRgba(hex: string, alpha: number): string {
 export function ObsidianGraphStage({
   graph,
   runDetail,
+  isLoading = false,
   readOnly = false,
   availableSkills = [],
   onEditGraph,
@@ -116,36 +76,36 @@ export function ObsidianGraphStage({
 }: ObsidianGraphStageProps) {
   const selectedNodeId = useWorkflowStore((s) => s.selectedNodeId);
   const selectedEdgeId = useWorkflowStore((s) => s.selectedEdgeId);
+  const canUndo = useWorkflowStore((s) => s.past.length > 0);
+  const canRedo = useWorkflowStore((s) => s.future.length > 0);
   const selectNode = useWorkflowStore((s) => s.selectNode);
   const selectEdge = useWorkflowStore((s) => s.selectEdge);
   const addNode = useWorkflowStore((s) => s.addNode);
-  const updateNode = useWorkflowStore((s) => s.updateNode);
   const addEdge = useWorkflowStore((s) => s.addEdge);
   const removeNodes = useWorkflowStore((s) => s.removeNodes);
   const removeEdges = useWorkflowStore((s) => s.removeEdges);
   const setNodePositions = useWorkflowStore((s) => s.setNodePositions);
-  const updateGraphMeta = useWorkflowStore((s) => s.updateGraphMeta);
+  const undo = useWorkflowStore((s) => s.undo);
+  const redo = useWorkflowStore((s) => s.redo);
 
-  const [physics, setPhysics] = useState<PhysicsParams>(DEFAULT_PHYSICS_PARAMS);
-  const [display, setDisplay] = useState<DisplaySettings>(DEFAULT_DISPLAY);
-  const [controlsOpen, setControlsOpen] = useState(false);
-  const [inspectorPinnedOpen, setInspectorPinnedOpen] = useState(false);
-  const [connectMode, setConnectMode] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterKind, setFilterKind] = useState<NodeKind | null>(null);
-  const [zoomPct, setZoomPct] = useState(100);
-  const [cursorStyle, setCursorStyle] = useState<string>("grab");
+  const [cursorStyle, setCursorStyle] = useState<string>("default");
+  const [canvasBounds, setCanvasBounds] = useState<{ width: number; height: number }>({ width: 960, height: 640 });
+  const [pickerAnchor, setPickerAnchor] = useState<{
+    connectFromId?: string;
+    worldPos: { x: number; y: number };
+    screenPos: { x: number; y: number };
+  } | null>(null);
+  const [popoverAnchor, setPopoverAnchor] = useState<{ x: number; y: number }>({ x: 400, y: 260 });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
-  // Simulation mutable refs for 60fps zero-re-render loop
   const simNodesRef = useRef<Map<string, SimNode>>(new Map());
   const ripplesRef = useRef<CanvasRipple[]>([]);
   const graphIdRef = useRef<string | null>(null);
   const edgeGeometriesRef = useRef<Map<string, BezierGeometry>>(new Map());
+  const alignGuidesRef = useRef<{ x: number | null; y: number | null }>({ x: null, y: null });
 
-  // Camera state with smooth damped target interpolation
   const camRef = useRef({
     x: 0,
     y: 0,
@@ -155,7 +115,6 @@ export function ObsidianGraphStage({
     targetZoom: 1,
   });
 
-  // Pointer interaction state
   const pointerRef = useRef<{
     hoveredNodeId: string | null;
     hoveredEdgeId: string | null;
@@ -164,13 +123,9 @@ export function ObsidianGraphStage({
     dragMoved: boolean;
     dragOffsetX: number;
     dragOffsetY: number;
-    lastWorldX: number;
-    lastWorldY: number;
-    isPanning: boolean;
-    panStartScreenX: number;
-    panStartScreenY: number;
-    panStartCamX: number;
-    panStartCamY: number;
+    portDownNodeId: string | null;
+    portDownScreenX: number;
+    portDownScreenY: number;
     connectingFromId: string | null;
     connectCursorX: number;
     connectCursorY: number;
@@ -183,38 +138,23 @@ export function ObsidianGraphStage({
     dragMoved: false,
     dragOffsetX: 0,
     dragOffsetY: 0,
-    lastWorldX: 0,
-    lastWorldY: 0,
-    isPanning: false,
-    panStartScreenX: 0,
-    panStartScreenY: 0,
-    panStartCamX: 0,
-    panStartCamY: 0,
+    portDownNodeId: null,
+    portDownScreenX: 0,
+    portDownScreenY: 0,
     connectingFromId: null,
     connectCursorX: 0,
     connectCursorY: 0,
     connectSnapTargetId: null,
   });
 
-  // Keep fresh reactive props in refs for the RAF loop
   const graphRef = useRef<RawGraph | null>(graph);
   graphRef.current = graph;
-  const physicsRef = useRef(physics);
-  physicsRef.current = physics;
-  const displayRef = useRef(display);
-  displayRef.current = display;
   const selectedNodeRef = useRef(selectedNodeId);
   selectedNodeRef.current = selectedNodeId;
   const selectedEdgeRef = useRef(selectedEdgeId);
   selectedEdgeRef.current = selectedEdgeId;
   const readOnlyRef = useRef(readOnly);
   readOnlyRef.current = readOnly;
-  const connectModeRef = useRef(connectMode);
-  connectModeRef.current = connectMode;
-  const searchQueryRef = useRef(searchQuery);
-  searchQueryRef.current = searchQuery;
-  const filterKindRef = useRef(filterKind);
-  filterKindRef.current = filterKind;
 
   const logsByNode = useMemo(() => {
     const map = new Map<string, NodeExecutionLog>();
@@ -241,6 +181,30 @@ export function ObsidianGraphStage({
     ripplesRef.current.push({ x, y, radius: 14, maxRadius, alpha: 0.72, color });
   }, []);
 
+  const worldToScreen = useCallback((wx: number, wy: number) => {
+    const wrapper = wrapperRef.current;
+    const width = wrapper?.clientWidth ?? 960;
+    const height = wrapper?.clientHeight ?? 640;
+    const cam = camRef.current;
+    return {
+      x: (wx + cam.x) * cam.zoom + width / 2,
+      y: (wy + cam.y) * cam.zoom + height / 2,
+    };
+  }, []);
+
+  const screenToWorld = useCallback((clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const sx = clientX - rect.left;
+    const sy = clientY - rect.top;
+    const cam = camRef.current;
+    return {
+      x: (sx - rect.width / 2) / cam.zoom - cam.x,
+      y: (sy - rect.height / 2) / cam.zoom - cam.y,
+    };
+  }, []);
+
   const fitView = useCallback((immediate = false) => {
     const wrapper = wrapperRef.current;
     const nodes = Array.from(simNodesRef.current.values());
@@ -251,17 +215,17 @@ export function ObsidianGraphStage({
     let minY = Infinity;
     let maxY = -Infinity;
     for (const n of nodes) {
-      minX = Math.min(minX, n.x - n.radius - 60);
-      maxX = Math.max(maxX, n.x + n.radius + 60);
-      minY = Math.min(minY, n.y - n.radius - 50);
-      maxY = Math.max(maxY, n.y + n.radius + 70);
+      minX = Math.min(minX, n.anchorX - n.radius - 76);
+      maxX = Math.max(maxX, n.anchorX + n.radius + 76);
+      minY = Math.min(minY, n.anchorY - n.radius - 58);
+      maxY = Math.max(maxY, n.anchorY + n.radius + 92);
     }
 
     const width = Math.max(1, wrapper.clientWidth);
     const height = Math.max(1, wrapper.clientHeight);
-    const spanX = Math.max(240, maxX - minX);
-    const spanY = Math.max(200, maxY - minY);
-    const nextZoom = Math.max(0.45, Math.min(1.35, Math.min((width * 0.82) / spanX, (height * 0.78) / spanY)));
+    const spanX = Math.max(260, maxX - minX);
+    const spanY = Math.max(220, maxY - minY);
+    const nextZoom = Math.max(0.42, Math.min(1.22, Math.min((width * 0.84) / spanX, (height * 0.78) / spanY)));
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
 
@@ -274,25 +238,10 @@ export function ObsidianGraphStage({
       camRef.current.y = -centerY;
       camRef.current.zoom = nextZoom;
     }
-    setZoomPct(Math.round(nextZoom * 100));
   }, []);
 
-  const focusNode = useCallback(
-    (nodeId: string) => {
-      const n = simNodesRef.current.get(nodeId);
-      if (!n) return;
-      camRef.current.targetX = -n.x;
-      camRef.current.targetY = -n.y;
-      camRef.current.targetZoom = Math.max(camRef.current.targetZoom, 1.05);
-      n.scaleVel += 0.12;
-      const nodeData = graphRef.current?.nodes.find((item) => item.id === nodeId);
-      emitRipple(n.x, n.y, nodeData ? NODE_META[nodeData.type].color : "#10b981", 68);
-    },
-    [emitRipple],
-  );
-
-  // Sync graph into physics simulation whenever graph changes
-  useEffect(() => {
+  // Synchronously sync simulation before browser paint so graph switches never flicker
+  useLayoutEffect(() => {
     if (!graph) {
       simNodesRef.current = new Map();
       graphIdRef.current = null;
@@ -307,60 +256,60 @@ export function ObsidianGraphStage({
     graphIdRef.current = graph.id;
 
     if (switchedGraph) {
-      // Pre-warm physics so the initial constellation opens poised and spacious
-      for (let i = 0; i < 64; i++) {
-        stepPhysics(synced, graph.edges, physicsRef.current, 0.016, {
-          draggedNodeId: null,
-          hoveredNodeId: null,
-          selectedNodeId: null,
-          focusedIds: null,
-          activeNodeIds: activeNodeIdsRef.current,
-        });
-      }
+      setPickerAnchor(null);
       fitView(true);
     } else {
-      // Trigger tactile ripple on any newly added node
+      let added = false;
       for (const n of graph.nodes) {
         if (!prevIds.has(n.id)) {
+          added = true;
           const sim = synced.get(n.id);
-          if (sim) {
-            emitRipple(sim.x, sim.y, NODE_META[n.type].color, 76);
-          }
+          if (sim) emitRipple(sim.x, sim.y, NODE_META[n.type].color, 72);
         }
+      }
+      if (added || prevIds.size !== graph.nodes.length) {
+        fitView(false);
       }
     }
   }, [graph, fitView, emitRipple]);
 
-  // Tactile re-heat helper
-  const reheatPhysics = useCallback(() => {
-    for (const n of simNodesRef.current.values()) {
-      n.vx += (Math.random() - 0.5) * 7;
-      n.vy += (Math.random() - 0.5) * 7;
+  // Update popover anchor when selection changes
+  useEffect(() => {
+    if (selectedNodeId) {
+      const sim = simNodesRef.current.get(selectedNodeId);
+      if (sim) setPopoverAnchor(worldToScreen(sim.x, sim.y));
+    } else if (selectedEdgeId) {
+      const geom = edgeGeometriesRef.current.get(selectedEdgeId);
+      if (geom) setPopoverAnchor(worldToScreen(geom.midX, geom.midY));
     }
-  }, []);
+  }, [selectedNodeId, selectedEdgeId, worldToScreen]);
 
-  // Coordinate transforms
-  const screenToWorld = useCallback((clientX: number, clientY: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    const sx = clientX - rect.left;
-    const sy = clientY - rect.top;
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
-    const cam = camRef.current;
-    return {
-      x: (sx - cx) / cam.zoom - cam.x,
-      y: (sy - cy) / cam.zoom - cam.y,
-    };
-  }, []);
+  // Keep canvas fitted cleanly when viewport dimensions change
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    setCanvasBounds({ width: wrapper.clientWidth, height: wrapper.clientHeight });
+    let lastW = wrapper.clientWidth;
+    let lastH = wrapper.clientHeight;
+    const ro = new ResizeObserver(() => {
+      const w = wrapper.clientWidth;
+      const h = wrapper.clientHeight;
+      if (Math.abs(w - lastW) > 4 || Math.abs(h - lastH) > 4) {
+        lastW = w;
+        lastH = h;
+        setCanvasBounds({ width: w, height: h });
+        fitView(true);
+      }
+    });
+    ro.observe(wrapper);
+    return () => ro.disconnect();
+  }, [fitView]);
 
   const hitTestNode = useCallback((wx: number, wy: number): SimNode | null => {
     const nodes = Array.from(simNodesRef.current.values());
     for (let i = nodes.length - 1; i >= 0; i--) {
       const n = nodes[i];
-      const hitRadius = n.radius * n.scale + 8;
-      if (Math.hypot(wx - n.x, wy - n.y) <= hitRadius) {
+      if (Math.hypot(wx - n.x, wy - n.y) <= n.radius * n.scale + 8) {
         return n;
       }
     }
@@ -369,19 +318,19 @@ export function ObsidianGraphStage({
 
   const hitTestLinkPort = useCallback((wx: number, wy: number): SimNode | null => {
     if (readOnlyRef.current) return null;
-    const hoveredId = pointerRef.current.hoveredNodeId;
-    if (!hoveredId) return null;
-    const n = simNodesRef.current.get(hoveredId);
+    const candidateId = pointerRef.current.hoveredNodeId ?? selectedNodeRef.current;
+    if (!candidateId) return null;
+    const n = simNodesRef.current.get(candidateId);
     if (!n) return null;
-    const portX = n.x + n.radius * n.scale + 11;
+    const portX = n.x + n.radius * n.scale + 12;
     const portY = n.y;
-    if (Math.hypot(wx - portX, wy - portY) <= 10) return n;
+    if (Math.hypot(wx - portX, wy - portY) <= 11) return n;
     return null;
   }, []);
 
   const hitTestEdge = useCallback((wx: number, wy: number): string | null => {
     let bestId: string | null = null;
-    let bestDist = 11 / Math.max(0.5, camRef.current.zoom);
+    let bestDist = 12 / Math.max(0.5, camRef.current.zoom);
     for (const [edgeId, geom] of edgeGeometriesRef.current.entries()) {
       const d = distanceToBezier(wx, wy, geom);
       if (d < bestDist) {
@@ -392,7 +341,7 @@ export function ObsidianGraphStage({
     return bestId;
   }, []);
 
-  // Keyboard shortcuts (Delete, Escape, Fit, Reheat)
+  // Keyboard shortcuts (Undo, Redo, Delete, Escape)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -400,11 +349,22 @@ export function ObsidianGraphStage({
         target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT");
       if (isInput) return;
 
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !readOnlyRef.current) {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y" && !readOnlyRef.current) {
+        e.preventDefault();
+        redo();
+        return;
+      }
+
       if (e.key === "Escape") {
         pointerRef.current.connectingFromId = null;
-        setConnectMode(false);
-        setControlsOpen(false);
-        setInspectorPinnedOpen(false);
+        pointerRef.current.portDownNodeId = null;
+        setPickerAnchor(null);
         selectNode(null);
         selectEdge(null);
         return;
@@ -420,22 +380,27 @@ export function ObsidianGraphStage({
           e.preventDefault();
           removeEdges([selectedEdgeRef.current]);
         }
-        return;
-      }
-
-      if (e.key.toLowerCase() === "f" && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault();
-        fitView(false);
-      } else if (e.key.toLowerCase() === "r" && !e.metaKey && !e.ctrlKey) {
-        reheatPhysics();
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [fitView, reheatPhysics, removeEdges, removeNodes, selectEdge, selectNode, emitRipple]);
+  }, [undo, redo, removeEdges, removeNodes, selectEdge, selectNode, emitRipple]);
 
-  // Main 60fps Physics + Canvas Renderer
+  // Auto-arrange all nodes back to clean topological Flow columns
+  const handleAutoArrange = useCallback(() => {
+    if (readOnly) return;
+    const updates: Array<{ id: string; position: { x: number; y: number } }> = [];
+    for (const sim of simNodesRef.current.values()) {
+      sim.anchorX = sim.flowAnchorX;
+      sim.anchorY = sim.flowAnchorY;
+      updates.push({ id: sim.id, position: { x: Math.round(sim.flowAnchorX), y: Math.round(sim.flowAnchorY) } });
+    }
+    if (updates.length > 0) setNodePositions(updates);
+    fitView(false);
+  }, [readOnly, setNodePositions, fitView]);
+
+  // 60fps Canvas Render Loop
   useEffect(() => {
     let rafId = 0;
     let lastTime = performance.now();
@@ -462,14 +427,10 @@ export function ObsidianGraphStage({
           const simNodes = simNodesRef.current;
           const ptr = pointerRef.current;
           const cam = camRef.current;
-          const phys = physicsRef.current;
-          const disp = displayRef.current;
           const selNodeId = selectedNodeRef.current;
           const selEdgeId = selectedEdgeRef.current;
-          const query = searchQueryRef.current.trim().toLowerCase();
-          const kindFilter = filterKindRef.current;
 
-          // Compute Obsidian neighborhood spotlight focus set
+          // Obsidian neighborhood spotlight
           let focusedIds: Set<string> | null = null;
           const spotlightId = ptr.connectingFromId ?? ptr.hoveredNodeId;
           if (spotlightId) {
@@ -480,24 +441,10 @@ export function ObsidianGraphStage({
             }
           } else if (ptr.hoveredEdgeId) {
             const hoveredEdge = currentGraph.edges.find((e) => e.id === ptr.hoveredEdgeId);
-            if (hoveredEdge) {
-              focusedIds = new Set([hoveredEdge.source, hoveredEdge.target]);
-            }
-          } else if (query || kindFilter) {
-            focusedIds = new Set();
-            for (const n of currentGraph.nodes) {
-              const matchesQuery =
-                !query ||
-                n.label.toLowerCase().includes(query) ||
-                n.id.toLowerCase().includes(query) ||
-                n.type.toLowerCase().includes(query);
-              const matchesKind = !kindFilter || n.type === kindFilter;
-              if (matchesQuery && matchesKind) focusedIds.add(n.id);
-            }
+            if (hoveredEdge) focusedIds = new Set([hoveredEdge.source, hoveredEdge.target]);
           }
 
-          // Advance physics simulation
-          stepPhysics(simNodes, currentGraph.edges, phys, dtSec, {
+          stepPhysics(simNodes, currentGraph.edges, DEFAULT_PHYSICS_PARAMS, dtSec, {
             draggedNodeId: ptr.draggedNodeId,
             hoveredNodeId: ptr.hoveredNodeId,
             selectedNodeId: selNodeId,
@@ -505,23 +452,21 @@ export function ObsidianGraphStage({
             activeNodeIds: activeNodeIdsRef.current,
           });
 
-          // Smooth camera interpolation
-          const camLerp = Math.min(1, dtSec * 11);
+          // Smooth auto-fit camera interpolation
+          const camLerp = Math.min(1, dtSec * 9);
           cam.x += (cam.targetX - cam.x) * camLerp;
           cam.y += (cam.targetY - cam.y) * camLerp;
           cam.zoom += (cam.targetZoom - cam.zoom) * camLerp;
 
-          // Clear canvas
           ctx.save();
           ctx.scale(dpr, dpr);
           ctx.fillStyle = "#09090b";
           ctx.fillRect(0, 0, width, height);
 
-          // Subtle Obsidian dot matrix backdrop in world space
-          const dotSpacing = 32;
-          const scaledSpacing = dotSpacing * cam.zoom;
+          // Subtle obsidian dot field
+          const scaledSpacing = 32 * cam.zoom;
           if (scaledSpacing >= 12) {
-            const dotAlpha = Math.min(0.24, Math.max(0.05, (scaledSpacing - 12) / 90));
+            const dotAlpha = Math.min(0.22, Math.max(0.05, (scaledSpacing - 12) / 90));
             ctx.fillStyle = `rgba(161, 161, 170, ${dotAlpha})`;
             const offsetX = (((width / 2 + cam.x * cam.zoom) % scaledSpacing) + scaledSpacing) % scaledSpacing;
             const offsetY = (((height / 2 + cam.y * cam.zoom) % scaledSpacing) + scaledSpacing) % scaledSpacing;
@@ -532,13 +477,35 @@ export function ObsidianGraphStage({
             }
           }
 
-          // Enter world coordinate space
+          // World transform
           ctx.save();
           ctx.translate(width / 2, height / 2);
           ctx.scale(cam.zoom, cam.zoom);
           ctx.translate(cam.x, cam.y);
 
-          // Update and draw expanding tactile ripples
+          // Magnetic alignment guides while dragging a node
+          const guides = alignGuidesRef.current;
+          if (ptr.draggedNodeId && (guides.x !== null || guides.y !== null)) {
+            ctx.save();
+            ctx.strokeStyle = "rgba(16, 185, 129, 0.28)";
+            ctx.lineWidth = 1 / cam.zoom;
+            ctx.setLineDash([4 / cam.zoom, 4 / cam.zoom]);
+            if (guides.x !== null) {
+              ctx.beginPath();
+              ctx.moveTo(guides.x, -2000);
+              ctx.lineTo(guides.x, 2000);
+              ctx.stroke();
+            }
+            if (guides.y !== null) {
+              ctx.beginPath();
+              ctx.moveTo(-2000, guides.y);
+              ctx.lineTo(2000, guides.y);
+              ctx.stroke();
+            }
+            ctx.restore();
+          }
+
+          // Expanding tactile ripples
           const nextRipples: CanvasRipple[] = [];
           for (const rp of ripplesRef.current) {
             rp.radius += (rp.maxRadius - rp.radius) * Math.min(1, dtSec * 8.5);
@@ -554,7 +521,7 @@ export function ObsidianGraphStage({
           }
           ripplesRef.current = nextRipples;
 
-          // Build reverse-edge lookup and vertical centroid for clean loop-back curves
+          // Edge geometry & vertical centroid
           const edgePairs = new Set(currentGraph.edges.map((e) => `${e.source}->${e.target}`));
           const nextGeoms = new Map<string, BezierGeometry>();
           let graphCenterY = 0;
@@ -621,27 +588,28 @@ export function ObsidianGraphStage({
             ctx.setLineDash([]);
 
             // Directional arrowhead
-            if (disp.showArrows) {
-              const headLen = 7;
-              ctx.beginPath();
-              ctx.moveTo(geom.tx, geom.ty);
-              ctx.lineTo(
-                geom.tx - headLen * Math.cos(geom.endAngle - Math.PI / 6.5),
-                geom.ty - headLen * Math.sin(geom.endAngle - Math.PI / 6.5),
-              );
-              ctx.lineTo(
-                geom.tx - headLen * Math.cos(geom.endAngle + Math.PI / 6.5),
-                geom.ty - headLen * Math.sin(geom.endAngle + Math.PI / 6.5),
-              );
-              ctx.closePath();
-              ctx.fillStyle = strokeColor;
-              ctx.fill();
-            }
+            const headLen = 7;
+            ctx.beginPath();
+            ctx.moveTo(geom.tx, geom.ty);
+            ctx.lineTo(
+              geom.tx - headLen * Math.cos(geom.endAngle - Math.PI / 6.5),
+              geom.ty - headLen * Math.sin(geom.endAngle - Math.PI / 6.5),
+            );
+            ctx.lineTo(
+              geom.tx - headLen * Math.cos(geom.endAngle + Math.PI / 6.5),
+              geom.ty - headLen * Math.sin(geom.endAngle + Math.PI / 6.5),
+            );
+            ctx.closePath();
+            ctx.fillStyle = strokeColor;
+            ctx.fill();
 
-            // Animated flow photon on highlighted, loop, or live edges
+            // Flow pulse photon on highlighted or live edges
             if (
-              disp.showParticles &&
-              (isSrcActive || isTgtActive || isEdgeSelected || isEdgeHovered || (spotlightId && isConnectedToSpotlight))
+              isSrcActive ||
+              isTgtActive ||
+              isEdgeSelected ||
+              isEdgeHovered ||
+              (spotlightId && isConnectedToSpotlight)
             ) {
               const speed = isSrcActive || isTgtActive ? 0.65 : 0.34;
               const phase = (timeSec * speed + (edge.id.charCodeAt(edge.id.length - 1) % 7) * 0.17) % 1;
@@ -653,7 +621,7 @@ export function ObsidianGraphStage({
             }
 
             // Condition pill at curve midpoint
-            if (disp.showConditions && edge.condition) {
+            if (edge.condition) {
               ctx.font = '500 10px "JetBrains Mono", ui-monospace, monospace';
               const textW = ctx.measureText(edge.condition).width;
               const pillW = textW + 12;
@@ -675,7 +643,7 @@ export function ObsidianGraphStage({
           }
           edgeGeometriesRef.current = nextGeoms;
 
-          // Draw live elastic connection wire when linking two nodes
+          // Live elastic link wire
           if (ptr.connectingFromId) {
             const fromSim = simNodes.get(ptr.connectingFromId);
             if (fromSim) {
@@ -724,7 +692,7 @@ export function ObsidianGraphStage({
             ctx.save();
             ctx.globalAlpha = sim.alpha;
 
-            // Subtle ambient radial halo on focus/active
+            // Ambient halo on focus or active
             if (sim.glow > 0.03) {
               const haloColor =
                 status === "running"
@@ -743,7 +711,7 @@ export function ObsidianGraphStage({
               ctx.fill();
             }
 
-            // Entry orbit dashed ring
+            // Input orbit dashed ring
             if (isEntry) {
               ctx.beginPath();
               ctx.arc(sim.x, sim.y, r + 5.5, 0, Math.PI * 2);
@@ -782,7 +750,6 @@ export function ObsidianGraphStage({
             ctx.fillStyle = isSelected || isHovered ? "#18181c" : "#111114";
             ctx.fill();
 
-            // Crisp perimeter ring
             let ringColor = meta.color;
             const ringWidth = isSelected ? 2.4 : isHovered ? 2.0 : 1.5;
             if (status === "running") ringColor = "#38bdf8";
@@ -795,17 +762,15 @@ export function ObsidianGraphStage({
             ctx.lineWidth = ringWidth;
             ctx.stroke();
 
-            // Subtle inner highlight rim
             ctx.beginPath();
             ctx.arc(sim.x, sim.y, Math.max(2, r - 2.5), 0, Math.PI * 2);
             ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
             ctx.lineWidth = 1;
             ctx.stroke();
 
-            // Vector icon glyph
             drawNodeGlyph(ctx, node.type, sim.x, sim.y, r * 0.95, isSelected || isHovered ? "#fafafa" : meta.color);
 
-            // Status corner dot for completed / failed / checkpoint
+            // Status corner dot
             if (status === "done" || status === "failed" || status === "waiting_checkpoint") {
               const dotX = sim.x + r * 0.72;
               const dotY = sim.y - r * 0.72;
@@ -819,62 +784,57 @@ export function ObsidianGraphStage({
               ctx.fill();
             }
 
-            // Tactile link port on right rim when hovered in edit mode
-            if (!readOnlyRef.current && isHovered && !ptr.draggedNodeId && !ptr.connectingFromId) {
-              const portX = sim.x + r + 11;
+            // Right rim '+' port (click to add next node, or drag to link)
+            if (!readOnlyRef.current && (isHovered || isSelected) && !ptr.draggedNodeId && !ptr.connectingFromId) {
+              const portX = sim.x + r + 12;
               const portY = sim.y;
               const portHovered = ptr.hoveredLinkPortNodeId === node.id;
               ctx.beginPath();
-              ctx.arc(portX, portY, portHovered ? 7.5 : 6.5, 0, Math.PI * 2);
+              ctx.arc(portX, portY, portHovered ? 8 : 6.8, 0, Math.PI * 2);
               ctx.fillStyle = portHovered ? "#10b981" : "#18181c";
               ctx.fill();
               ctx.strokeStyle = portHovered ? "#10b981" : "#52525b";
               ctx.lineWidth = 1.25;
               ctx.stroke();
 
-              // Tiny '+' glyph inside port
               ctx.beginPath();
-              ctx.moveTo(portX - 2.8, portY);
-              ctx.lineTo(portX + 2.8, portY);
-              ctx.moveTo(portX, portY - 2.8);
-              ctx.lineTo(portX, portY + 2.8);
+              ctx.moveTo(portX - 3, portY);
+              ctx.lineTo(portX + 3, portY);
+              ctx.moveTo(portX, portY - 3);
+              ctx.lineTo(portX, portY + 3);
               ctx.strokeStyle = portHovered ? "#09090b" : "#fafafa";
-              ctx.lineWidth = 1.4;
+              ctx.lineWidth = 1.45;
               ctx.stroke();
             }
 
-            // Label & metadata anchored beneath node orb
-            if (disp.showLabels && (cam.zoom >= 0.42 || isHovered || isSelected)) {
-              const labelY = sim.y + r + 14;
-              const label = node.label || node.id;
-              ctx.font = `${isSelected || isHovered ? "600" : "500"} 12px Inter, system-ui, sans-serif`;
-              ctx.textAlign = "center";
-              ctx.textBaseline = "middle";
+            // Label & metadata
+            const labelY = sim.y + r + 14;
+            const label = node.label || node.id;
+            ctx.font = `${isSelected || isHovered ? "600" : "500"} 12px Inter, system-ui, sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
 
-              // Clean dark backing pill so edges never cut through text characters
-              const tw = ctx.measureText(label).width;
-              ctx.fillStyle = isHovered || isSelected ? "rgba(9, 9, 11, 0.92)" : "rgba(9, 9, 11, 0.74)";
-              ctx.beginPath();
-              ctx.roundRect(sim.x - tw / 2 - 6, labelY - 9, tw + 12, 18, 5);
-              ctx.fill();
+            const tw = ctx.measureText(label).width;
+            ctx.fillStyle = isHovered || isSelected ? "rgba(9, 9, 11, 0.92)" : "rgba(9, 9, 11, 0.74)";
+            ctx.beginPath();
+            ctx.roundRect(sim.x - tw / 2 - 6, labelY - 9, tw + 12, 18, 5);
+            ctx.fill();
 
-              ctx.fillStyle = isSelected || isHovered ? "#fafafa" : "#e4e4e7";
-              ctx.fillText(label, sim.x, labelY);
+            ctx.fillStyle = isSelected || isHovered ? "#fafafa" : "#e4e4e7";
+            ctx.fillText(label, sim.x, labelY);
 
-              // Secondary mono metadata (tier · queue · latency)
-              if (disp.showMetadata && (cam.zoom >= 0.82 || isHovered || isSelected)) {
-                const latency = formatLatency(log?.startedAt, log?.finishedAt);
-                const metaLine = getNodeMetaLine(node, latency);
-                if (metaLine) {
-                  ctx.font = '400 10px "JetBrains Mono", ui-monospace, monospace';
-                  const mw = ctx.measureText(metaLine).width;
-                  ctx.fillStyle = "rgba(9, 9, 11, 0.68)";
-                  ctx.beginPath();
-                  ctx.roundRect(sim.x - mw / 2 - 4, labelY + 8, mw + 8, 13, 3);
-                  ctx.fill();
-                  ctx.fillStyle = "#71717a";
-                  ctx.fillText(metaLine, sim.x, labelY + 14.5);
-                }
+            if (cam.zoom >= 0.72 || isHovered || isSelected) {
+              const latency = formatLatency(log?.startedAt, log?.finishedAt);
+              const metaLine = getNodeMetaLine(node, latency);
+              if (metaLine) {
+                ctx.font = '400 10px "JetBrains Mono", ui-monospace, monospace';
+                const mw = ctx.measureText(metaLine).width;
+                ctx.fillStyle = "rgba(9, 9, 11, 0.68)";
+                ctx.beginPath();
+                ctx.roundRect(sim.x - mw / 2 - 4, labelY + 8, mw + 8, 13, 3);
+                ctx.fill();
+                ctx.fillStyle = "#71717a";
+                ctx.fillText(metaLine, sim.x, labelY + 14.5);
               }
             }
 
@@ -893,20 +853,19 @@ export function ObsidianGraphStage({
     return () => cancelAnimationFrame(rafId);
   }, []);
 
-  // Pointer handlers on canvas
+  // Pointer handlers
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.button !== 0) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     const { x: wx, y: wy } = screenToWorld(e.clientX, e.clientY);
     const ptr = pointerRef.current;
 
-    // 1. Check link port first
+    // 1. Check '+' rim port (click to add node, drag to link)
     const portNode = hitTestLinkPort(wx, wy);
     if (portNode && !readOnly) {
-      ptr.connectingFromId = portNode.id;
-      ptr.connectCursorX = wx;
-      ptr.connectCursorY = wy;
-      ptr.connectSnapTargetId = null;
+      ptr.portDownNodeId = portNode.id;
+      ptr.portDownScreenX = e.clientX;
+      ptr.portDownScreenY = e.clientY;
       setCursorStyle("crosshair");
       return;
     }
@@ -914,7 +873,8 @@ export function ObsidianGraphStage({
     // 2. Check node hit
     const hitNode = hitTestNode(wx, wy);
     if (hitNode) {
-      if (!readOnly && (e.shiftKey || connectModeRef.current)) {
+      setPickerAnchor(null);
+      if (!readOnly && e.shiftKey) {
         ptr.connectingFromId = hitNode.id;
         ptr.connectCursorX = wx;
         ptr.connectCursorY = wy;
@@ -927,35 +887,43 @@ export function ObsidianGraphStage({
       ptr.dragMoved = false;
       ptr.dragOffsetX = hitNode.x - wx;
       ptr.dragOffsetY = hitNode.y - wy;
-      ptr.lastWorldX = wx;
-      ptr.lastWorldY = wy;
       hitNode.vx = 0;
       hitNode.vy = 0;
-      setCursorStyle("grabbing");
+      setCursorStyle(readOnly ? "pointer" : "grabbing");
       return;
     }
 
     // 3. Check edge hit
     const hitEdgeId = hitTestEdge(wx, wy);
     if (hitEdgeId) {
+      setPickerAnchor(null);
+      const geom = edgeGeometriesRef.current.get(hitEdgeId);
+      if (geom) setPopoverAnchor(worldToScreen(geom.midX, geom.midY));
       selectEdge(hitEdgeId);
-      setInspectorPinnedOpen(true);
       return;
     }
 
-    // 4. Pan canvas
-    ptr.isPanning = true;
-    ptr.dragMoved = false;
-    ptr.panStartScreenX = e.clientX;
-    ptr.panStartScreenY = e.clientY;
-    ptr.panStartCamX = camRef.current.targetX;
-    ptr.panStartCamY = camRef.current.targetY;
-    setCursorStyle("grabbing");
+    // 4. Empty space click dismisses popovers
+    setPickerAnchor(null);
+    selectNode(null);
+    selectEdge(null);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const { x: wx, y: wy } = screenToWorld(e.clientX, e.clientY);
     const ptr = pointerRef.current;
+
+    // Transition from port press to magnetic link wire when dragged > 5px
+    if (ptr.portDownNodeId) {
+      if (Math.hypot(e.clientX - ptr.portDownScreenX, e.clientY - ptr.portDownScreenY) > 5) {
+        ptr.connectingFromId = ptr.portDownNodeId;
+        ptr.portDownNodeId = null;
+        ptr.connectCursorX = wx;
+        ptr.connectCursorY = wy;
+        ptr.connectSnapTargetId = null;
+      }
+      return;
+    }
 
     if (ptr.connectingFromId) {
       ptr.connectCursorX = wx;
@@ -965,33 +933,38 @@ export function ObsidianGraphStage({
       return;
     }
 
-    if (ptr.draggedNodeId) {
+    if (ptr.draggedNodeId && !readOnly) {
       const node = simNodesRef.current.get(ptr.draggedNodeId);
       if (node) {
-        const nextX = wx + ptr.dragOffsetX;
-        const nextY = wy + ptr.dragOffsetY;
-        const dx = wx - ptr.lastWorldX;
-        const dy = wy - ptr.lastWorldY;
-        if (Math.hypot(dx, dy) > 1.5) ptr.dragMoved = true;
-        node.vx = dx * 0.45;
-        node.vy = dy * 0.45;
+        let nextX = wx + ptr.dragOffsetX;
+        let nextY = wy + ptr.dragOffsetY;
+
+        if (Math.hypot(nextX - node.x, nextY - node.y) > 2) {
+          ptr.dragMoved = true;
+        }
+
+        // Magnetic alignment snap to peer nodes (within 10px)
+        let snapX: number | null = null;
+        let snapY: number | null = null;
+        for (const peer of simNodesRef.current.values()) {
+          if (peer.id === node.id) continue;
+          if (Math.abs(nextX - peer.anchorX) < 10) {
+            nextX = peer.anchorX;
+            snapX = peer.anchorX;
+          }
+          if (Math.abs(nextY - peer.anchorY) < 10) {
+            nextY = peer.anchorY;
+            snapY = peer.anchorY;
+          }
+        }
+        alignGuidesRef.current = { x: snapX, y: snapY };
+
         node.x = nextX;
         node.y = nextY;
-        ptr.lastWorldX = wx;
-        ptr.lastWorldY = wy;
+        if (selectedNodeRef.current === node.id) {
+          setPopoverAnchor(worldToScreen(node.x, node.y));
+        }
       }
-      return;
-    }
-
-    if (ptr.isPanning) {
-      const dx = e.clientX - ptr.panStartScreenX;
-      const dy = e.clientY - ptr.panStartScreenY;
-      if (Math.hypot(dx, dy) > 3) ptr.dragMoved = true;
-      const cam = camRef.current;
-      cam.targetX = ptr.panStartCamX + dx / cam.zoom;
-      cam.targetY = ptr.panStartCamY + dy / cam.zoom;
-      cam.x = cam.targetX;
-      cam.y = cam.targetY;
       return;
     }
 
@@ -1010,14 +983,14 @@ export function ObsidianGraphStage({
     if (hitNode) {
       ptr.hoveredNodeId = hitNode.id;
       ptr.hoveredEdgeId = null;
-      setCursorStyle(connectModeRef.current ? "crosshair" : "pointer");
+      setCursorStyle("pointer");
       return;
     }
 
     ptr.hoveredNodeId = null;
     const hitEdge = hitTestEdge(wx, wy);
     ptr.hoveredEdgeId = hitEdge;
-    setCursorStyle(hitEdge ? "pointer" : "grab");
+    setCursorStyle(hitEdge ? "pointer" : "default");
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -1026,6 +999,25 @@ export function ObsidianGraphStage({
     }
     const ptr = pointerRef.current;
 
+    // Clicked '+' rim port without dragging -> open Node Picker beside node
+    if (ptr.portDownNodeId) {
+      const sourceId = ptr.portDownNodeId;
+      ptr.portDownNodeId = null;
+      const sim = simNodesRef.current.get(sourceId);
+      if (sim && !readOnly) {
+        selectNode(null);
+        selectEdge(null);
+        setPickerAnchor({
+          connectFromId: sourceId,
+          worldPos: { x: sim.anchorX + 240, y: sim.anchorY },
+          screenPos: worldToScreen(sim.x + sim.radius + 16, sim.y),
+        });
+      }
+      setCursorStyle("default");
+      return;
+    }
+
+    // Released magnetic link wire
     if (ptr.connectingFromId) {
       if (ptr.connectSnapTargetId && !readOnly) {
         addEdge(ptr.connectingFromId, ptr.connectSnapTargetId);
@@ -1034,156 +1026,75 @@ export function ObsidianGraphStage({
           tgt.scaleVel += 0.14;
           emitRipple(tgt.x, tgt.y, "#10b981", 68);
         }
-        setInspectorPinnedOpen(true);
       }
       ptr.connectingFromId = null;
       ptr.connectSnapTargetId = null;
-      setCursorStyle(connectModeRef.current ? "crosshair" : "grab");
+      setCursorStyle("default");
       return;
     }
 
+    // Released node (click -> open details; drag -> lock new arranged position)
     if (ptr.draggedNodeId) {
       const draggedId = ptr.draggedNodeId;
       const moved = ptr.dragMoved;
       ptr.draggedNodeId = null;
+      alignGuidesRef.current = { x: null, y: null };
 
+      const sim = simNodesRef.current.get(draggedId);
       if (!moved) {
-        selectNode(draggedId);
-        setInspectorPinnedOpen(true);
-        const sim = simNodesRef.current.get(draggedId);
-        const nodeData = graphRef.current?.nodes.find((n) => n.id === draggedId);
         if (sim) {
-          sim.scaleVel += 0.11;
-          emitRipple(sim.x, sim.y, nodeData ? NODE_META[nodeData.type].color : "#10b981", 58);
+          setPopoverAnchor(worldToScreen(sim.x, sim.y));
+          sim.scaleVel += 0.1;
+          const nodeData = graphRef.current?.nodes.find((n) => n.id === draggedId);
+          emitRipple(sim.x, sim.y, nodeData ? NODE_META[nodeData.type].color : "#10b981", 56);
         }
-      } else if (!readOnly) {
-        // Persist updated coordinates into workflow store without disturbing physics
-        const updates = Array.from(simNodesRef.current.values()).map((n) => ({
-          id: n.id,
-          position: { x: Math.round(n.x), y: Math.round(n.y) },
-        }));
-        setNodePositions(updates);
+        selectNode(draggedId);
+      } else if (sim && !readOnly) {
+        sim.anchorX = sim.x;
+        sim.anchorY = sim.y;
+        setNodePositions([{ id: draggedId, position: { x: Math.round(sim.x), y: Math.round(sim.y) } }]);
+        fitView(false);
       }
       setCursorStyle("pointer");
-      return;
-    }
-
-    if (ptr.isPanning) {
-      const moved = ptr.dragMoved;
-      ptr.isPanning = false;
-      if (!moved) {
-        selectNode(null);
-        selectEdge(null);
-        setInspectorPinnedOpen(false);
-      }
-      setCursorStyle("grab");
     }
   };
 
-  // Double-click focuses a node without creating random nodes
-  const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!graph) return;
-    const { x: wx, y: wy } = screenToWorld(e.clientX, e.clientY);
-    const hit = hitTestNode(wx, wy);
-    if (hit) {
-      focusNode(hit.id);
-    }
-  };
-
-  // Keep graph fitted only when container dimensions actually change
-  useEffect(() => {
-    const wrapper = wrapperRef.current;
-    if (!wrapper) return;
-    let lastW = wrapper.clientWidth;
-    let lastH = wrapper.clientHeight;
-    const ro = new ResizeObserver(() => {
-      const w = wrapper.clientWidth;
-      const h = wrapper.clientHeight;
-      if (Math.abs(w - lastW) > 4 || Math.abs(h - lastH) > 4) {
-        lastW = w;
-        lastH = h;
-        fitView(true);
-      }
-    });
-    ro.observe(wrapper);
-    return () => ro.disconnect();
-  }, [fitView]);
-
-  // Native non-passive wheel listener for smooth cursor-anchored zoom without console warnings
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const sx = e.clientX - rect.left - rect.width / 2;
-      const sy = e.clientY - rect.top - rect.height / 2;
-
-      const cam = camRef.current;
-      const zoomFactor = Math.exp(-e.deltaY * 0.0014);
-      const nextZoom = Math.max(0.28, Math.min(2.6, cam.targetZoom * zoomFactor));
-
-      const worldBeforeX = sx / cam.targetZoom - cam.targetX;
-      const worldBeforeY = sy / cam.targetZoom - cam.targetY;
-      cam.targetZoom = nextZoom;
-      cam.targetX = sx / nextZoom - worldBeforeX;
-      cam.targetY = sy / nextZoom - worldBeforeY;
-      setZoomPct(Math.round(nextZoom * 100));
-    };
-
-    canvas.addEventListener("wheel", onWheel, { passive: false });
-    return () => canvas.removeEventListener("wheel", onWheel);
-  }, []);
-
-  const handleSpawnNodeFromDock = (kind: NodeKind) => {
-    if (readOnly || !graph) return;
-    const selectedSim = selectedNodeId ? simNodesRef.current.get(selectedNodeId) : null;
-    const cam = camRef.current;
-    const spawnPos = selectedSim
-      ? {
-          x: selectedSim.x + 150 + (Math.random() - 0.5) * 36,
-          y: selectedSim.y + (Math.random() - 0.5) * 90,
-        }
-      : {
-          x: -cam.targetX + (Math.random() - 0.5) * 70,
-          y: -cam.targetY + (Math.random() - 0.5) * 70,
-        };
-
+  const handlePickNodeKind = (kind: NodeKind) => {
+    if (!pickerAnchor || readOnly) return;
     const created = addNode(kind, {
-      position: spawnPos,
-      connectFromId: selectedSim ? selectedSim.id : undefined,
+      position: pickerAnchor.worldPos,
+      connectFromId: pickerAnchor.connectFromId,
     });
+    setPickerAnchor(null);
     if (created) {
-      setInspectorPinnedOpen(true);
+      const pos = worldToScreen(pickerAnchor.worldPos.x, pickerAnchor.worldPos.y);
+      setPopoverAnchor(pos);
     }
   };
 
-  const adjustZoom = (factor: number) => {
-    const nextZoom = Math.max(0.28, Math.min(2.6, camRef.current.targetZoom * factor));
-    camRef.current.targetZoom = nextZoom;
-    setZoomPct(Math.round(nextZoom * 100));
-  };
-
-  const setLayoutMode = (mode: GraphLayoutMode) => {
-    setPhysics((prev) => ({ ...prev, layoutMode: mode }));
-    reheatPhysics();
-  };
-
-  const kindCounts = useMemo(() => {
-    const map = new Map<NodeKind, number>();
-    for (const n of graph?.nodes ?? []) {
-      map.set(n.type, (map.get(n.type) ?? 0) + 1);
-    }
-    return map;
-  }, [graph]);
+  if (isLoading) {
+    return (
+      <div className="flex h-full w-full flex-col bg-canvas">
+        <header className="flex h-11 shrink-0 items-center border-b border-border-subtle bg-surface px-4">
+          <Skeleton className="h-4 w-48" />
+        </header>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex items-center gap-12">
+            <Skeleton className="h-12 w-12 rounded-full" />
+            <Skeleton className="h-12 w-12 rounded-full" />
+            <Skeleton className="h-12 w-12 rounded-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!graph) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-canvas text-center">
         <div className="text-[14px] font-medium text-text-primary">No workflow selected</div>
         <p className="max-w-xs text-[12px] text-text-secondary">
-          Choose a workflow from the sidebar or create a new graph to open the physics canvas.
+          Select a saved workflow from the sidebar or create a new one.
         </p>
       </div>
     );
@@ -1196,7 +1107,9 @@ export function ObsidianGraphStage({
 
   const doneCount = runDetail?.history.filter((l) => l.status === "done").length ?? 0;
   const failedCount = runDetail?.history.filter((l) => l.status === "failed").length ?? 0;
+
   const selectedNode = selectedNodeId ? (graph.nodes.find((n) => n.id === selectedNodeId) ?? null) : null;
+  const selectedEdge = selectedEdgeId ? (graph.edges.find((e) => e.id === selectedEdgeId) ?? null) : null;
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-canvas">
@@ -1233,8 +1146,50 @@ export function ObsidianGraphStage({
         </div>
 
         {/* Right Controls */}
-        <div className="flex shrink-0 items-center gap-1.5">
-          {readOnly ? (
+        <div className="flex shrink-0 items-center gap-1">
+          {!readOnly ? (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={!canUndo}
+                onClick={undo}
+                title="Undo (Ctrl+Z)"
+                className="h-7 w-7"
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={!canRedo}
+                onClick={redo}
+                title="Redo (Ctrl+Shift+Z)"
+                className="h-7 w-7"
+              >
+                <Redo2 className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="xs" onClick={handleAutoArrange} title="Auto-arrange flow layout">
+                <LayoutGrid className="h-3 w-3" />
+                <span className="hidden sm:inline">Arrange</span>
+              </Button>
+              <Button
+                variant="secondary"
+                size="xs"
+                onClick={() => {
+                  selectNode(null);
+                  selectEdge(null);
+                  setPickerAnchor({
+                    worldPos: { x: 0, y: 0 },
+                    screenPos: { x: canvasBounds.width - 240, y: 56 },
+                  });
+                }}
+              >
+                <Plus className="h-3 w-3" />
+                <span>Add Node</span>
+              </Button>
+            </>
+          ) : (
             <>
               {onEditGraph ? (
                 <Button variant="secondary" size="xs" onClick={onEditGraph}>
@@ -1247,70 +1202,58 @@ export function ObsidianGraphStage({
                 </Button>
               ) : null}
             </>
-          ) : null}
+          )}
         </div>
       </header>
 
-      {/* Main Split: Interactive Physics Canvas + Slide-Over Inspector */}
-      <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <div ref={wrapperRef} className="relative min-w-0 flex-1 overflow-hidden select-none">
-          <canvas
-            ref={canvasRef}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            onDoubleClick={handleDoubleClick}
-            style={{ cursor: cursorStyle }}
-            className="block h-full w-full touch-none"
+      {/* Interactive Always-Fit Flow Canvas */}
+      <div ref={wrapperRef} className="relative min-h-0 min-w-0 flex-1 overflow-hidden select-none">
+        <canvas
+          ref={canvasRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          style={{ cursor: cursorStyle }}
+          className="block h-full w-full touch-none"
+        />
+
+        {/* Anchored Node Detail & Edit Card */}
+        {selectedNode ? (
+          <AnchoredNodePopover
+            graph={graph}
+            node={selectedNode}
+            runDetail={runDetail}
+            readOnly={readOnly}
+            availableSkills={availableSkills}
+            screenPos={popoverAnchor}
+            bounds={canvasBounds}
+            onClose={() => selectNode(null)}
+            onSelectNode={(id) => selectNode(id)}
+            onSelectEdge={(id) => selectEdge(id)}
           />
+        ) : null}
 
-          {/* Selected Node Quick Actions (Input / Output / Delete) */}
-          {selectedNode && !readOnly ? (
-            <div className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-xl border border-border-strong bg-surface/95 px-2.5 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
-              <span className="max-w-[160px] truncate px-1 text-[11px] font-medium text-text-primary">
-                {selectedNode.label}
-              </span>
-              <div className="h-3.5 w-px bg-border-subtle" />
-              <button
-                type="button"
-                onClick={() => updateGraphMeta({ entryNode: selectedNode.id })}
-                className={cn(
-                  "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
-                  graph.entryNode === selectedNode.id
-                    ? "bg-accent/15 text-accent"
-                    : "text-text-secondary hover:bg-elevated hover:text-text-primary",
-                )}
-              >
-                <LogIn className="h-3 w-3" />
-                <span>Input Node</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => updateNode(selectedNode.id, { isOutput: !selectedNode.isOutput })}
-                className={cn(
-                  "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
-                  selectedNode.isOutput
-                    ? "bg-info/15 text-info"
-                    : "text-text-secondary hover:bg-elevated hover:text-text-primary",
-                )}
-              >
-                <LogOut className="h-3 w-3" />
-                <span>Output Node</span>
-              </button>
-              <div className="h-3.5 w-px bg-border-subtle" />
-              <button
-                type="button"
-                onClick={() => removeNodes([selectedNode.id])}
-                title="Delete node"
-                className="rounded-md p-1 text-text-muted transition-colors hover:bg-elevated hover:text-error"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : null}
+        {/* Anchored Edge Condition Editor */}
+        {selectedEdge ? (
+          <AnchoredEdgePopover
+            edge={selectedEdge}
+            readOnly={readOnly}
+            screenPos={popoverAnchor}
+            bounds={canvasBounds}
+            onClose={() => selectEdge(null)}
+          />
+        ) : null}
 
-        </div>
+        {/* Anchored Node Picker */}
+        {pickerAnchor && !readOnly ? (
+          <AnchoredNodePicker
+            screenPos={pickerAnchor.screenPos}
+            bounds={canvasBounds}
+            onPick={handlePickNodeKind}
+            onClose={() => setPickerAnchor(null)}
+          />
+        ) : null}
       </div>
     </div>
   );

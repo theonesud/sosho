@@ -33,6 +33,8 @@ export interface SimNode {
   alpha: number;
   glow: number;
   level: number;
+  anchorX: number;
+  anchorY: number;
   flowAnchorX: number;
   flowAnchorY: number;
 }
@@ -139,19 +141,6 @@ export function syncSimNodes(prevNodes: Map<string, SimNode>, graph: RawGraph): 
     degreeMap.set(e.target, (degreeMap.get(e.target) ?? 0) + 1);
   }
 
-  // Compute saved position centroid so saved workflows open centered around (0, 0)
-  const positioned = graph.nodes.filter((n) => n.position);
-  let meanX = 0;
-  let meanY = 0;
-  if (positioned.length > 0) {
-    for (const n of positioned) {
-      meanX += n.position?.x ?? 0;
-      meanY += n.position?.y ?? 0;
-    }
-    meanX /= positioned.length;
-    meanY /= positioned.length;
-  }
-
   const next = new Map<string, SimNode>();
   const isFreshGraph = prevNodes.size === 0;
 
@@ -169,32 +158,24 @@ export function syncSimNodes(prevNodes: Map<string, SimNode>, graph: RawGraph): 
       existing.flowAnchorY = anchor.y;
       next.set(n.id, existing);
     } else {
-      let x = anchor.x;
-      let y = anchor.y;
-      if (n.position && !isFreshGraph) {
-        x = n.position.x;
-        y = n.position.y;
-      } else if (n.position && isFreshGraph) {
-        x = (n.position.x - meanX) * 0.72;
-        y = (n.position.y - meanY) * 0.72;
-      } else {
-        x = anchor.x + (Math.random() - 0.5) * 28;
-        y = anchor.y + (Math.random() - 0.5) * 28;
-      }
+      const spawnX = !isFreshGraph && n.position ? n.position.x : anchor.x;
+      const spawnY = !isFreshGraph && n.position ? n.position.y : anchor.y;
 
       next.set(n.id, {
         id: n.id,
-        x: anchor.x,
-        y: anchor.y,
+        x: spawnX,
+        y: spawnY,
         vx: 0,
         vy: 0,
         radius,
         degree,
-        scale: isFreshGraph ? 0.85 : 0.4,
-        scaleVel: isFreshGraph ? 0.04 : 0.12,
+        scale: isFreshGraph ? 0.92 : 0.35,
+        scaleVel: isFreshGraph ? 0.03 : 0.14,
         alpha: 1,
         glow: isFreshGraph ? 0 : 1,
         level: anchor.level,
+        anchorX: spawnX,
+        anchorY: spawnY,
         flowAnchorX: anchor.x,
         flowAnchorY: anchor.y,
       });
@@ -311,13 +292,33 @@ export function stepPhysics(
     }
   }
 
-  // 3. Center gravity or Flow DAG spring anchors + velocity integration + spring scale
+  // 3. Elastic anchor springs (with subtle Obsidian neighbor lean when dragging a node)
+  const draggedSim = options.draggedNodeId ? (nodesMap.get(options.draggedNodeId) ?? null) : null;
+  const draggedNeighbors = new Set<string>();
+  if (draggedSim) {
+    for (const edge of edges) {
+      if (edge.source === draggedSim.id) draggedNeighbors.add(edge.target);
+      if (edge.target === draggedSim.id) draggedNeighbors.add(edge.source);
+    }
+  }
+
   const dampingFactor = (params.layoutMode === "flow" ? 0.72 : params.damping) ** stepScale;
   for (const n of nodes) {
     if (n.id !== options.draggedNodeId) {
       if (params.layoutMode === "flow") {
-        n.vx += (n.flowAnchorX - n.x) * 0.12 * stepScale;
-        n.vy += (n.flowAnchorY - n.y) * 0.12 * stepScale;
+        let targetX = n.anchorX;
+        let targetY = n.anchorY;
+        if (draggedSim && draggedNeighbors.has(n.id)) {
+          // Subtle elastic lean toward the dragged neighbor (capped to 18px)
+          const pullDx = draggedSim.x - draggedSim.anchorX;
+          const pullDy = draggedSim.y - draggedSim.anchorY;
+          const pullLen = Math.hypot(pullDx, pullDy);
+          const scale = pullLen > 1 ? Math.min(18, pullLen * 0.12) / pullLen : 0;
+          targetX += pullDx * scale;
+          targetY += pullDy * scale;
+        }
+        n.vx += (targetX - n.x) * 0.14 * stepScale;
+        n.vy += (targetY - n.y) * 0.14 * stepScale;
       } else {
         n.vx += -n.x * params.centerStrength * stepScale;
         n.vy += -n.y * params.centerStrength * stepScale;

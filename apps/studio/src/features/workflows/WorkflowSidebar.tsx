@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useWorkflowStore } from "@/stores/workflow-store";
-import type { RawGraph, RunSummary, WorkflowSummary } from "@/types";
+import { extractTemplateVariables, type RawGraph, type RunSummary, type WorkflowSummary } from "@/types";
 
 interface WorkflowSidebarProps {
   workflows: WorkflowSummary[];
@@ -25,8 +27,8 @@ interface WorkflowSidebarProps {
   onLoadTemplate: (templateKey: string) => void;
   onNewWorkflow: () => void;
   onSaveWorkflow: () => void;
-  onDeleteWorkflow: () => void;
-  onStartRun: (initialData: Record<string, unknown>) => void;
+  onDeleteWorkflow: (workflowId: string) => void;
+  onStartRun: (workflowId: string, initialData: Record<string, unknown>) => void;
   onCancelRun: (runId: string) => void;
 }
 
@@ -49,10 +51,14 @@ export function WorkflowSidebar({
   onCancelRun,
 }: WorkflowSidebarProps) {
   const [editingWorkflowId, setEditingWorkflowId] = useState<string | null>(null);
+  const [runPopoverId, setRunPopoverId] = useState<string | null>(null);
+  const [runInputs, setRunInputs] = useState<Record<string, string>>({});
   const updateGraphMeta = useWorkflowStore((s) => s.updateGraphMeta);
 
+  const activeVars = activeGraph ? extractTemplateVariables(activeGraph) : [];
+
   return (
-    <aside className="flex h-full w-[240px] shrink-0 flex-col border-r border-border-subtle bg-surface overflow-hidden">
+    <aside className="flex h-full w-[248px] shrink-0 flex-col border-r border-border-subtle bg-surface overflow-hidden">
       {/* Saved Workflows */}
       <div className="flex items-center justify-between border-b border-border-subtle px-3 py-2.5">
         <span className="text-[12px] font-semibold text-text-primary">Saved Workflows</span>
@@ -75,7 +81,7 @@ export function WorkflowSidebar({
         </div>
       </div>
 
-      <div className="max-h-[210px] space-y-0.5 overflow-y-auto border-b border-border-subtle p-2">
+      <div className="max-h-[240px] space-y-0.5 overflow-y-auto border-b border-border-subtle p-2">
         {workflowsLoading ? (
           <div className="space-y-1.5 p-1">
             <Skeleton className="h-7 w-full" />
@@ -87,6 +93,8 @@ export function WorkflowSidebar({
           workflows.map((wf) => {
             const isActive = activeGraph?.id === wf.id && !activeRunId;
             const isEditing = editingWorkflowId === wf.id && isActive;
+            const vars = isActive ? activeVars : ["topic"];
+
             return (
               <div
                 key={wf.id}
@@ -99,7 +107,7 @@ export function WorkflowSidebar({
               >
                 {isEditing ? (
                   <input
-                    autoFocus
+                    ref={(el) => el?.focus()}
                     aria-label="Edit workflow name"
                     value={activeGraph.name}
                     onChange={(e) => updateGraphMeta({ name: e.target.value })}
@@ -120,17 +128,18 @@ export function WorkflowSidebar({
                     {isActive ? activeGraph.name : wf.name}
                   </button>
                 )}
+
                 <div
                   className={cn(
-                    "flex shrink-0 items-center gap-0.5 transition-opacity",
-                    isEditing ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                    "flex shrink-0 items-center gap-0.5 transition-opacity duration-150",
+                    isEditing || runPopoverId === wf.id ? "opacity-100" : "opacity-0 group-hover:opacity-100",
                   )}
                 >
                   {isEditing ? (
                     <button
                       type="button"
                       onClick={() => setEditingWorkflowId(null)}
-                      title="Done editing"
+                      title="Done"
                       className="rounded p-1 text-accent hover:bg-canvas"
                     >
                       <Check className="h-3 w-3" />
@@ -143,31 +152,86 @@ export function WorkflowSidebar({
                           if (!isActive) onSelectWorkflow(wf.id);
                           setEditingWorkflowId(wf.id);
                         }}
-                        title="Edit workflow name"
+                        title="Rename workflow"
                         className="rounded p-1 text-text-muted hover:bg-canvas hover:text-text-primary"
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
-                      <button
-                        type="button"
-                        disabled={isStartingRun}
-                        onClick={() => {
-                          if (!isActive) onSelectWorkflow(wf.id);
-                          onStartRun({});
-                        }}
-                        title="Run workflow"
-                        className="rounded p-1 text-text-muted hover:bg-canvas hover:text-accent disabled:opacity-50"
-                      >
-                        <Play className="h-3 w-3" />
-                      </button>
+
+                      {vars.length > 0 ? (
+                        <Popover
+                          open={runPopoverId === wf.id}
+                          onOpenChange={(open) => {
+                            setRunPopoverId(open ? wf.id : null);
+                            if (open) setRunInputs({});
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              disabled={isStartingRun}
+                              title="Run workflow"
+                              className="rounded p-1 text-text-muted hover:bg-canvas hover:text-accent disabled:opacity-50"
+                            >
+                              <Play className="h-3 w-3" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent side="right" align="start" className="w-64 space-y-2.5 p-3">
+                            <div className="text-[12px] font-semibold text-text-primary">Run {wf.name}</div>
+                            {vars.map((v) => (
+                              <div key={v} className="space-y-1">
+                                <label className="block font-mono text-[10px] text-text-muted">{v}</label>
+                                <Input
+                                  autoFocus={vars[0] === v}
+                                  value={runInputs[v] ?? ""}
+                                  onChange={(e) => setRunInputs((prev) => ({ ...prev, [v]: e.target.value }))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      setRunPopoverId(null);
+                                      onStartRun(wf.id, runInputs);
+                                    }
+                                  }}
+                                  placeholder={`Enter ${v}...`}
+                                  className="h-7 text-[12px]"
+                                />
+                              </div>
+                            ))}
+                            <div className="flex justify-end gap-1.5 pt-0.5">
+                              <Button variant="ghost" size="xs" onClick={() => setRunPopoverId(null)}>
+                                Cancel
+                              </Button>
+                              <Button
+                                variant="primary"
+                                size="xs"
+                                disabled={isStartingRun}
+                                onClick={() => {
+                                  setRunPopoverId(null);
+                                  onStartRun(wf.id, runInputs);
+                                }}
+                              >
+                                <Play className="h-3 w-3" />
+                                Run
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={isStartingRun}
+                          onClick={() => onStartRun(wf.id, {})}
+                          title="Run workflow"
+                          className="rounded p-1 text-text-muted hover:bg-canvas hover:text-accent disabled:opacity-50"
+                        >
+                          <Play className="h-3 w-3" />
+                        </button>
+                      )}
                     </>
                   )}
+
                   <button
                     type="button"
-                    onClick={() => {
-                      if (!isActive) onSelectWorkflow(wf.id);
-                      onDeleteWorkflow();
-                    }}
+                    onClick={() => onDeleteWorkflow(wf.id)}
                     title="Delete saved workflow"
                     className="rounded p-1 text-text-muted hover:bg-canvas hover:text-error"
                   >
@@ -181,9 +245,12 @@ export function WorkflowSidebar({
         {saveStatus ? <div className="px-2 pt-1 text-[11px] text-text-muted">{saveStatus}</div> : null}
       </div>
 
-      {/* Recent Runs */}
+      {/* Run History */}
       <div className="flex items-center justify-between px-3 py-2">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Runs</span>
+        {runs.length > 0 ? (
+          <span className="font-mono text-[10px] text-text-muted tabular-nums">{runs.length}</span>
+        ) : null}
       </div>
       <div className="flex-1 space-y-1 overflow-y-auto px-2 pb-3">
         {runsLoading ? (
