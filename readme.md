@@ -182,3 +182,51 @@ make test
 | `make restart` | Restart `llama-cpp` |
 | `make status` | Show Docker Compose container status |
 | `make logs` | Stream logs for core services |
+
+---
+
+## Core Technical Pillars
+
+Sosho stands on six technical pillars. Each pillar isolates a clear responsibility, enforces explicit safety limits, and exposes clean extension points.
+
+### 1. Local-First Hybrid Model Routing (`@sosho/llm`)
+
+- **Core design:** One shared client in `packages/llm/src/index.ts` resolves `.env` keys, `.pi/models.json` providers, and `.pi/model-roles.json` tiers for both interactive agents and workflow nodes.
+- **Key guarantees:** Caches local health checks for 15 seconds, falls back from offline local servers to cloud providers automatically, and emits best-effort Langfuse generation traces whenever Langfuse keys exist.
+- **Extensibility:** Add any OpenAI-compatible local or cloud provider in `.pi/models.json` and bind a new role tier in `.pi/model-roles.json` without code changes.
+- **Primary use cases:** Fast zero-cost CPU routing on `decision`, private offline inference on `local-uncensored`, parallel cloud research on `subagent`, and deep synthesis on `main`.
+
+### 2. Durable SQLite WAL DAG Workflow Engine (`@sosho/workflow-engine`)
+
+- **Core design:** Runs an in-process Directed Acyclic Graph scheduler backed by `.pi/workflows/runs.sqlite` in Write-Ahead Log mode with zero external broker or database containers.
+- **Key guarantees:** Validates every graph with Zod and static edge checks before save and run start. Executes unconditional branches concurrently, synchronizes join nodes, pauses cleanly on `approve` or `reject` checkpoints, recovers interrupted runs at startup, and fails cyclic loops with `max_steps_exceeded`.
+- **Extensibility:** Author new workflows as JSON files in `workflows/*.graph.json` or in Sosho Studio. Add custom node types in `schema.ts` and wire their execution handlers in `activities.ts`.
+- **Primary use cases:** Repeatable research pipelines, Human-in-the-Loop approval gates, scheduled memory consolidation, and multi-stage music or code generation pipelines.
+
+### 3. Two-Tier Hybrid Memory System (`@sosho/memory`)
+
+- **Core design:** Separates human-readable Markdown source files (`~/.sosho/memory` and `<repo>/.pi/memory`) from a disposable, rebuildable SQLite index (`index.sqlite`) that stores FTS5 full-text rows, `embeddinggemma` dense vectors, and entity links.
+- **Key guarantees:** Writes files atomically via temporary file, `fsync`, and rename. Drains inbox events via atomic batch rename with SHA-256 deduplication. Redacts secrets in both global and project scopes. Tracks `access_count`, `last_accessed`, and bi-temporal supersede chains in `archive/` and `audit.jsonl`.
+- **Extensibility:** Swap the local embedding endpoint via `SOSHO_EMBED_URL`, add new secret regex rules in `SECRET_PATTERNS`, or add custom memory types and entity extractors without migrating Markdown files.
+- **Primary use cases:** Cross-project personal preferences, repository architecture memory, session task distillation, and fast sub-10-millisecond hybrid recall across hundreds of records.
+
+### 4. Sandboxed Autonomous Agent Runtime and Subagents (`pi` + `.pi/extensions/`)
+
+- **Core design:** Runs `pi` inside a reproducible `pi-sandbox:latest` container via `bin/pi-launcher.sh`, mounting Sosho read-only at `/opt/sosho` so every external Git repository inherits extensions, skills, and model configs cleanly.
+- **Key guarantees:** Enforces `SOSHO_SUBAGENT_DEPTH` (`MAX_DEPTH = 3`), runs child processes with `--no-session`, applies module-level per-tier semaphores (`local-uncensored = 1` globally while cloud tiers run concurrently), caps `stdout` and `stderr` at 2 megabytes each, and propagates `isError` on failure.
+- **Extensibility:** Drop new modular skills into `.pi/skills/<name>/SKILL.md` with deterministic helper scripts in `scripts/`, or add new Pi lifecycle extensions in `.pi/extensions/`.
+- **Primary use cases:** Autonomous coding in any host Git repository, parallel codebase exploration, browser-assisted research via Dokobot, and script-backed batch automation.
+
+### 5. VRAM-Safe Local Media and Model Orchestration (`compose.yaml` + `yue2/`)
+
+- **Core design:** Isolates model directories per container, runs CPU-only helper models (`Qwen3-1.7B` and `embeddinggemma`) with zero graphics card memory, and coordinates exclusive GPU access between `llama-cpp` and `yue2-engine` over unprivileged HTTP model unload calls.
+- **Key guarantees:** Removes `/var/run/docker.sock` from `yue2-gateway`, keeps `llama-cpp` paused across queued music jobs until the queue empties, runs `ffmpeg` FLAC encoding off the FastAPI event loop, prunes disk usage recursively, and enforces constant-time bearer auth plus atomic `MAX_PENDING` limits.
+- **Extensibility:** Add new local `llama.cpp` profiles in `compose.yaml` with isolated read-only mounts, or submit music jobs from any workflow node or CLI script via `http://127.0.0.1:8021/v1/jobs`.
+- **Primary use cases:** Single-GPU workstations with 8 gigabytes of Video Random Access Memory that run large local language models alongside local audio synthesis.
+
+### 6. Security, Observability, and Automated Verification (`apps/studio/`, `docker/`, `tests/`)
+
+- **Core design:** Pairs an always-on memory-capped Langfuse v4 telemetry stack (`:3000`) with a token-authenticated Studio API (`:4101`), an interactive React Flow editor (`:4100`), and a single fail-fast verification runner (`tests/run_tests.sh`).
+- **Key guarantees:** Enforces strict container memory limits on ClickHouse, Postgres, MinIO, Redis, and Langfuse. Restricts Studio CORS to loopback UI origins, requires `SOSHO_STUDIO_TOKEN` on mutating endpoints, caps payloads at 1 megabyte, and rejects unsafe workflow IDs.
+- **Extensibility:** Override any secret or port in `.env`, subscribe custom dashboards to `GET /api/events` SSE streams, and add new package checks to `tests/run_tests.sh`.
+- **Primary use cases:** Full trace inspection in Langfuse, interactive graph editing with live node badges, safe local multi-service operation, and one-command regression testing via `make test`.
