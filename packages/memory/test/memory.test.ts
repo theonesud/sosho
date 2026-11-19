@@ -89,21 +89,38 @@ try {
   assert.equal(archivedOld?.status, "superseded");
   assert.equal(archivedOld?.superseded_by, p2.record.id);
 
-  // 5. Inbox drain + Core Profile rebuild
-  appendInboxEvent(
-    {
-      timestamp: new Date().toISOString(),
-      scope: "project",
-      kind: "session_summary",
-      title: "Built Phase 1 Subagents",
-      content: "Added subagent_run and subagent_parallel with Langfuse trace propagation.",
-    },
-    fakeProject,
-  );
-  const drained = drainInboxToEpisodic("project", fakeProject);
+  // 5. Inbox drain + dedupe + mid-drain concurrent append + profile refresh on empty inbox
+  const dupEvent = {
+    timestamp: new Date().toISOString(),
+    scope: "project" as const,
+    kind: "session_summary" as const,
+    title: "Built Phase 1 Subagents",
+    content: "Added subagent_run and subagent_parallel with Langfuse trace propagation.",
+  };
+  appendInboxEvent(dupEvent, fakeProject);
+  appendInboxEvent(dupEvent, fakeProject); // Duplicate should be deduplicated
+  const drained = drainInboxToEpisodic("project", fakeProject, () => {
+    // Simulate concurrent append after events.jsonl is renamed to batch file
+    appendInboxEvent(
+      {
+        timestamp: new Date().toISOString(),
+        scope: "project",
+        kind: "task_finish",
+        title: "Concurrent Mid-Drain Task",
+        content: "Appended while drain was processing previous batch.",
+      },
+      fakeProject,
+    );
+  });
   assert.equal(drained, 1);
 
-  rebuildCoreProfile("global", fakeProject);
+  // Second drain picks up the mid-drain concurrent event with zero loss
+  const drained2 = drainInboxToEpisodic("project", fakeProject);
+  assert.equal(drained2, 1);
+
+  // Empty inbox drain still refreshes core/profile.md
+  const drainedEmpty = drainInboxToEpisodic("global", fakeProject);
+  assert.equal(drainedEmpty, 0);
   const profile = readCoreProfile("global", fakeProject);
   assert.ok(profile.includes("Preferred Audio Target"));
 

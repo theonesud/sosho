@@ -563,42 +563,78 @@ export function rebuildCoreProfile(scope: MemoryScope, cwd: string = process.cwd
   return text;
 }
 
-export function drainInboxToEpisodic(scope: MemoryScope, cwd: string = process.cwd()): number {
+export function drainInboxToEpisodic(
+  scope: MemoryScope,
+  cwd: string = process.cwd(),
+  onBatchClaimed?: () => void,
+): number {
   const root = getScopeRoot(scope, cwd);
   ensureMemoryDirs(root);
-  const inboxPath = join(root, "inbox", "events.jsonl");
-  if (!existsSync(inboxPath)) return 0;
+  const inboxDir = join(root, "inbox");
+  const inboxPath = join(inboxDir, "events.jsonl");
 
-  const raw = readFileSync(inboxPath, "utf8").trim();
-  if (!raw) return 0;
-
-  const lines = raw.split("\n").filter(Boolean);
-  let promoted = 0;
-  for (const line of lines) {
+  if (existsSync(inboxPath)) {
+    const batchPath = join(inboxDir, `events.${Date.now()}.${process.pid}.${randomBytes(3).toString("hex")}.jsonl`);
     try {
-      const ev = JSON.parse(line) as InboxEvent;
-      if (!ev.title || !ev.content) continue;
-      upsertMemory(
-        {
-          scope,
-          type: "episodic",
-          title: ev.title,
-          content: ev.content,
-          tags: ev.tags || [ev.kind],
-          entities: ev.entities || [],
-          importance: ev.kind === "user_correction" ? 0.85 : 0.6,
-          confidence: 0.8,
-          source: ev.source,
-        },
-        cwd,
-      );
-      promoted++;
+      renameSync(inboxPath, batchPath);
     } catch {
-      // Skip malformed line
+      // Another process claimed events.jsonl concurrently
     }
   }
 
-  writeFileSync(inboxPath, "", "utf8");
+  if (onBatchClaimed) {
+    onBatchClaimed();
+  }
+
+  const batchFiles = readdirSync(inboxDir)
+    .filter((f) => /^events\..+\.jsonl$/.test(f))
+    .sort()
+    .map((f) => join(inboxDir, f));
+
+  const seenHashes = new Set<string>();
+  let promoted = 0;
+
+  for (const batchPath of batchFiles) {
+    const raw = readFileSync(batchPath, "utf8").trim();
+    if (raw) {
+      const lines = raw.split("\n").filter(Boolean);
+      for (const line of lines) {
+        try {
+          const ev = JSON.parse(line) as InboxEvent;
+          if (!ev.title || !ev.content) continue;
+          const dedupeHash = createHash("sha256")
+            .update(`${ev.kind}\0${ev.title.trim()}\0${ev.content.trim()}`)
+            .digest("hex");
+          if (seenHashes.has(dedupeHash)) continue;
+          seenHashes.add(dedupeHash);
+
+          upsertMemory(
+            {
+              scope,
+              type: "episodic",
+              title: ev.title,
+              content: ev.content,
+              tags: ev.tags || [ev.kind],
+              entities: ev.entities || [],
+              importance: ev.kind === "user_correction" ? 0.85 : 0.6,
+              confidence: 0.8,
+              source: ev.source,
+            },
+            cwd,
+          );
+          promoted++;
+        } catch {
+          // Skip malformed line
+        }
+      }
+    }
+    try {
+      unlinkSync(batchPath);
+    } catch {
+      // Already removed
+    }
+  }
+
   rebuildCoreProfile(scope, cwd);
   return promoted;
 }
