@@ -10,7 +10,7 @@ import {
   useEdgesState,
   useNodesState,
 } from "@xyflow/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type NodeKind = "agent" | "subagent" | "decision" | "tool" | "skill" | "checkpoint" | "memory";
 type ModelTier = "main" | "subagent" | "subagent-code" | "decision" | "local-uncensored";
@@ -559,36 +559,40 @@ export default function App() {
     if (tab === "memory") loadMemories();
   }, [tab, loadMemories]);
 
-  const styledNodes = nodes.map((n) => {
-    const raw = n.data as RawGraphNode;
-    const st = nodeStatus[n.id];
-    const borderColor = st ? STATUS_BORDER[st.status] || TYPE_COLORS[raw.type] : TYPE_COLORS[raw.type];
-    const isEntry = graphMeta?.entryNode === n.id;
-    return {
-      ...n,
-      data: {
-        ...raw,
-        label: (
-          <div>
-            <div style={{ fontSize: 10, opacity: 0.7, textTransform: "uppercase" }}>
-              {raw.type} {isEntry ? "· ENTRY" : ""} {st ? `· ${st.status}` : ""}
-            </div>
-            <div style={{ fontWeight: 600 }}>{String(raw.label || n.id)}</div>
-            {st?.preview && (
-              <div style={{ fontSize: 10, opacity: 0.75, marginTop: 4 }}>
-                {st.preview.slice(0, 60)}
+  const styledNodes = useMemo(
+    () =>
+      nodes.map((n) => {
+        const raw = n.data as RawGraphNode;
+        const st = nodeStatus[n.id];
+        const borderColor = st ? STATUS_BORDER[st.status] || TYPE_COLORS[raw.type] : TYPE_COLORS[raw.type];
+        const isEntry = graphMeta?.entryNode === n.id;
+        return {
+          ...n,
+          data: {
+            ...raw,
+            label: (
+              <div>
+                <div style={{ fontSize: 10, opacity: 0.7, textTransform: "uppercase" }}>
+                  {raw.type} {isEntry ? "· ENTRY" : ""} {st ? `· ${st.status}` : ""}
+                </div>
+                <div style={{ fontWeight: 600 }}>{String(raw.label || n.id)}</div>
+                {st?.preview && (
+                  <div style={{ fontSize: 10, opacity: 0.75, marginTop: 4 }}>
+                    {st.preview.slice(0, 60)}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ),
-      },
-      style: {
-        ...n.style,
-        border: `2px solid ${borderColor}`,
-        boxShadow: st?.status === "running" ? "0 0 12px #facc15" : undefined,
-      },
-    };
-  });
+            ),
+          },
+          style: {
+            ...n.style,
+            border: `2px solid ${borderColor}`,
+            boxShadow: st?.status === "running" ? "0 0 12px #facc15" : undefined,
+          },
+        };
+      }),
+    [graphMeta?.entryNode, nodeStatus, nodes],
+  );
 
   const selectedNode = nodes.find((n) => n.id === selectedId);
   const selectedRaw = selectedNode ? (selectedNode.data as RawGraphNode) : null;
@@ -730,7 +734,7 @@ export default function App() {
           </aside>
 
           {/* React Flow Canvas */}
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0, height: "100%", position: "relative" }}>
             <ReactFlow
               nodes={styledNodes}
               edges={edges}

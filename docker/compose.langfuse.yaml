@@ -24,7 +24,7 @@ services:
   langfuse-web:
     image: docker.langfuse.com/langfuse/langfuse:4
     restart: unless-stopped
-    mem_limit: 768m
+    mem_limit: 1280m
     depends_on:
       postgres: { condition: service_healthy }
       minio: { condition: service_healthy }
@@ -33,7 +33,7 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     environment: &langfuse-env
-      NODE_OPTIONS: --max-old-space-size=512
+      NODE_OPTIONS: --max-old-space-size=1024
       DATABASE_URL: postgresql://${LANGFUSE_PG_USER:-postgres}:${LANGFUSE_PG_PASSWORD:-postgres}@postgres:5432/${LANGFUSE_PG_DB:-postgres}
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-local-dev-secret-change-me}
       SALT: ${LANGFUSE_SALT:-local-dev-salt-change-me}

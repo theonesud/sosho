@@ -198,6 +198,17 @@ export function createStudioServer(options: StudioServerOptions = {}): {
       const url = new URL(req.url || "/", `http://127.0.0.1:${PORT}`);
       const path = url.pathname;
 
+      // 0. Root & Health Info
+      if (req.method === "GET" && (path === "/" || path === "/health")) {
+        sendJson(req, res, 200, {
+          service: "sosho-studio-api",
+          status: "ok",
+          ui: "http://127.0.0.1:4100",
+          endpoints: ["/api/workflows", "/api/runs", "/api/memory", "/api/skills", "/api/events"],
+        });
+        return;
+      }
+
       // 1. SSE Live Events Stream (with 15s : ping heartbeat)
       if (req.method === "GET" && path === "/api/events") {
         res.writeHead(200, {
@@ -261,7 +272,19 @@ export function createStudioServer(options: StudioServerOptions = {}): {
         }
         graph.id = rawId;
         const validated = validateGraph(graph);
-        const outPath = join(WORKFLOWS_DIR, `${validated.id}.graph.json`);
+        let outPath = join(WORKFLOWS_DIR, `${validated.id}.graph.json`);
+        const existingFiles = readdirSync(WORKFLOWS_DIR).filter((f) => f.endsWith(".graph.json"));
+        for (const f of existingFiles) {
+          try {
+            const existing = JSON.parse(readFileSync(join(WORKFLOWS_DIR, f), "utf8")) as { id?: string };
+            if (existing.id === validated.id) {
+              outPath = join(WORKFLOWS_DIR, f);
+              break;
+            }
+          } catch {
+            // ignore unreadable file
+          }
+        }
         writeFileSync(outPath, `${JSON.stringify(validated, null, 2)}\n`, "utf8");
         sendJson(req, res, 200, { ok: true, id: validated.id, path: outPath });
         return;

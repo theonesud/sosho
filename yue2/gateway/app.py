@@ -604,6 +604,16 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="YuE2 Job Gateway", version="0.1.0", lifespan=lifespan)
 
 
+@app.get("/")
+async def root_info() -> dict[str, Any]:
+    return {
+        "service": "yue2-gateway",
+        "status": "ok",
+        "docs": "/docs",
+        "endpoints": ["/health/live", "/health/ready", "/health/llm", "/v1/jobs", "/v1/models"],
+    }
+
+
 @app.get("/health/live")
 async def health_live() -> dict[str, str]:
     return {"status": "ok"}
