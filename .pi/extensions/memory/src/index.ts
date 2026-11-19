@@ -11,7 +11,7 @@ import {
   rebuildCoreProfile,
   searchMemory,
   upsertMemory,
-} from "../../../packages/memory/src/store.ts";
+} from "../../../../packages/memory/src/store.ts";
 
 export default function memoryExtension(pi: ExtensionAPI): void {
   // 1. Inject compact Global + Project core profiles before agent start (KV-cache friendly)
