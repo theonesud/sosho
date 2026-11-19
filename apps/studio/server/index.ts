@@ -204,8 +204,101 @@ export function createStudioServer(options: StudioServerOptions = {}): {
           service: "sosho-studio-api",
           status: "ok",
           ui: "http://127.0.0.1:4100",
-          endpoints: ["/api/workflows", "/api/runs", "/api/memory", "/api/skills", "/api/events"],
+          endpoints: [
+            "/api/system/status",
+            "/api/workflows",
+            "/api/runs",
+            "/api/memory",
+            "/api/skills",
+            "/api/music/jobs",
+            "/api/events",
+          ],
         });
+        return;
+      }
+
+      // 0b. System Status (live probes for all Sosho services + roles + skills)
+      if (req.method === "GET" && path === "/api/system/status") {
+        const probe = async (id: string, name: string, targetUrl: string, uiUrl: string, detail: string) => {
+          const t0 = Date.now();
+          try {
+            const r = await fetch(targetUrl, { signal: AbortSignal.timeout(1500) });
+            return { id, name, ok: r.ok, status: r.status, latencyMs: Date.now() - t0, url: uiUrl, detail };
+          } catch {
+            return { id, name, ok: false, status: 0, latencyMs: Date.now() - t0, url: uiUrl, detail };
+          }
+        };
+        const services = await Promise.all([
+          probe("llama-cpp", "Local GPU LLM", "http://127.0.0.1:8080/health", "http://127.0.0.1:8080", "Qwen3.6-35B-A3B (:8080)"),
+          probe("llama-decision", "CPU Decision Router", "http://127.0.0.1:8081/health", "http://127.0.0.1:8081", "Qwen3-1.7B (:8081)"),
+          probe("llama-embed", "CPU Embeddings", "http://127.0.0.1:8082/health", "http://127.0.0.1:8082", "embeddinggemma (:8082)"),
+          probe("langfuse", "Langfuse Telemetry", "http://127.0.0.1:3000/api/public/health", "http://127.0.0.1:3000", "Traces & Prompts (:3000)"),
+          probe("yue2", "YuE2 Music Gateway", "http://127.0.0.1:8021/health/live", "http://127.0.0.1:8021/docs", "Audio Synthesis (:8021)"),
+        ]);
+        services.unshift({
+          id: "studio-api",
+          name: "Sosho Studio API",
+          ok: true,
+          status: 200,
+          latencyMs: 0,
+          url: `http://127.0.0.1:${PORT}`,
+          detail: `SQLite WAL DAG Engine (:${PORT})`,
+        });
+
+        let roles: Record<string, { provider: string; model: string; description?: string }> = {};
+        const rolesPath = join(ROOT, ".pi", "model-roles.json");
+        if (existsSync(rolesPath)) {
+          try {
+            const parsed = JSON.parse(readFileSync(rolesPath, "utf8")) as {
+              roles?: Record<string, { provider: string; model: string; description?: string }>;
+            };
+            roles = parsed.roles || {};
+          } catch {
+            roles = {};
+          }
+        }
+        const skills = existsSync(SKILLS_DIR)
+          ? readdirSync(SKILLS_DIR, { withFileTypes: true })
+              .filter((d) => d.isDirectory())
+              .map((d) => d.name)
+              .sort()
+          : [];
+        sendJson(req, res, 200, { services, roles, skills });
+        return;
+      }
+
+      // 0c. YuE2 Music Gateway Proxy (/api/music/jobs*)
+      if (path === "/api/music/jobs" || path.startsWith("/api/music/jobs/")) {
+        const yue2Base = (process.env.YUE2_GATEWAY_URL || "http://127.0.0.1:8021").replace(/\/+$/, "");
+        const yue2Key = process.env.YUE2_API_KEY?.trim() || "";
+        const targetPath = path.replace(/^\/api\/music/, "/v1") + url.search;
+        const headers: Record<string, string> = {};
+        if (yue2Key) headers.Authorization = `Bearer ${yue2Key}`;
+        let bodyStr: string | undefined;
+        if (req.method === "POST") {
+          const body = await readBody(req);
+          bodyStr = JSON.stringify(body);
+          headers["Content-Type"] = "application/json";
+        }
+        try {
+          const upstream = await fetch(`${yue2Base}${targetPath}`, {
+            method: req.method || "GET",
+            headers,
+            body: bodyStr,
+            signal: AbortSignal.timeout(15_000),
+          });
+          const ct = upstream.headers.get("content-type") || "application/octet-stream";
+          const buf = Buffer.from(await upstream.arrayBuffer());
+          res.writeHead(upstream.status, {
+            "Content-Type": ct,
+            ...corsHeaders(req),
+          });
+          res.end(buf);
+        } catch (err) {
+          sendJson(req, res, 502, {
+            error: `YuE2 gateway unreachable: ${err instanceof Error ? err.message : String(err)}`,
+          });
+        }
         return;
       }
 
