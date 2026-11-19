@@ -2,7 +2,6 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
-import { Client, Connection } from "@temporalio/client";
 import {
   drainInboxToEpisodic,
   loadScopeMemories,
@@ -18,7 +17,6 @@ const ROOT = resolve(process.env.SOSHO_ROOT || join(import.meta.dirname, "../../
 const WORKFLOWS_DIR = join(ROOT, "workflows");
 const SKILLS_DIR = join(ROOT, ".pi", "skills");
 const PORT = Number(process.env.STUDIO_API_PORT || "4101");
-const TEMPORAL_ADDRESS = process.env.TEMPORAL_ADDRESS || "127.0.0.1:7233";
 
 mkdirSync(WORKFLOWS_DIR, { recursive: true });
 
@@ -36,15 +34,7 @@ function broadcastEvent(payload: Record<string, unknown>) {
   }
 }
 
-let temporalClientPromise: Promise<Client> | null = null;
-async function getTemporalClient(): Promise<Client> {
-  if (!temporalClientPromise) {
-    temporalClientPromise = Connection.connect({ address: TEMPORAL_ADDRESS }).then(
-      (connection) => new Client({ connection, namespace: process.env.TEMPORAL_NAMESPACE || "default" }),
-    );
-  }
-  return temporalClientPromise;
-}
+// Workflow engine pending SQLite DAG wiring (Phase 5 / Phase 6)
 
 function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, {
@@ -149,47 +139,22 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    // 4. Temporal Run Control & HITL Checkpoints
+    // 4. Workflow Run Control & HITL Checkpoints (wired to SQLite engine in Phase 6)
     if (req.method === "POST" && path === "/api/runs") {
-      const body = await readBody(req);
-      const client = await getTemporalClient();
-      const runId = `sosho-${String((body.graph as { id?: string })?.id || "run")}-${randomBytes(3).toString("hex")}`;
-      const handle = await client.workflow.start("executeGraphWorkflow", {
-        taskQueue: "cloud-io",
-        workflowId: runId,
-        args: [
-          {
-            graph: body.graph,
-            initialData: (body.initialData as Record<string, unknown>) || {},
-            cwd: ROOT,
-          },
-        ],
-      });
-      sendJson(res, 202, { runId: handle.workflowId });
+      await readBody(req);
+      const runId = `sosho-run-${randomBytes(3).toString("hex")}`;
+      sendJson(res, 503, { error: "SQLite workflow engine not yet wired", runId });
       return;
     }
 
     if (req.method === "GET" && path.startsWith("/api/runs/")) {
-      const runId = decodeURIComponent(path.slice("/api/runs/".length));
-      const client = await getTemporalClient();
-      const handle = client.workflow.getHandle(runId);
-      const state = await handle.query("getRunState");
-      sendJson(res, 200, state);
+      sendJson(res, 503, { error: "SQLite workflow engine not yet wired" });
       return;
     }
 
     if (req.method === "POST" && path.match(/^\/api\/runs\/[^/]+\/checkpoint$/)) {
-      const runId = decodeURIComponent(path.split("/")[3]);
-      const body = await readBody(req);
-      const client = await getTemporalClient();
-      const handle = client.workflow.getHandle(runId);
-      await handle.signal("checkpointDecision", {
-        nodeId: String(body.nodeId),
-        action: body.action === "reject" ? "reject" : "approve",
-        statePatch: body.statePatch as Record<string, unknown> | undefined,
-        note: body.note ? String(body.note) : undefined,
-      });
-      sendJson(res, 200, { ok: true, runId });
+      await readBody(req);
+      sendJson(res, 503, { error: "SQLite workflow engine not yet wired" });
       return;
     }
 
