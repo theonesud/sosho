@@ -65,7 +65,7 @@
 ### 5. Security, Container Limits, and External Repositories
 
 - **Studio Server Security (`apps/studio/server/index.ts`):** Restricts `Access-Control-Allow-Origin` to `http://127.0.0.1:4100` and `http://localhost:4100`. Requires `SOSHO_STUDIO_TOKEN` bearer authentication on all `POST`, `PUT`, and `DELETE` routes. Caps request bodies at 1 megabyte (`HTTP 413`), rejects invalid JSON (`HTTP 400`), and blocks path traversal in workflow IDs.
-- **Langfuse Memory Limits (`docker/compose.langfuse.yaml`, `docker/clickhouse-memory.xml`):** Parameterizes all secrets via `.env` and caps container memory: `clickhouse` (`1g`), `langfuse-web` (`512m`), `langfuse-worker` (`512m`), `postgres` (`512m`), `minio` (`256m`), and `redis` (`256m`).
+- **Langfuse Memory Limits (`docker/compose.langfuse.yaml`, `docker/clickhouse-memory.xml`):** Parameterizes all secrets via `.env` and caps container memory: `clickhouse` (`1g`), `langfuse-web` (`768m`), `langfuse-worker` (`512m`), `postgres` (`512m`), `minio` (`256m`), and `redis` (`256m`).
 - **Isolated Model Mounts (`compose.yaml`):** Mounts each model directory separately for `llama-cpp`, `llama-decision`, and `llama-embed`.
 - **External Repository Launcher (`bin/pi-launcher.sh`):** Symlinks `~/.local/bin/pi` to `bin/pi-launcher.sh`, mounts Sosho read-only at `/opt/sosho`, resolves extensions and skills in any external Git repository, and syncs compaction settings to the active default model `contextWindow`.
 
