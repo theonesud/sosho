@@ -9,12 +9,16 @@ import {
   readdirSync,
   readFileSync,
   renameSync,
+  statSync,
   unlinkSync,
   writeFileSync,
   writeSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+
+const require = createRequire(import.meta.url);
 
 export type MemoryScope = "global" | "project";
 export type MemoryType = "semantic" | "procedural" | "episodic" | "entity";
@@ -365,7 +369,296 @@ export function archiveMemory(
 }
 
 // ---------------------------------------------------------------------------
-// Hybrid Search: BM25 + Cosine Vector (pluggable local embedder + hash fallback) + RRF + Decay
+// Rebuildable SQLite Index (memories + FTS5 + memory_entities + dense vectors)
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_EMBED_URL = process.env.SOSHO_EMBED_URL || "http://127.0.0.1:8082/v1/embeddings";
+
+interface SqliteStatement {
+  run(...params: unknown[]): unknown;
+  get(...params: unknown[]): Record<string, unknown> | undefined;
+  all(...params: unknown[]): Record<string, unknown>[];
+}
+
+interface SqliteDb {
+  exec(sql: string): void;
+  prepare(sql: string): SqliteStatement;
+  close(): void;
+}
+
+const indexCache = new Map<string, SqliteDb>();
+
+function openSqliteDb(dbPath: string): SqliteDb {
+  const cached = indexCache.get(dbPath);
+  if (cached) return cached;
+
+  let db: SqliteDb;
+  const nodeMajor = Number(process.versions.node.split(".")[0] || "20");
+  if (nodeMajor >= 22) {
+    try {
+      const { DatabaseSync } = require("node:sqlite") as { DatabaseSync: new (p: string) => SqliteDb };
+      db = new DatabaseSync(dbPath);
+    } catch {
+      const BetterSqlite3 = require("better-sqlite3") as new (p: string) => SqliteDb;
+      db = new BetterSqlite3(dbPath);
+    }
+  } else {
+    const BetterSqlite3 = require("better-sqlite3") as new (p: string) => SqliteDb;
+    db = new BetterSqlite3(dbPath);
+  }
+
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA synchronous = NORMAL;
+    CREATE TABLE IF NOT EXISTS memories (
+      id TEXT PRIMARY KEY,
+      scope TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      tags_json TEXT NOT NULL,
+      entities_json TEXT NOT NULL,
+      importance REAL NOT NULL,
+      confidence REAL NOT NULL,
+      status TEXT NOT NULL,
+      valid_from TEXT NOT NULL,
+      valid_to TEXT,
+      superseded_by TEXT,
+      access_count INTEGER NOT NULL DEFAULT 0,
+      last_accessed TEXT NOT NULL,
+      sources_json TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      mtime_ms REAL NOT NULL,
+      embedding BLOB
+    );
+    CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+      id UNINDEXED,
+      title,
+      tags,
+      entities,
+      content
+    );
+    CREATE TABLE IF NOT EXISTS memory_entities (
+      memory_id TEXT NOT NULL,
+      entity TEXT NOT NULL,
+      PRIMARY KEY (memory_id, entity)
+    );
+    CREATE INDEX IF NOT EXISTS idx_memory_entities_entity ON memory_entities(entity);
+    CREATE INDEX IF NOT EXISTS idx_memories_file_path ON memories(file_path);
+  `);
+
+  indexCache.set(dbPath, db);
+  return db;
+}
+
+export function closeMemoryIndexes(): void {
+  for (const db of indexCache.values()) {
+    try {
+      db.close();
+    } catch {
+      // ignore close errors
+    }
+  }
+  indexCache.clear();
+}
+
+function runTx(db: SqliteDb, fn: () => void): void {
+  db.exec("BEGIN");
+  try {
+    fn();
+    db.exec("COMMIT");
+  } catch (err) {
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      // ignore rollback errors
+    }
+    throw err;
+  }
+}
+
+function encodeFloat32(vec: Float32Array): Buffer {
+  return Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength);
+}
+
+function decodeFloat32(blob: unknown): Float32Array | null {
+  if (!blob) return null;
+  if (blob instanceof Uint8Array) {
+    const copy = new Uint8Array(blob.byteLength);
+    copy.set(blob);
+    return new Float32Array(copy.buffer);
+  }
+  return null;
+}
+
+function rowToMemoryRecord(row: Record<string, unknown>): MemoryRecord {
+  return {
+    id: String(row.id),
+    scope: String(row.scope) as MemoryScope,
+    type: String(row.type) as MemoryType,
+    title: String(row.title),
+    content: String(row.content),
+    tags: JSON.parse(String(row.tags_json || "[]")) as string[],
+    entities: JSON.parse(String(row.entities_json || "[]")) as string[],
+    importance: Number(row.importance ?? 0.6),
+    confidence: Number(row.confidence ?? 0.8),
+    status: String(row.status || "active") as MemoryStatus,
+    valid_from: String(row.valid_from),
+    valid_to: row.valid_to ? String(row.valid_to) : null,
+    superseded_by: row.superseded_by ? String(row.superseded_by) : null,
+    access_count: Number(row.access_count ?? 0),
+    last_accessed: String(row.last_accessed || row.valid_from),
+    sources: JSON.parse(String(row.sources_json || "[]")) as MemorySource[],
+    filePath: String(row.file_path),
+  };
+}
+
+export function syncScopeIndex(scope: MemoryScope, cwd: string = process.cwd()): SqliteDb {
+  const root = getScopeRoot(scope, cwd);
+  ensureMemoryDirs(root);
+  const db = openSqliteDb(join(root, "index.sqlite"));
+
+  const dirs = ["semantic", "procedural", "episodic", "entities", "archive"];
+  const diskFiles = new Map<string, number>();
+  for (const d of dirs) {
+    for (const filePath of walkMarkdownFiles(join(root, d))) {
+      try {
+        diskFiles.set(filePath, statSync(filePath).mtimeMs);
+      } catch {
+        // Ignore vanished file
+      }
+    }
+  }
+
+  const indexedRows = db.prepare("SELECT id, file_path, mtime_ms, access_count, last_accessed FROM memories").all();
+  const byPath = new Map<string, { id: string; mtimeMs: number; accessCount: number; lastAccessed: string }>();
+  for (const r of indexedRows) {
+    byPath.set(String(r.file_path), {
+      id: String(r.id),
+      mtimeMs: Number(r.mtime_ms),
+      accessCount: Number(r.access_count ?? 0),
+      lastAccessed: String(r.last_accessed || ""),
+    });
+  }
+
+  const toDelete: string[] = [];
+  for (const [fp, info] of byPath.entries()) {
+    if (!diskFiles.has(fp)) {
+      toDelete.push(info.id);
+    }
+  }
+
+  const toUpsert: Array<{ rec: MemoryRecord; mtimeMs: number; accessCount: number; lastAccessed: string }> = [];
+  for (const [fp, mtimeMs] of diskFiles.entries()) {
+    const existing = byPath.get(fp);
+    if (existing && Math.abs(existing.mtimeMs - mtimeMs) < 1) {
+      continue;
+    }
+    try {
+      const parsed = parseMemoryMarkdown(readFileSync(fp, "utf8"), fp);
+      if (parsed) {
+        const accessCount = Math.max(parsed.access_count, existing?.accessCount ?? 0);
+        const lastAccessed =
+          existing?.lastAccessed && existing.lastAccessed > parsed.last_accessed
+            ? existing.lastAccessed
+            : parsed.last_accessed;
+        toUpsert.push({ rec: parsed, mtimeMs, accessCount, lastAccessed });
+      }
+    } catch {
+      // Ignore unreadable file
+    }
+  }
+
+  if (toDelete.length === 0 && toUpsert.length === 0) {
+    return db;
+  }
+
+  const delMem = db.prepare("DELETE FROM memories WHERE id = ?");
+  const delFts = db.prepare("DELETE FROM memories_fts WHERE id = ?");
+  const delEnt = db.prepare("DELETE FROM memory_entities WHERE memory_id = ?");
+  const insMem = db.prepare(`
+    INSERT OR REPLACE INTO memories (
+      id, scope, type, title, content, tags_json, entities_json,
+      importance, confidence, status, valid_from, valid_to, superseded_by,
+      access_count, last_accessed, sources_json, file_path, mtime_ms, embedding
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+  `);
+  const insFts = db.prepare("INSERT INTO memories_fts (id, title, tags, entities, content) VALUES (?, ?, ?, ?, ?)");
+  const insEnt = db.prepare("INSERT OR IGNORE INTO memory_entities (memory_id, entity) VALUES (?, ?)");
+
+  runTx(db, () => {
+    for (const id of toDelete) {
+      delMem.run(id);
+      delFts.run(id);
+      delEnt.run(id);
+    }
+    for (const { rec, mtimeMs, accessCount, lastAccessed } of toUpsert) {
+      delFts.run(rec.id);
+      delEnt.run(rec.id);
+      insMem.run(
+        rec.id,
+        rec.scope,
+        rec.type,
+        rec.title,
+        rec.content,
+        JSON.stringify(rec.tags),
+        JSON.stringify(rec.entities),
+        rec.importance,
+        rec.confidence,
+        rec.status,
+        rec.valid_from,
+        rec.valid_to,
+        rec.superseded_by,
+        accessCount,
+        lastAccessed,
+        JSON.stringify(rec.sources),
+        rec.filePath || "",
+        mtimeMs,
+      );
+      insFts.run(rec.id, rec.title, rec.tags.join(" "), rec.entities.join(" "), rec.content);
+      for (const entity of rec.entities) {
+        const norm = entity.trim().toLowerCase();
+        if (norm) insEnt.run(rec.id, norm);
+      }
+    }
+  });
+
+  return db;
+}
+
+export async function fetchEmbeddings(
+  texts: string[],
+  embedUrl: string = DEFAULT_EMBED_URL,
+): Promise<Float32Array[] | null> {
+  if (!embedUrl || texts.length === 0) return null;
+  try {
+    const res = await fetch(embedUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "embeddinggemma", input: texts }),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      data?: Array<{ embedding?: number[]; index?: number }>;
+    };
+    if (!Array.isArray(json.data) || json.data.length !== texts.length) return null;
+    const sorted = [...json.data].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+    return sorted.map((item) => {
+      const arr = new Float32Array(item.embedding || []);
+      let norm = 0;
+      for (let i = 0; i < arr.length; i++) norm += arr[i] * arr[i];
+      norm = Math.sqrt(norm) || 1;
+      for (let i = 0; i < arr.length; i++) arr[i] /= norm;
+      return arr;
+    });
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hybrid Search: SQLite FTS5 + Dense Vectors (embeddinggemma) + 1-Hop Entity Graph + RRF + Decay
 // ---------------------------------------------------------------------------
 
 function tokenize(text: string): string[] {
@@ -376,31 +669,19 @@ function tokenize(text: string): string[] {
     .filter((t) => t.length >= 2);
 }
 
-function hashEmbed(text: string, dims = 128): Float32Array {
-  const vec = new Float32Array(dims);
-  const tokens = tokenize(text);
-  for (const tok of tokens) {
-    const h = createHash("sha256").update(tok).digest();
-    const idx = h.readUInt16BE(0) % dims;
-    const sign = (h[2] & 1) === 0 ? 1 : -1;
-    vec[idx] += sign;
-    // Character trigram features for fuzzy/morphological recall
-    for (let i = 0; i <= tok.length - 3; i++) {
-      const tri = tok.slice(i, i + 3);
-      const th = createHash("sha256").update(tri).digest();
-      const tidx = th.readUInt16BE(0) % dims;
-      vec[tidx] += ((th[2] & 1) === 0 ? 0.5 : -0.5);
-    }
-  }
-  let norm = 0;
-  for (let i = 0; i < dims; i++) norm += vec[i] * vec[i];
-  norm = Math.sqrt(norm) || 1;
-  for (let i = 0; i < dims; i++) vec[i] /= norm;
-  return vec;
+function buildFtsQuery(query: string): string | null {
+  const tokens = tokenize(query)
+    .map((t) => t.replace(/[^a-z0-9_]/g, ""))
+    .filter((t) => t.length >= 2);
+  if (tokens.length === 0) return null;
+  return Array.from(new Set(tokens))
+    .map((t) => `"${t}"`)
+    .join(" OR ");
 }
 
 function cosineSim(a: Float32Array, b: Float32Array): number {
   const len = Math.min(a.length, b.length);
+  if (len === 0) return 0;
   let dot = 0;
   for (let i = 0; i < len; i++) dot += a[i] * b[i];
   return dot;
@@ -414,9 +695,16 @@ function computeDecay(rec: MemoryRecord): number {
   return 0.5 + 0.5 * Math.exp(-lambda * ageDays);
 }
 
-export function searchMemory(
+interface IndexedDoc {
+  record: MemoryRecord;
+  embedding: Float32Array | null;
+  db: SqliteDb;
+}
+
+function runIndexedSearch(
   options: MemorySearchOptions,
-  cwd: string = process.cwd(),
+  cwd: string,
+  queryEmbedding: Float32Array | null,
 ): MemorySearchResult[] {
   const scopes: MemoryScope[] =
     options.scope === "global"
@@ -425,78 +713,134 @@ export function searchMemory(
         ? ["project"]
         : ["project", "global"];
 
-  let docs: MemoryRecord[] = [];
+  const docs: IndexedDoc[] = [];
+  const lexicalMap = new Map<string, number>();
+  const directEntityHits = new Map<string, number>();
+  const entityToDocs = new Map<string, Set<string>>();
+  const docToEntities = new Map<string, string[]>();
+
+  const ftsQuery = buildFtsQuery(options.query);
+  const queryLower = options.query.toLowerCase();
+  const allowedTypes = options.types && options.types.length > 0 ? new Set(options.types) : null;
+
   for (const s of scopes) {
-    docs.push(...loadScopeMemories(s, cwd, Boolean(options.includeArchived)));
+    const db = syncScopeIndex(s, cwd);
+    const statusClause = options.includeArchived ? "" : "WHERE status = 'active'";
+    const rows = db.prepare(`SELECT * FROM memories ${statusClause}`).all();
+    const validIds = new Set<string>();
+
+    for (const row of rows) {
+      const rec = rowToMemoryRecord(row);
+      if (allowedTypes && !allowedTypes.has(rec.type)) continue;
+      validIds.add(rec.id);
+      docs.push({
+        record: rec,
+        embedding: decodeFloat32(row.embedding),
+        db,
+      });
+    }
+
+    if (validIds.size === 0) continue;
+
+    // FTS5 BM25 lexical recall
+    if (ftsQuery) {
+      try {
+        const ftsRows = db
+          .prepare("SELECT id, bm25(memories_fts) AS rank FROM memories_fts WHERE memories_fts MATCH ? LIMIT 200")
+          .all(ftsQuery);
+        for (const fr of ftsRows) {
+          const id = String(fr.id);
+          if (!validIds.has(id)) continue;
+          // SQLite bm25() returns negative values where more negative = better match
+          const score = Math.max(0.001, -Number(fr.rank || 0));
+          lexicalMap.set(id, score);
+        }
+      } catch {
+        // Ignore FTS syntax issues on unusual queries
+      }
+    }
+
+    // Load entity graph edges from memory_entities
+    const entRows = db.prepare("SELECT memory_id, entity FROM memory_entities").all();
+    for (const er of entRows) {
+      const mid = String(er.memory_id);
+      if (!validIds.has(mid)) continue;
+      const entity = String(er.entity);
+      let set = entityToDocs.get(entity);
+      if (!set) {
+        set = new Set();
+        entityToDocs.set(entity, set);
+      }
+      set.add(mid);
+      const list = docToEntities.get(mid) || [];
+      list.push(entity);
+      docToEntities.set(mid, list);
+
+      if (entity.length >= 2 && queryLower.includes(entity)) {
+        directEntityHits.set(mid, (directEntityHits.get(mid) || 0) + 1);
+      }
+    }
   }
 
-  if (options.types && options.types.length > 0) {
-    const allowed = new Set(options.types);
-    docs = docs.filter((d) => allowed.has(d.type));
-  }
-  if (!options.includeArchived) {
-    docs = docs.filter((d) => d.status === "active");
-  }
   if (docs.length === 0) return [];
 
-  const queryTokens = tokenize(options.query);
-  const querySet = new Set(queryTokens);
-  const queryVec = hashEmbed(options.query);
+  const lexicalScores = docs.map((d) => lexicalMap.get(d.record.id) || 0);
+  const vectorScores = docs.map((d) => {
+    if (!queryEmbedding || !d.embedding || queryEmbedding.length !== d.embedding.length) return 0;
+    return Math.max(0, cosineSim(queryEmbedding, d.embedding));
+  });
 
-  // BM25 corpus stats
-  const docTokens = docs.map((d) =>
-    tokenize(`${d.title} ${d.tags.join(" ")} ${d.entities.join(" ")} ${d.content}`),
-  );
-  const avgDl = docTokens.reduce((sum, t) => sum + t.length, 0) / Math.max(1, docs.length);
-  const df = new Map<string, number>();
-  for (const toks of docTokens) {
-    for (const uniq of new Set(toks)) {
-      df.set(uniq, (df.get(uniq) || 0) + 1);
+  // 1-hop entity graph traversal from top seed documents (lexical + vector + direct entity matches)
+  const seedIds = new Set<string>(directEntityHits.keys());
+  const topLexIndices = docs
+    .map((_, i) => i)
+    .filter((i) => lexicalScores[i] > 0)
+    .sort((a, b) => lexicalScores[b] - lexicalScores[a])
+    .slice(0, 5);
+  for (const idx of topLexIndices) seedIds.add(docs[idx].record.id);
+
+  const topVecIndices = docs
+    .map((_, i) => i)
+    .filter((i) => vectorScores[i] > 0.35)
+    .sort((a, b) => vectorScores[b] - vectorScores[a])
+    .slice(0, 5);
+  for (const idx of topVecIndices) seedIds.add(docs[idx].record.id);
+
+  const oneHopHits = new Map<string, number>();
+  for (const sid of seedIds) {
+    const ents = docToEntities.get(sid) || [];
+    for (const e of ents) {
+      const neighbors = entityToDocs.get(e);
+      if (!neighbors) continue;
+      for (const nid of neighbors) {
+        if (nid === sid) continue;
+        oneHopHits.set(nid, (oneHopHits.get(nid) || 0) + 1);
+      }
     }
   }
 
-  const k1 = 1.5;
-  const b = 0.75;
+  // Reciprocal Rank Fusion (RRF)
   const N = docs.length;
-
-  const lexicalScores = docs.map((_d, i) => {
-    const toks = docTokens[i];
-    const tf = new Map<string, number>();
-    for (const t of toks) tf.set(t, (tf.get(t) || 0) + 1);
-    let score = 0;
-    for (const qt of queryTokens) {
-      const f = tf.get(qt) || 0;
-      if (f === 0) continue;
-      const n = df.get(qt) || 0;
-      const idf = Math.log(1 + (N - n + 0.5) / (n + 0.5));
-      score += idf * ((f * (k1 + 1)) / (f + k1 * (1 - b + (b * toks.length) / Math.max(1, avgDl))));
-    }
-    return score;
-  });
-
-  const vectorScores = docs.map((d) => {
-    const dv = hashEmbed(`${d.title} ${d.tags.join(" ")} ${d.content}`);
-    return Math.max(0, cosineSim(queryVec, dv));
-  });
-
-  // Ranks for Reciprocal Rank Fusion (RRF)
-  const lexOrder = docs.map((_, i) => i).sort((a, bIdx) => lexicalScores[bIdx] - lexicalScores[a]);
-  const vecOrder = docs.map((_, i) => i).sort((a, bIdx) => vectorScores[bIdx] - vectorScores[a]);
+  const lexOrder = docs.map((_, i) => i).sort((a, b) => lexicalScores[b] - lexicalScores[a]);
+  const vecOrder = docs.map((_, i) => i).sort((a, b) => vectorScores[b] - vectorScores[a]);
   const lexRank = new Map<number, number>();
   const vecRank = new Map<number, number>();
   lexOrder.forEach((docIdx, r) => lexRank.set(docIdx, r + 1));
   vecOrder.forEach((docIdx, r) => vecRank.set(docIdx, r + 1));
 
   const RRF_K = 20;
-  const scored: MemorySearchResult[] = docs.map((rec, i) => {
+  const scored: MemorySearchResult[] = docs.map((d, i) => {
+    const rec = d.record;
     const lexContrib = lexicalScores[i] > 0 ? 1 / (RRF_K + (lexRank.get(i) || N)) : 0;
-    const vecContrib = vectorScores[i] > 0.05 ? 1 / (RRF_K + (vecRank.get(i) || N)) : 0;
-    const rrf = lexContrib + vecContrib;
+    const vecContrib = vectorScores[i] > 0.2 ? 1 / (RRF_K + (vecRank.get(i) || N)) : 0;
+    const directHits = directEntityHits.get(rec.id) || 0;
+    const hopHits = oneHopHits.get(rec.id) || 0;
+    const graphContrib = directHits > 0 || hopHits > 0 ? 0.5 / (RRF_K + 1) : 0;
+    const rrf = lexContrib + vecContrib + graphContrib;
     const scopeWeight = rec.scope === "project" ? 1.05 : 1.0;
     const decay = computeDecay(rec);
     const accessBoost = 1 + 0.15 * Math.log(1 + rec.access_count);
-    const entityMatches = rec.entities.filter((e) => querySet.has(e)).length;
-    const graphBoost = 1 + Math.min(0.4, entityMatches * 0.15);
+    const graphBoost = 1 + Math.min(0.4, directHits * 0.15 + hopHits * 0.1);
     const score = rrf * scopeWeight * decay * rec.confidence * (0.5 + 0.5 * rec.importance) * accessBoost * graphBoost;
 
     return {
@@ -508,7 +852,7 @@ export function searchMemory(
     };
   });
 
-  scored.sort((a, bRes) => bRes.score - a.score);
+  scored.sort((a, b) => b.score - a.score);
   const limit = options.limit ?? 8;
   const maxTokens = options.maxTokens ?? 1200;
 
@@ -516,7 +860,7 @@ export function searchMemory(
   let estTokens = 0;
   for (const item of scored) {
     if (picked.length >= limit) break;
-    if (item.lexicalScore === 0 && item.vectorScore < 0.08) continue;
+    if (item.lexicalScore === 0 && item.vectorScore < 0.2 && item.graphBoost <= 1.0) continue;
     const itemTokens = Math.ceil((item.record.title.length + item.record.content.length) / 4);
     if (picked.length > 0 && estTokens + itemTokens > maxTokens) break;
     picked.push(item);
@@ -524,6 +868,55 @@ export function searchMemory(
   }
 
   return picked;
+}
+
+export function searchMemory(
+  options: MemorySearchOptions,
+  cwd: string = process.cwd(),
+): MemorySearchResult[] {
+  return runIndexedSearch(options, cwd, null);
+}
+
+export async function searchMemoryAsync(
+  options: MemorySearchOptions,
+  cwd: string = process.cwd(),
+): Promise<MemorySearchResult[]> {
+  const embedUrl = options.embedUrl ?? DEFAULT_EMBED_URL;
+  const scopes: MemoryScope[] =
+    options.scope === "global"
+      ? ["global"]
+      : options.scope === "project"
+        ? ["project"]
+        : ["project", "global"];
+
+  let queryVec: Float32Array | null = null;
+  const qVecs = await fetchEmbeddings([options.query], embedUrl);
+  if (qVecs && qVecs[0]) {
+    queryVec = qVecs[0];
+    // Backfill missing dense vectors in SQLite for active rows
+    for (const s of scopes) {
+      const db = syncScopeIndex(s, cwd);
+      const missing = db
+        .prepare("SELECT id, title, tags_json, content FROM memories WHERE embedding IS NULL AND status = 'active' LIMIT 64")
+        .all();
+      if (missing.length > 0) {
+        const texts = missing.map(
+          (r) => `${String(r.title)} ${(JSON.parse(String(r.tags_json || "[]")) as string[]).join(" ")} ${String(r.content)}`,
+        );
+        const vecs = await fetchEmbeddings(texts, embedUrl);
+        if (vecs && vecs.length === missing.length) {
+          const upd = db.prepare("UPDATE memories SET embedding = ? WHERE id = ?");
+          runTx(db, () => {
+            for (let i = 0; i < missing.length; i++) {
+              upd.run(encodeFloat32(vecs[i]), String(missing[i].id));
+            }
+          });
+        }
+      }
+    }
+  }
+
+  return runIndexedSearch(options, cwd, queryVec);
 }
 
 // ---------------------------------------------------------------------------

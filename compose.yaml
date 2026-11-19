@@ -175,6 +175,71 @@ services:
       - "${DECISION_LLM_THREADS:-8}"
       - --cache-prompt
 
+  # Lightweight CPU-only embedding model for memory vector recall (0 GPU VRAM, ~400 MB RAM).
+  embed-model-download:
+    profiles: [embed]
+    image: python:3.12-slim
+    environment:
+      HF_REPO: ggml-org/embeddinggemma-300M-GGUF
+      MODEL_SUBDIR: embeddinggemma-300M
+      MODEL_FILE: embeddinggemma-300M-Q8_0.gguf
+      HF_XET_HIGH_PERFORMANCE: "1"
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - ./models:/models
+      - hf-cache:/root/.cache/huggingface
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        dir=/models/$$MODEL_SUBDIR
+        if [ -e "$$dir/$$MODEL_FILE" ]; then
+          echo "Embedding model present in $$dir"; exit 0
+        fi
+        pip install -q --root-user-action=ignore "huggingface_hub[cli,hf_xet]"
+        hf download "$$HF_REPO" "$$MODEL_FILE" --local-dir "$$dir"
+    restart: "no"
+
+  llama-embed:
+    profiles: [embed]
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: llama-embed
+    restart: unless-stopped
+    mem_limit: 1g
+    depends_on:
+      embed-model-download:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8082:8082"
+    networks: [webui-net]
+    volumes:
+      - ./models/embeddinggemma-300M:/models/embeddinggemma-300M:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8082/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    command:
+      - -m
+      - /models/embeddinggemma-300M/embeddinggemma-300M-Q8_0.gguf
+      - --alias
+      - embeddinggemma
+      - --embeddings
+      - --pooling
+      - mean
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8082"
+      - -c
+      - "2048"
+      - -np
+      - "4"
+      - -t
+      - "${EMBED_LLM_THREADS:-4}"
+
 
 
   # YuE2 model fetch: GGUF weights + sidecars from Hugging Face, once.
