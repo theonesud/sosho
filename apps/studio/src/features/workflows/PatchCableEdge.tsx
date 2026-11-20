@@ -14,6 +14,7 @@ import {
 import { type CableRopeState, createCableRope, ropePointsToSvgPath, stepCableRope } from "./cable-physics";
 
 const MIDDLEWARE_STAGES: EdgeMiddlewareStage[] = ["validate", "map", "cast", "redact", "trace", "deliver"];
+const CAST_TYPES: PortDataType[] = ["any", "text", "markdown", "json", "number", "boolean", "audio", "memory"];
 
 export interface PatchCableEdgeData extends Record<string, unknown> {
   portType?: PortDataType;
@@ -99,7 +100,6 @@ export function PatchCableEdge({ id, sourceX, sourceY, targetX, targetY, selecte
 
   return (
     <>
-      {/* Wide invisible hit target for easy cable clicking */}
       <path
         d={pathD}
         fill="none"
@@ -112,7 +112,6 @@ export function PatchCableEdge({ id, sourceX, sourceY, targetX, targetY, selecte
         }}
       />
 
-      {/* Under-cable drop shadow for rack depth */}
       <path
         d={pathD}
         fill="none"
@@ -123,7 +122,6 @@ export function PatchCableEdge({ id, sourceX, sourceY, targetX, targetY, selecte
         className="pointer-events-none"
       />
 
-      {/* Main insulated cable jacket */}
       <path
         d={pathD}
         fill="none"
@@ -132,12 +130,11 @@ export function PatchCableEdge({ id, sourceX, sourceY, targetX, targetY, selecte
         strokeLinecap="round"
         style={{
           filter: isActive ? `drop-shadow(0 0 8px ${strokeColor})` : undefined,
-          opacity: isActive || isTraversed || selected ? 1 : 0.85,
+          opacity: isActive || isTraversed || selected ? 1 : 0.86,
         }}
         className="pointer-events-none transition-colors duration-150"
       />
 
-      {/* Top specular light reflection along the cable */}
       <path
         d={pathD}
         fill="none"
@@ -148,7 +145,6 @@ export function PatchCableEdge({ id, sourceX, sourceY, targetX, targetY, selecte
         className="pointer-events-none"
       />
 
-      {/* Active signal pulse */}
       {isActive ? (
         <path
           d={pathD}
@@ -161,7 +157,6 @@ export function PatchCableEdge({ id, sourceX, sourceY, targetX, targetY, selecte
         />
       ) : null}
 
-      {/* Rubber plug boots at source and target jacks */}
       <g className="pointer-events-none">
         <rect
           x={sourceX - 2}
@@ -191,10 +186,10 @@ export function PatchCableEdge({ id, sourceX, sourceY, targetX, targetY, selecte
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${midPoint.x}px, ${midPoint.y}px)`,
             pointerEvents: "all",
+            zIndex: pillOpen ? 40 : 10,
           }}
           className="nodrag nopan"
         >
-          {/* Compact pill trigger */}
           {!pillOpen ? (
             <button
               type="button"
@@ -216,9 +211,9 @@ export function PatchCableEdge({ id, sourceX, sourceY, targetX, targetY, selecte
           ) : (
             <div
               onClick={(e) => e.stopPropagation()}
-              className="w-56 rounded-lg border border-zinc-700/90 bg-zinc-950/95 p-2 text-[11px] text-zinc-200 shadow-2xl backdrop-blur-xl"
+              className="w-60 rounded-lg border border-zinc-700/90 bg-zinc-950/95 p-2.5 text-[11px] text-zinc-200 shadow-2xl backdrop-blur-xl"
             >
-              <div className="mb-1.5 flex items-center justify-between border-b border-zinc-800 pb-1">
+              <div className="mb-2 flex items-center justify-between border-b border-zinc-800 pb-1">
                 <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                   Cable Middleware
                 </span>
@@ -244,24 +239,60 @@ export function PatchCableEdge({ id, sourceX, sourceY, targetX, targetY, selecte
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-1">
-                {MIDDLEWARE_STAGES.map((stage) => {
-                  const enabled = activeStages.includes(stage);
-                  return (
-                    <button
-                      key={stage}
-                      type="button"
-                      onClick={() => toggleStage(stage)}
-                      className={`rounded border px-1.5 py-0.5 font-mono text-[10px] transition ${
-                        enabled
-                          ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
-                          : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
-                      }`}
-                    >
-                      {stage}
-                    </button>
-                  );
-                })}
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-12 shrink-0 font-mono text-[9px] uppercase text-zinc-500">Branch</span>
+                  <input
+                    type="text"
+                    value={edgeData.condition ?? ""}
+                    placeholder="condition..."
+                    onChange={(e) => updateEdge(id, { condition: e.target.value || undefined })}
+                    className="h-6 flex-1 rounded border border-zinc-800 bg-zinc-900 px-1.5 font-mono text-[10px] text-zinc-200 outline-none focus:border-amber-400/60"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="w-12 shrink-0 font-mono text-[9px] uppercase text-zinc-500">Cast</span>
+                  <select
+                    value={middleware?.castTo ?? ""}
+                    onChange={(e) =>
+                      updateEdge(id, {
+                        middleware: {
+                          ...middleware,
+                          castTo: (e.target.value || undefined) as PortDataType | undefined,
+                        },
+                      })
+                    }
+                    className="h-6 flex-1 rounded border border-zinc-800 bg-zinc-900 px-1.5 font-mono text-[10px] text-zinc-200 outline-none focus:border-emerald-500/60"
+                  >
+                    <option value="">auto</option>
+                    {CAST_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-wrap gap-1">
+                  {MIDDLEWARE_STAGES.map((stage) => {
+                    const enabled = activeStages.includes(stage);
+                    return (
+                      <button
+                        key={stage}
+                        type="button"
+                        onClick={() => toggleStage(stage)}
+                        className={`rounded border px-1.5 py-0.5 font-mono text-[10px] transition ${
+                          enabled
+                            ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
+                            : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                        }`}
+                      >
+                        {stage}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}

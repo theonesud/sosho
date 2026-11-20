@@ -701,9 +701,21 @@ export class WorkflowEngine extends EventEmitter {
         });
       }
 
+      const anySolo = run.graph.nodes.some((n) => n.uiFlags?.solo);
+
       try {
         const results = await Promise.all(
           waveEntries.map(async ({ node, queue, inputSnapshot }) => {
+            const isBypassed = Boolean(node.uiFlags?.bypass) || (anySolo && !node.uiFlags?.solo);
+            if (isBypassed) {
+              return {
+                node,
+                res: {
+                  preview: "[Bypassed]",
+                  branch: node.type === "decision" ? node.branches[0] : undefined,
+                } as ActivityResult,
+              };
+            }
             const release = await this.queues[queue].acquire();
             this.emitQueueStats(runId, queue);
             try {

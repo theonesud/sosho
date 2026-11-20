@@ -81,19 +81,28 @@ interface WorkflowState {
   updatePolicy: (patch: Partial<GraphPolicy>) => void;
   addNode: (
     kind: NodeKind,
-    options?: { position?: { x: number; y: number }; connectFromId?: string; condition?: string },
+    options?: { position?: { x: number; y: number }; connectFromId?: string; condition?: string; sourcePort?: string },
   ) => RawGraphNode | null;
-  updateNode: (nodeId: string, patch: Record<string, unknown>) => void;
+  updateNode: (nodeId: string, patch: Record<string, unknown>, skipHistory?: boolean) => void;
+  commitHistory: () => void;
+  duplicateNode: (nodeId: string) => RawGraphNode | null;
+  setEntryNode: (nodeId: string) => void;
   toggleNodeFlag: (nodeId: string, flag: keyof NodeUiFlags) => void;
   setNodePositions: (updates: Array<{ id: string; position: { x: number; y: number } }>) => void;
   removeNodes: (nodeIds: string[]) => void;
-  addEdge: (source: string, target: string, condition?: string) => void;
+  addEdge: (
+    source: string,
+    target: string,
+    condition?: string,
+    ports?: { sourcePort?: string; targetPort?: string },
+  ) => void;
   updateEdge: (edgeId: string, patch: Partial<RawGraphEdge>) => void;
   rewireEdge: (edgeId: string, source: string, target: string, condition?: string) => void;
   removeEdges: (edgeIds: string[]) => void;
   addZipTie: (position: { x: number; y: number }, edgeIds?: string[]) => ZipTie | null;
-  moveZipTie: (id: string, position: { x: number; y: number }) => void;
+  moveZipTie: (id: string, position: { x: number; y: number }, commit?: boolean) => void;
   attachEdgeToZipTie: (zipTieId: string, edgeId: string) => void;
+  detachEdgeFromZipTie: (zipTieId: string, edgeId: string) => void;
   removeZipTie: (id: string) => void;
   selectNode: (nodeId: string | null) => void;
   selectEdge: (edgeId: string | null) => void;
@@ -173,11 +182,14 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const nextEdges = [...current.edges];
     if (options?.connectFromId && current.nodes.some((n) => n.id === options.connectFromId)) {
       const edgeId = `e_${options.connectFromId}_${created.id}_${Date.now().toString(36).slice(-4)}`;
-      nextEdges.push(
-        options.condition
-          ? { id: edgeId, source: options.connectFromId, target: created.id, condition: options.condition }
-          : { id: edgeId, source: options.connectFromId, target: created.id },
-      );
+      const newEdge: RawGraphEdge = {
+        id: edgeId,
+        source: options.connectFromId,
+        target: created.id,
+        ...(options.condition ? { condition: options.condition } : {}),
+        ...(options.sourcePort ? { middleware: { sourcePort: options.sourcePort } } : {}),
+      };
+      nextEdges.push(newEdge);
     }
     set((state) => ({
       graph: {
@@ -195,7 +207,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     return created;
   },
 
-  updateNode: (nodeId, patch) =>
+  updateNode: (nodeId, patch, skipHistory = false) =>
     set((state) => {
       if (!state.graph) return state;
       return {
@@ -203,6 +215,55 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
           ...state.graph,
           nodes: state.graph.nodes.map((n) => (n.id === nodeId ? { ...n, ...patch } : n)),
         },
+        past: skipHistory ? state.past : pushHistory(state.past, state.graph),
+        future: skipHistory ? state.future : [],
+        isDirty: true,
+      };
+    }),
+
+  commitHistory: () =>
+    set((state) => {
+      if (!state.graph) return state;
+      return {
+        past: pushHistory(state.past, state.graph),
+        future: [],
+      };
+    }),
+
+  duplicateNode: (nodeId) => {
+    const current = get().graph;
+    if (!current) return null;
+    const orig = current.nodes.find((n) => n.id === nodeId);
+    if (!orig) return null;
+    let idx = current.nodes.length + 1;
+    while (current.nodes.some((n) => n.id === `${orig.type}_${idx}`)) {
+      idx += 1;
+    }
+    const copy: RawGraphNode = {
+      ...structuredClone(orig),
+      id: `${orig.type}_${idx}`,
+      label: `${orig.label} Copy`,
+      position: {
+        x: Math.round((orig.position?.x ?? 100) + 40),
+        y: Math.round((orig.position?.y ?? 100) + 40),
+      },
+    };
+    set((state) => ({
+      graph: { ...current, nodes: [...current.nodes, copy] },
+      past: pushHistory(state.past, current),
+      future: [],
+      isDirty: true,
+      selectedNodeId: copy.id,
+      selectedEdgeId: null,
+    }));
+    return copy;
+  },
+
+  setEntryNode: (nodeId) =>
+    set((state) => {
+      if (!state.graph || state.graph.entryNode === nodeId) return state;
+      return {
+        graph: { ...state.graph, entryNode: nodeId },
         past: pushHistory(state.past, state.graph),
         future: [],
         isDirty: true,
@@ -266,15 +327,33 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       };
     }),
 
-  addEdge: (source, target, condition) =>
+  addEdge: (source, target, condition, ports) =>
     set((state) => {
       if (!state.graph || !source || !target || source === target) return state;
       const exists = state.graph.edges.some(
-        (e) => e.source === source && e.target === target && (e.condition ?? "") === (condition ?? ""),
+        (e) =>
+          e.source === source &&
+          e.target === target &&
+          (e.condition ?? "") === (condition ?? "") &&
+          (e.middleware?.sourcePort ?? "") === (ports?.sourcePort ?? "") &&
+          (e.middleware?.targetPort ?? "") === (ports?.targetPort ?? ""),
       );
       if (exists) return state;
       const id = `e_${source}_${target}_${Date.now().toString(36).slice(-4)}`;
-      const nextEdge: RawGraphEdge = condition ? { id, source, target, condition } : { id, source, target };
+      const middleware =
+        ports?.sourcePort || ports?.targetPort
+          ? {
+              ...(ports.sourcePort ? { sourcePort: ports.sourcePort } : {}),
+              ...(ports.targetPort ? { targetPort: ports.targetPort } : {}),
+            }
+          : undefined;
+      const nextEdge: RawGraphEdge = {
+        id,
+        source,
+        target,
+        ...(condition ? { condition } : {}),
+        ...(middleware ? { middleware } : {}),
+      };
       return {
         graph: {
           ...state.graph,
@@ -362,7 +441,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     return zt;
   },
 
-  moveZipTie: (id, position) =>
+  moveZipTie: (id, position, commit = false) =>
     set((state) => {
       if (!state.graph) return state;
       const rx = Math.round(position.x);
@@ -372,6 +451,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
           ...state.graph,
           zipTies: (state.graph.zipTies ?? []).map((zt) => (zt.id === id ? { ...zt, position: { x: rx, y: ry } } : zt)),
         },
+        past: commit ? pushHistory(state.past, state.graph) : state.past,
+        future: commit ? [] : state.future,
         isDirty: true,
       };
     }),
@@ -387,6 +468,22 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
             if (zt.edgeIds.includes(edgeId)) return zt;
             return { ...zt, edgeIds: [...zt.edgeIds, edgeId] };
           }),
+        },
+        past: pushHistory(state.past, state.graph),
+        future: [],
+        isDirty: true,
+      };
+    }),
+
+  detachEdgeFromZipTie: (zipTieId, edgeId) =>
+    set((state) => {
+      if (!state.graph) return state;
+      return {
+        graph: {
+          ...state.graph,
+          zipTies: (state.graph.zipTies ?? []).map((zt) =>
+            zt.id === zipTieId ? { ...zt, edgeIds: zt.edgeIds.filter((eid) => eid !== edgeId) } : zt,
+          ),
         },
         past: pushHistory(state.past, state.graph),
         future: [],

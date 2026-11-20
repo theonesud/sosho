@@ -64,6 +64,7 @@ export const NodeUiFlagsSchema = z.object({
   locked: z.boolean().optional(),
   solo: z.boolean().optional(),
   outputExpanded: z.boolean().optional(),
+  wide: z.boolean().optional(),
 });
 
 export const ZipTieSchema = z.object({

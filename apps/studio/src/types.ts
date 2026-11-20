@@ -41,6 +41,7 @@ export interface NodeUiFlags {
   locked?: boolean;
   solo?: boolean;
   outputExpanded?: boolean;
+  wide?: boolean;
 }
 
 export interface ZipTie {

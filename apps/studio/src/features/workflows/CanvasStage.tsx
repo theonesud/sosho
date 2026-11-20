@@ -7,6 +7,7 @@ import {
   Controls,
   type Edge,
   type EdgeChange,
+  type IsValidConnection,
   MiniMap,
   type Node,
   type NodeChange,
@@ -17,11 +18,13 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
+  AlertTriangle,
   Bot,
   Brain,
   Cable,
   Copy,
   GitFork,
+  LayoutGrid,
   PanelLeft,
   PauseCircle,
   Pencil,
@@ -30,6 +33,7 @@ import {
   RotateCcw,
   Save,
   Sparkles,
+  Square,
   Undo2,
   Users,
   Wrench,
@@ -40,6 +44,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import {
+  checkNodeCompatibility,
+  extractTemplateVariables,
   formatLatency,
   NODE_META,
   type NodeExecutionLog,
@@ -50,6 +56,7 @@ import {
   type RawGraphNode,
   type RunDetail,
   type SkillInfo,
+  validateGraphIssues,
   type WorkflowVersion,
 } from "@/types";
 import { PatchCableEdge, type PatchCableEdgeData } from "./PatchCableEdge";
@@ -122,6 +129,28 @@ function deriveNodePorts(node: RawGraphNode): { inputs: NodePort[]; outputs: Nod
   }
 }
 
+function wouldCreateCycle(graph: RawGraph, source: string, target: string): boolean {
+  if (source === target) return true;
+  const adj = new Map<string, string[]>();
+  for (const e of graph.edges) {
+    const list = adj.get(e.source) ?? [];
+    list.push(e.target);
+    adj.set(e.source, list);
+  }
+  const queue = [target];
+  const visited = new Set<string>();
+  while (queue.length > 0) {
+    const curr = queue.shift();
+    if (!curr || visited.has(curr)) continue;
+    if (curr === source) return true;
+    visited.add(curr);
+    for (const next of adj.get(curr) ?? []) {
+      queue.push(next);
+    }
+  }
+  return false;
+}
+
 export interface CanvasStageProps {
   graph: RawGraph | null;
   runDetail?: RunDetail | null;
@@ -138,6 +167,7 @@ export interface CanvasStageProps {
   modelCatalog?: unknown[];
   onSaveWorkflow?: () => void;
   onStartRun?: (initialData: Record<string, unknown>) => void;
+  onCancelRun?: () => void;
   onRestoreVersion?: (version: WorkflowVersion) => void;
   onCreateStarterGraph?: (kind: NodeKind) => void;
   onEditGraph?: () => void;
@@ -153,6 +183,7 @@ interface QuickAddMenuState {
   flowY: number;
   connectFromId?: string;
   condition?: string;
+  sourcePort?: string;
 }
 
 function RackCanvasInner({
@@ -168,13 +199,14 @@ function RackCanvasInner({
   saveStatus = null,
   onSaveWorkflow,
   onStartRun,
+  onCancelRun,
   onCreateStarterGraph,
   onEditGraph,
   onForkSnapshot,
   onRollbackRun,
   onNodeClick,
 }: CanvasStageProps) {
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
 
   const selectedNodeId = useWorkflowStore((s) => s.selectedNodeId);
   const selectedEdgeId = useWorkflowStore((s) => s.selectedEdgeId);
@@ -182,10 +214,12 @@ function RackCanvasInner({
   const canRedo = useWorkflowStore((s) => s.future.length > 0);
 
   const addNode = useWorkflowStore((s) => s.addNode);
+  const duplicateNode = useWorkflowStore((s) => s.duplicateNode);
   const toggleNodeFlag = useWorkflowStore((s) => s.toggleNodeFlag);
   const setNodePositions = useWorkflowStore((s) => s.setNodePositions);
   const removeNodes = useWorkflowStore((s) => s.removeNodes);
   const addEdge = useWorkflowStore((s) => s.addEdge);
+  const rewireEdge = useWorkflowStore((s) => s.rewireEdge);
   const removeEdges = useWorkflowStore((s) => s.removeEdges);
   const addZipTie = useWorkflowStore((s) => s.addZipTie);
   const moveZipTie = useWorkflowStore((s) => s.moveZipTie);
@@ -195,9 +229,18 @@ function RackCanvasInner({
   const undo = useWorkflowStore((s) => s.undo);
   const redo = useWorkflowStore((s) => s.redo);
 
-  const [topicInput, setTopicInput] = useState("local AI architecture");
+  const [runInputs, setRunInputs] = useState<Record<string, string>>({ topic: "local AI architecture" });
   const [quickAdd, setQuickAdd] = useState<QuickAddMenuState | null>(null);
   const pendingConnectRef = useRef<{ nodeId: string; handleId: string | null } | null>(null);
+  const reconnectSuccessRef = useRef(true);
+
+  const templateVars = useMemo(() => {
+    if (!graph) return ["topic"];
+    const vars = extractTemplateVariables(graph);
+    return vars.length > 0 ? vars : ["topic"];
+  }, [graph]);
+
+  const graphIssues = useMemo(() => (graph ? validateGraphIssues(graph) : []), [graph]);
 
   const latestLogs = useMemo(() => {
     const map = new Map<string, NodeExecutionLog>();
@@ -259,6 +302,47 @@ function RackCanvasInner({
     [graph, attachEdgeToZipTie],
   );
 
+  const handleTidyLayout = useCallback(() => {
+    if (!graph || graph.nodes.length === 0) return;
+    const adj = new Map<string, string[]>();
+    for (const e of graph.edges) {
+      const list = adj.get(e.source) ?? [];
+      list.push(e.target);
+      adj.set(e.source, list);
+    }
+    const levels = new Map<string, number>();
+    const queue: Array<{ id: string; level: number }> = [];
+    if (graph.entryNode) queue.push({ id: graph.entryNode, level: 0 });
+    while (queue.length > 0) {
+      const curr = queue.shift();
+      if (!curr) continue;
+      const prev = levels.get(curr.id);
+      if (prev !== undefined && prev >= curr.level) continue;
+      levels.set(curr.id, curr.level);
+      for (const next of adj.get(curr.id) ?? []) {
+        queue.push({ id: next, level: curr.level + 1 });
+      }
+    }
+    for (const n of graph.nodes) {
+      if (!levels.has(n.id)) levels.set(n.id, 0);
+    }
+    const rowsByLevel = new Map<number, string[]>();
+    for (const n of graph.nodes) {
+      const lvl = levels.get(n.id) ?? 0;
+      const arr = rowsByLevel.get(lvl) ?? [];
+      arr.push(n.id);
+      rowsByLevel.set(lvl, arr);
+    }
+    const updates: Array<{ id: string; position: { x: number; y: number } }> = [];
+    for (const [lvl, ids] of rowsByLevel.entries()) {
+      ids.forEach((id, rowIdx) => {
+        updates.push({ id, position: { x: 80 + lvl * 380, y: 80 + rowIdx * 280 } });
+      });
+    }
+    setNodePositions(updates);
+    setTimeout(() => void fitView({ padding: 0.2, duration: 250 }), 30);
+  }, [graph, setNodePositions, fitView]);
+
   const flowNodes: Array<Node> = useMemo(() => {
     if (!graph) return [];
     const workflowNodes: WorkflowFlowNode[] = graph.nodes.map((n, idx) => {
@@ -295,7 +379,7 @@ function RackCanvasInner({
       draggable: !readOnly,
       data: {
         zipTieId: zt.id,
-        edgeCount: zt.edgeIds.length,
+        edgeIds: zt.edgeIds,
         label: zt.label,
         onGatherNearby: readOnly ? undefined : handleGatherNearby,
       },
@@ -343,10 +427,10 @@ function RackCanvasInner({
       const posUpdates: Array<{ id: string; position: { x: number; y: number } }> = [];
       const removed: string[] = [];
       for (const ch of changes) {
-        if (ch.type === "position" && ch.position && !ch.dragging) {
+        if (ch.type === "position" && ch.position) {
           if (ch.id.startsWith("zt_")) {
-            moveZipTie(ch.id, ch.position);
-          } else {
+            moveZipTie(ch.id, ch.position, !ch.dragging);
+          } else if (!ch.dragging) {
             posUpdates.push({ id: ch.id, position: ch.position });
           }
         } else if (ch.type === "remove") {
@@ -370,15 +454,77 @@ function RackCanvasInner({
     [readOnly, removeEdges],
   );
 
+  const isValidConnection: IsValidConnection = useCallback(
+    (connection) => {
+      if (!graph || !connection.source || !connection.target) return false;
+      if (wouldCreateCycle(graph, connection.source, connection.target)) return false;
+      if (graph.policy?.strictCompatibility) {
+        const srcNode = graph.nodes.find((n) => n.id === connection.source);
+        const tgtNode = graph.nodes.find((n) => n.id === connection.target);
+        if (
+          srcNode &&
+          tgtNode &&
+          checkNodeCompatibility(
+            srcNode,
+            tgtNode,
+            {
+              id: "preview",
+              source: srcNode.id,
+              target: tgtNode.id,
+              middleware: {
+                sourcePort: connection.sourceHandle ?? undefined,
+                targetPort: connection.targetHandle ?? undefined,
+              },
+            },
+            true,
+          ) === "incompatible"
+        ) {
+          return false;
+        }
+      }
+      return true;
+    },
+    [graph],
+  );
+
   const handleConnect = useCallback(
     (connection: Connection) => {
       if (readOnly || !connection.source || !connection.target) return;
       const sourceNode = graph?.nodes.find((n) => n.id === connection.source);
       const isBranching = sourceNode?.type === "decision" || sourceNode?.type === "checkpoint";
       const condition = isBranching && connection.sourceHandle ? connection.sourceHandle : undefined;
-      addEdge(connection.source, connection.target, condition);
+      addEdge(connection.source, connection.target, condition, {
+        sourcePort: connection.sourceHandle ?? undefined,
+        targetPort: connection.targetHandle ?? undefined,
+      });
     },
     [readOnly, graph, addEdge],
+  );
+
+  const handleReconnectStart = useCallback(() => {
+    reconnectSuccessRef.current = false;
+  }, []);
+
+  const handleReconnect = useCallback(
+    (oldEdge: Edge, newConnection: Connection) => {
+      reconnectSuccessRef.current = true;
+      if (readOnly || !newConnection.source || !newConnection.target) return;
+      const sourceNode = graph?.nodes.find((n) => n.id === newConnection.source);
+      const isBranching = sourceNode?.type === "decision" || sourceNode?.type === "checkpoint";
+      const condition = isBranching && newConnection.sourceHandle ? newConnection.sourceHandle : undefined;
+      rewireEdge(oldEdge.id, newConnection.source, newConnection.target, condition);
+    },
+    [readOnly, graph, rewireEdge],
+  );
+
+  const handleReconnectEnd = useCallback(
+    (_event: MouseEvent | TouchEvent, edge: Edge) => {
+      if (!reconnectSuccessRef.current && !readOnly) {
+        removeEdges([edge.id]);
+      }
+      reconnectSuccessRef.current = true;
+    },
+    [readOnly, removeEdges],
   );
 
   const handleConnectStart = useCallback(
@@ -416,6 +562,7 @@ function RackCanvasInner({
         flowY: flowPos.y,
         connectFromId: pending.nodeId,
         condition: isBranching && pending.handleId ? pending.handleId : undefined,
+        sourcePort: pending.handleId ?? undefined,
       });
     },
     [readOnly, screenToFlowPosition, graph],
@@ -425,7 +572,10 @@ function RackCanvasInner({
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
-      if (e.key === "/" && !readOnly && graph) {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "d" || e.key === "D") && selectedNodeId && !readOnly) {
+        e.preventDefault();
+        duplicateNode(selectedNodeId);
+      } else if (e.key === "/" && !readOnly && graph) {
         e.preventDefault();
         const center = screenToFlowPosition({ x: window.innerWidth * 0.55, y: window.innerHeight * 0.45 });
         setQuickAdd({
@@ -438,13 +588,15 @@ function RackCanvasInner({
         toggleNodeFlag(selectedNodeId, "bypass");
       } else if ((e.key === "l" || e.key === "L") && selectedNodeId && !readOnly) {
         toggleNodeFlag(selectedNodeId, "locked");
+      } else if (e.key === "f" || e.key === "F") {
+        void fitView({ padding: 0.22, duration: 220 });
       } else if (e.key === "Escape") {
         setQuickAdd(null);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [readOnly, graph, screenToFlowPosition, selectedNodeId, toggleNodeFlag]);
+  }, [readOnly, graph, screenToFlowPosition, selectedNodeId, toggleNodeFlag, duplicateNode, fitView]);
 
   if (isLoading) {
     return (
@@ -478,10 +630,12 @@ function RackCanvasInner({
     );
   }
 
+  const isRunning = runDetail?.status === "running" || runDetail?.status === "waiting_checkpoint";
+
   return (
     <div className="relative h-full w-full bg-[#09090b]">
       {/* Smoked glass top transport bar */}
-      <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex items-center justify-between gap-2">
+      <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex flex-wrap items-center justify-between gap-2">
         <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-zinc-800/90 bg-zinc-950/85 px-2.5 py-1.5 shadow-xl backdrop-blur-xl">
           {onToggleDrawer ? (
             <Button
@@ -497,10 +651,19 @@ function RackCanvasInner({
           {isDirty ? (
             <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] text-amber-300">Unsaved</span>
           ) : null}
+          {graphIssues.length > 0 ? (
+            <span
+              title={graphIssues.map((i) => i.message).join("\n")}
+              className="inline-flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] text-amber-300"
+            >
+              <AlertTriangle className="h-3 w-3" />
+              {graphIssues.length}
+            </span>
+          ) : null}
           {saveStatus ? <span className="font-mono text-[10px] text-zinc-400">{saveStatus}</span> : null}
         </div>
 
-        <div className="pointer-events-auto flex items-center gap-1.5 rounded-lg border border-zinc-800/90 bg-zinc-950/85 px-2.5 py-1.5 shadow-xl backdrop-blur-xl">
+        <div className="pointer-events-auto flex flex-wrap items-center gap-1.5 rounded-lg border border-zinc-800/90 bg-zinc-950/85 px-2.5 py-1.5 shadow-xl backdrop-blur-xl">
           {!readOnly ? (
             <>
               <Button variant="ghost" size="sm" disabled={!canUndo} onClick={undo} title="Undo">
@@ -509,12 +672,19 @@ function RackCanvasInner({
               <Button variant="ghost" size="sm" disabled={!canRedo} onClick={redo} title="Redo">
                 <Redo2 className="h-3.5 w-3.5" />
               </Button>
-              <Input
-                value={topicInput}
-                onChange={(e) => setTopicInput(e.target.value)}
-                placeholder="Topic input..."
-                className="h-7 w-40 border-zinc-800 bg-zinc-900/90 font-mono text-[11px]"
-              />
+              <Button variant="ghost" size="sm" onClick={handleTidyLayout} title="Auto-arrange modules">
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </Button>
+              {templateVars.slice(0, 3).map((varName) => (
+                <Input
+                  key={varName}
+                  value={runInputs[varName] ?? ""}
+                  onChange={(e) => setRunInputs((prev) => ({ ...prev, [varName]: e.target.value }))}
+                  placeholder={`${varName}...`}
+                  title={`Input variable: ${varName}`}
+                  className="h-7 w-32 border-zinc-800 bg-zinc-900/90 font-mono text-[11px]"
+                />
+              ))}
               {onSaveWorkflow ? (
                 <Button variant="secondary" size="sm" disabled={isSaving} onClick={onSaveWorkflow}>
                   <Save className="h-3.5 w-3.5" />
@@ -522,7 +692,7 @@ function RackCanvasInner({
                 </Button>
               ) : null}
               {onStartRun ? (
-                <Button size="sm" disabled={isStartingRun} onClick={() => onStartRun({ topic: topicInput })}>
+                <Button size="sm" disabled={isStartingRun} onClick={() => onStartRun(runInputs)}>
                   <Play className="h-3.5 w-3.5" />
                   {isStartingRun ? "Starting" : "Run"}
                 </Button>
@@ -530,6 +700,12 @@ function RackCanvasInner({
             </>
           ) : (
             <>
+              {isRunning && onCancelRun ? (
+                <Button variant="danger" size="sm" onClick={onCancelRun}>
+                  <Square className="h-3 w-3" />
+                  Stop
+                </Button>
+              ) : null}
               {onRollbackRun ? (
                 <Button variant="secondary" size="sm" onClick={() => onRollbackRun()}>
                   <RotateCcw className="h-3.5 w-3.5" />
@@ -558,9 +734,13 @@ function RackCanvasInner({
         edges={flowEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        isValidConnection={isValidConnection}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
+        onReconnectStart={handleReconnectStart}
+        onReconnect={handleReconnect}
+        onReconnectEnd={handleReconnectEnd}
         onConnectStart={handleConnectStart}
         onConnectEnd={handleConnectEnd}
         onNodeClick={(_e, node) => {
@@ -578,7 +758,9 @@ function RackCanvasInner({
         fitViewOptions={{ padding: 0.25 }}
         nodesDraggable={!readOnly}
         nodesConnectable={!readOnly}
+        edgesReconnectable={!readOnly}
         elementsSelectable
+        selectionOnDrag
         deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
         defaultEdgeOptions={{ type: "patchCable" }}
         proOptions={{ hideAttribution: true }}
@@ -616,6 +798,7 @@ function RackCanvasInner({
                     position: { x: quickAdd.flowX, y: quickAdd.flowY },
                     connectFromId: quickAdd.connectFromId,
                     condition: quickAdd.condition,
+                    sourcePort: quickAdd.sourcePort,
                   });
                   setQuickAdd(null);
                 }}

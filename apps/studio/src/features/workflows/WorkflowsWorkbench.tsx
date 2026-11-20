@@ -277,6 +277,18 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
     }
   };
 
+  const handleCancelRun = async () => {
+    if (!runId) return;
+    const res = await apiJson<{ ok: boolean }>(`/api/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+    if (res.ok) {
+      await queryClient.invalidateQueries({ queryKey: ["runs"] });
+      void refetchRun();
+    }
+  };
+
   const handleRestoreVersion = (version: WorkflowVersion) => {
     setGraph(version.graph, true);
     setSaveStatus(`Restored ${version.label}`);
@@ -340,6 +352,7 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
           modelCatalog={systemData?.modelCatalog ?? []}
           onSaveWorkflow={handleSaveWorkflow}
           onStartRun={handleStartRun}
+          onCancelRun={handleCancelRun}
           onRestoreVersion={handleRestoreVersion}
           onCreateStarterGraph={handleCreateStarterGraph}
           onEditGraph={
