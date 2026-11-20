@@ -36,6 +36,31 @@ export interface GraphPolicy {
   strictCompatibility?: boolean;
 }
 
+export interface NodeUiFlags {
+  bypass?: boolean;
+  locked?: boolean;
+  solo?: boolean;
+  outputExpanded?: boolean;
+}
+
+export interface ZipTie {
+  id: string;
+  position: { x: number; y: number };
+  edgeIds: string[];
+  label?: string;
+}
+
+export const PORT_TYPE_COLOR: Record<PortDataType, string> = {
+  text: "#38bdf8",
+  markdown: "#38bdf8",
+  json: "#a78bfa",
+  number: "#38bdf8",
+  boolean: "#fb7185",
+  audio: "#10b981",
+  memory: "#f59e0b",
+  any: "#a1a1aa",
+};
+
 export interface RawGraphNode {
   id: string;
   type: NodeKind;
@@ -50,6 +75,7 @@ export interface RawGraphNode {
   outputs?: NodePort[];
   outputVisibility?: OutputVisibility;
   isOutput?: boolean;
+  uiFlags?: NodeUiFlags;
   [key: string]: unknown;
 }
 
@@ -71,6 +97,7 @@ export interface RawGraph {
   policy?: GraphPolicy;
   nodes: RawGraphNode[];
   edges: RawGraphEdge[];
+  zipTies?: ZipTie[];
 }
 
 export interface WorkflowVersion {

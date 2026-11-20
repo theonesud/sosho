@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { GraphPolicy, NodeKind, RawGraph, RawGraphEdge, RawGraphNode } from "@/types";
+import type { GraphPolicy, NodeKind, NodeUiFlags, RawGraph, RawGraphEdge, RawGraphNode, ZipTie } from "@/types";
 
 function defaultNodeProps(kind: NodeKind, index: number): RawGraphNode {
   const id = `${kind}_${index}`;
@@ -84,12 +84,17 @@ interface WorkflowState {
     options?: { position?: { x: number; y: number }; connectFromId?: string; condition?: string },
   ) => RawGraphNode | null;
   updateNode: (nodeId: string, patch: Record<string, unknown>) => void;
+  toggleNodeFlag: (nodeId: string, flag: keyof NodeUiFlags) => void;
   setNodePositions: (updates: Array<{ id: string; position: { x: number; y: number } }>) => void;
   removeNodes: (nodeIds: string[]) => void;
   addEdge: (source: string, target: string, condition?: string) => void;
   updateEdge: (edgeId: string, patch: Partial<RawGraphEdge>) => void;
   rewireEdge: (edgeId: string, source: string, target: string, condition?: string) => void;
   removeEdges: (edgeIds: string[]) => void;
+  addZipTie: (position: { x: number; y: number }, edgeIds?: string[]) => ZipTie | null;
+  moveZipTie: (id: string, position: { x: number; y: number }) => void;
+  attachEdgeToZipTie: (zipTieId: string, edgeId: string) => void;
+  removeZipTie: (id: string) => void;
   selectNode: (nodeId: string | null) => void;
   selectEdge: (edgeId: string | null) => void;
   undo: () => void;
@@ -204,6 +209,24 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       };
     }),
 
+  toggleNodeFlag: (nodeId, flag) =>
+    set((state) => {
+      if (!state.graph) return state;
+      return {
+        graph: {
+          ...state.graph,
+          nodes: state.graph.nodes.map((n) => {
+            if (n.id !== nodeId) return n;
+            const prev = n.uiFlags ?? {};
+            return { ...n, uiFlags: { ...prev, [flag]: !prev[flag] } };
+          }),
+        },
+        past: pushHistory(state.past, state.graph),
+        future: [],
+        isDirty: true,
+      };
+    }),
+
   setNodePositions: (updates) =>
     set((state) => {
       if (!state.graph || updates.length === 0) return state;
@@ -299,15 +322,89 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     set((state) => {
       if (!state.graph || edgeIds.length === 0) return state;
       const removeSet = new Set(edgeIds);
+      const zipTies = (state.graph.zipTies ?? []).map((zt) => ({
+        ...zt,
+        edgeIds: zt.edgeIds.filter((eid) => !removeSet.has(eid)),
+      }));
       return {
         graph: {
           ...state.graph,
           edges: state.graph.edges.filter((e) => !removeSet.has(e.id)),
+          zipTies,
         },
         past: pushHistory(state.past, state.graph),
         future: [],
         isDirty: true,
         selectedEdgeId: state.selectedEdgeId && removeSet.has(state.selectedEdgeId) ? null : state.selectedEdgeId,
+      };
+    }),
+
+  addZipTie: (position, edgeIds = []) => {
+    const current = get().graph;
+    if (!current) return null;
+    const zt: ZipTie = {
+      id: `zt_${Date.now().toString(36).slice(-5)}`,
+      position: { x: Math.round(position.x), y: Math.round(position.y) },
+      edgeIds,
+    };
+    set((state) => {
+      if (!state.graph) return state;
+      return {
+        graph: {
+          ...state.graph,
+          zipTies: [...(state.graph.zipTies ?? []), zt],
+        },
+        past: pushHistory(state.past, state.graph),
+        future: [],
+        isDirty: true,
+      };
+    });
+    return zt;
+  },
+
+  moveZipTie: (id, position) =>
+    set((state) => {
+      if (!state.graph) return state;
+      const rx = Math.round(position.x);
+      const ry = Math.round(position.y);
+      return {
+        graph: {
+          ...state.graph,
+          zipTies: (state.graph.zipTies ?? []).map((zt) => (zt.id === id ? { ...zt, position: { x: rx, y: ry } } : zt)),
+        },
+        isDirty: true,
+      };
+    }),
+
+  attachEdgeToZipTie: (zipTieId, edgeId) =>
+    set((state) => {
+      if (!state.graph) return state;
+      return {
+        graph: {
+          ...state.graph,
+          zipTies: (state.graph.zipTies ?? []).map((zt) => {
+            if (zt.id !== zipTieId) return zt;
+            if (zt.edgeIds.includes(edgeId)) return zt;
+            return { ...zt, edgeIds: [...zt.edgeIds, edgeId] };
+          }),
+        },
+        past: pushHistory(state.past, state.graph),
+        future: [],
+        isDirty: true,
+      };
+    }),
+
+  removeZipTie: (id) =>
+    set((state) => {
+      if (!state.graph) return state;
+      return {
+        graph: {
+          ...state.graph,
+          zipTies: (state.graph.zipTies ?? []).filter((zt) => zt.id !== id),
+        },
+        past: pushHistory(state.past, state.graph),
+        future: [],
+        isDirty: true,
       };
     }),
 

@@ -59,6 +59,20 @@ export const PositionSchema = z.object({
   y: z.number(),
 });
 
+export const NodeUiFlagsSchema = z.object({
+  bypass: z.boolean().optional(),
+  locked: z.boolean().optional(),
+  solo: z.boolean().optional(),
+  outputExpanded: z.boolean().optional(),
+});
+
+export const ZipTieSchema = z.object({
+  id: z.string().min(1),
+  position: PositionSchema,
+  edgeIds: z.array(z.string()).default([]),
+  label: z.string().optional(),
+});
+
 const BaseNodeSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
@@ -72,6 +86,7 @@ const BaseNodeSchema = z.object({
   outputs: z.array(NodePortSchema).optional(),
   outputVisibility: OutputVisibilitySchema.optional(),
   isOutput: z.boolean().optional(),
+  uiFlags: NodeUiFlagsSchema.optional(),
 });
 
 export const AgentNodeSchema = BaseNodeSchema.extend({
@@ -163,11 +178,14 @@ export const GraphDefinitionSchema = z.object({
   policy: GraphPolicySchema.optional(),
   nodes: z.array(GraphNodeSchema).min(1),
   edges: z.array(GraphEdgeSchema),
+  zipTies: z.array(ZipTieSchema).optional(),
 });
 
 export type PortDataType = z.infer<typeof PortDataTypeSchema>;
 export type NodePort = z.infer<typeof NodePortSchema>;
 export type OutputVisibility = z.infer<typeof OutputVisibilitySchema>;
+export type NodeUiFlags = z.infer<typeof NodeUiFlagsSchema>;
+export type ZipTie = z.infer<typeof ZipTieSchema>;
 export type EdgeMiddlewareStage = z.infer<typeof EdgeMiddlewareStageSchema>;
 export type EdgeMiddlewareConfig = z.infer<typeof EdgeMiddlewareConfigSchema>;
 export type GraphPolicy = z.infer<typeof GraphPolicySchema>;

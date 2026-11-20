@@ -14,8 +14,8 @@ import type {
   WorkflowSummary,
   WorkflowVersion,
 } from "@/types";
+import { CanvasStage } from "./CanvasStage";
 import { CheckpointBar } from "./CheckpointBar";
-import { ObsidianGraphStage } from "./ObsidianGraphStage";
 import { SourceDrawer } from "./SourceDrawer";
 
 interface WorkflowsWorkbenchProps {
@@ -324,7 +324,7 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
           />
         ) : null}
 
-        <ObsidianGraphStage
+        <CanvasStage
           graph={displayedGraph}
           runDetail={runDetail}
           isLoading={stageLoading}

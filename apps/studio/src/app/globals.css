@@ -75,6 +75,15 @@ select {
   }
 }
 
+@keyframes cable-pulse {
+  from {
+    stroke-dashoffset: 32;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 .node-running-shimmer {
   background-image: linear-gradient(90deg, transparent 0%, rgba(56, 189, 248, 0.14) 50%, transparent 100%);
   background-size: 200% 100%;
