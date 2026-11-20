@@ -1,6 +1,40 @@
 export type NodeKind = "agent" | "subagent" | "decision" | "tool" | "skill" | "checkpoint" | "memory";
 export type ModelTier = "main" | "subagent" | "subagent-code" | "decision" | "local-uncensored";
 export type QueueLane = "cloud-io" | "local-gpu" | "host-browser";
+export type PortDataType = "text" | "json" | "number" | "boolean" | "markdown" | "audio" | "memory" | "any";
+export type PortCompatibility = "compatible" | "cast" | "incompatible";
+export type EdgeMiddlewareStage = "validate" | "map" | "cast" | "redact" | "trace" | "deliver";
+
+export interface NodePort {
+  id: string;
+  name: string;
+  type: PortDataType;
+  required?: boolean;
+  description?: string;
+}
+
+export interface OutputVisibility {
+  previewLength?: number;
+  includeInFinalOutput?: boolean;
+  redact?: boolean;
+}
+
+export interface EdgeMiddlewareConfig {
+  stages?: EdgeMiddlewareStage[];
+  sourcePort?: string;
+  targetPort?: string;
+  fieldMapping?: Record<string, string>;
+  castTo?: PortDataType;
+  redactPatterns?: string[];
+  strict?: boolean;
+}
+
+export interface GraphPolicy {
+  memoryRecallBefore?: "off" | "entry" | "decision" | "all";
+  saveRunSummary?: boolean;
+  autoCheckpointBefore?: Array<"gpu" | "yue2" | "tool">;
+  strictCompatibility?: boolean;
+}
 
 export interface RawGraphNode {
   id: string;
@@ -10,6 +44,12 @@ export interface RawGraphNode {
   queue?: QueueLane;
   retryMaxAttempts?: number;
   timeoutSeconds?: number;
+  modelId?: string;
+  inputType?: PortDataType;
+  inputs?: NodePort[];
+  outputs?: NodePort[];
+  outputVisibility?: OutputVisibility;
+  isOutput?: boolean;
   [key: string]: unknown;
 }
 
@@ -18,6 +58,7 @@ export interface RawGraphEdge {
   source: string;
   target: string;
   condition?: string;
+  middleware?: EdgeMiddlewareConfig;
 }
 
 export interface RawGraph {
@@ -27,8 +68,25 @@ export interface RawGraph {
   version: number;
   entryNode: string;
   maxSteps: number;
+  policy?: GraphPolicy;
   nodes: RawGraphNode[];
   edges: RawGraphEdge[];
+}
+
+export interface WorkflowVersion {
+  versionId: string;
+  graphId: string;
+  label: string;
+  graph: RawGraph;
+  createdAt: string;
+}
+
+export interface ModelCatalogEntry {
+  id: string;
+  name: string;
+  provider: string;
+  contextWindow?: number;
+  tags: string[];
 }
 
 export interface WorkflowSummary {
@@ -50,12 +108,24 @@ export interface NodeExecutionLog {
   traceUrl?: string;
   branch?: string;
   error?: string;
+  middlewareTraces?: string[];
+  memoryRecall?: {
+    query: string;
+    count: number;
+    preview?: string;
+  };
+  decisionLog?: {
+    chosenBranch: string;
+    modelId?: string;
+    reason?: string;
+  };
 }
 
 export interface PausedCheckpoint {
   nodeId: string;
   message?: string;
   allowStateEdit?: boolean;
+  synthetic?: boolean;
 }
 
 export interface RunSummary {
@@ -96,6 +166,7 @@ export interface SkillInfo {
 export interface SystemStatusResponse {
   services: ServiceStatus[];
   roles: Record<string, { provider: string; model: string; description?: string }>;
+  modelCatalog?: ModelCatalogEntry[];
   skills: Array<string | SkillInfo>;
 }
 
@@ -275,4 +346,160 @@ export function formatLatency(startedAt?: string, finishedAt?: string): string |
   if (!Number.isFinite(ms) || ms < 0) return null;
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
+}
+
+export const PORT_DATA_TYPES: PortDataType[] = [
+  "text",
+  "markdown",
+  "json",
+  "number",
+  "boolean",
+  "memory",
+  "audio",
+  "any",
+];
+
+export const MIDDLEWARE_STAGES: EdgeMiddlewareStage[] = ["validate", "map", "cast", "redact", "trace", "deliver"];
+
+export const BRANCH_COLORS = ["#10b981", "#f59e0b", "#38bdf8", "#ec4899", "#8b5cf6", "#f97316"];
+
+export function deriveNodePorts(node: RawGraphNode): { inputs: NodePort[]; outputs: NodePort[] } {
+  if (node.inputs?.length && node.outputs?.length) {
+    return { inputs: node.inputs, outputs: node.outputs };
+  }
+  const inputType = node.inputType ?? "any";
+  const outputKey = typeof node.outputKey === "string" && node.outputKey ? node.outputKey : "output";
+  let defaultInputs: NodePort[];
+  let defaultOutputs: NodePort[];
+
+  switch (node.type) {
+    case "agent":
+    case "subagent":
+    case "skill":
+      defaultInputs = [{ id: "in", name: "input", type: inputType === "any" ? "text" : inputType }];
+      defaultOutputs = [{ id: outputKey, name: outputKey, type: "markdown" }];
+      break;
+    case "decision": {
+      const branches = Array.isArray(node.branches) ? (node.branches as string[]) : ["yes", "no"];
+      defaultInputs = [{ id: "in", name: "context", type: inputType }];
+      defaultOutputs = branches.map((b) => ({ id: b, name: b, type: "text" }));
+      break;
+    }
+    case "tool":
+      defaultInputs = [{ id: "in", name: "args", type: inputType }];
+      defaultOutputs = [{ id: outputKey, name: outputKey, type: node.toolKind === "yue2" ? "audio" : "text" }];
+      break;
+    case "memory":
+      defaultInputs = [{ id: "in", name: "query", type: inputType === "any" ? "text" : inputType }];
+      defaultOutputs = [{ id: outputKey, name: outputKey, type: "memory" }];
+      break;
+    case "checkpoint":
+      defaultInputs = [{ id: "in", name: "state", type: "any" }];
+      defaultOutputs = [
+        { id: "approve", name: "approve", type: "any" },
+        { id: "reject", name: "reject", type: "any" },
+      ];
+      break;
+  }
+
+  return {
+    inputs: node.inputs?.length ? node.inputs : defaultInputs,
+    outputs: node.outputs?.length ? node.outputs : defaultOutputs,
+  };
+}
+
+const CASTABLE_CLIENT: Record<PortDataType, PortDataType[]> = {
+  any: ["text", "json", "number", "boolean", "markdown", "audio", "memory", "any"],
+  text: ["markdown", "json", "any"],
+  markdown: ["text", "any"],
+  json: ["text", "markdown", "any"],
+  number: ["text", "json", "any"],
+  boolean: ["text", "json", "any"],
+  memory: ["text", "json", "markdown", "any"],
+  audio: ["any"],
+};
+
+export function checkNodeCompatibility(
+  src: RawGraphNode,
+  tgt: RawGraphNode,
+  edge?: RawGraphEdge,
+  strict = false,
+): PortCompatibility {
+  const srcPorts = deriveNodePorts(src).outputs;
+  const tgtPorts = deriveNodePorts(tgt).inputs;
+  const srcPort =
+    (edge?.middleware?.sourcePort ? srcPorts.find((p) => p.id === edge.middleware?.sourcePort) : undefined) ??
+    srcPorts[0];
+  const tgtPort =
+    (edge?.middleware?.targetPort ? tgtPorts.find((p) => p.id === edge.middleware?.targetPort) : undefined) ??
+    tgtPorts[0];
+  if (!srcPort || !tgtPort) return "compatible";
+  if (srcPort.type === tgtPort.type || srcPort.type === "any" || tgtPort.type === "any") return "compatible";
+  if (!strict && CASTABLE_CLIENT[srcPort.type]?.includes(tgtPort.type)) return "cast";
+  return "incompatible";
+}
+
+export interface GraphValidationIssue {
+  id: string;
+  severity: "error" | "warning";
+  message: string;
+  nodeId?: string;
+  edgeId?: string;
+}
+
+export function validateGraphIssues(graph: RawGraph | null): GraphValidationIssue[] {
+  if (!graph) return [];
+  const issues: GraphValidationIssue[] = [];
+  const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
+  const strict = Boolean(graph.policy?.strictCompatibility);
+
+  if (graph.nodes.length === 0) {
+    issues.push({ id: "empty", severity: "warning", message: "Workflow has no nodes yet." });
+    return issues;
+  }
+
+  if (!graph.entryNode || !nodeMap.has(graph.entryNode)) {
+    issues.push({ id: "missing-entry", severity: "error", message: "Missing valid entry node." });
+  }
+
+  const connected = new Set<string>();
+  for (const e of graph.edges) {
+    connected.add(e.source);
+    connected.add(e.target);
+    const src = nodeMap.get(e.source);
+    const tgt = nodeMap.get(e.target);
+    if (!src || !tgt) {
+      issues.push({
+        id: `dangling-${e.id}`,
+        severity: "error",
+        message: `Edge ${e.id} references missing node.`,
+        edgeId: e.id,
+      });
+      continue;
+    }
+    const compat = checkNodeCompatibility(src, tgt, e, strict);
+    if (compat === "incompatible") {
+      issues.push({
+        id: `compat-${e.id}`,
+        severity: strict ? "error" : "warning",
+        message: `Incompatible types: ${src.label} → ${tgt.label}`,
+        edgeId: e.id,
+      });
+    }
+  }
+
+  if (graph.nodes.length > 1) {
+    for (const n of graph.nodes) {
+      if (!connected.has(n.id)) {
+        issues.push({
+          id: `orphan-${n.id}`,
+          severity: "warning",
+          message: `Node "${n.label}" is disconnected.`,
+          nodeId: n.id,
+        });
+      }
+    }
+  }
+
+  return issues;
 }

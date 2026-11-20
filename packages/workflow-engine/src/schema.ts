@@ -10,6 +10,50 @@ export const ModelTierSchema = z.enum([
 
 export const TaskQueueSchema = z.enum(["cloud-io", "local-gpu", "host-browser"]);
 
+export const PortDataTypeSchema = z.enum(["text", "json", "number", "boolean", "markdown", "audio", "memory", "any"]);
+
+export const NodePortSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  type: PortDataTypeSchema.default("any"),
+  required: z.boolean().optional(),
+  description: z.string().optional(),
+});
+
+export const OutputVisibilitySchema = z.object({
+  previewLength: z.number().int().min(40).max(10000).optional(),
+  includeInFinalOutput: z.boolean().optional(),
+  redact: z.boolean().optional(),
+});
+
+export const EdgeMiddlewareStageSchema = z.enum(["validate", "map", "cast", "redact", "trace", "deliver"]);
+
+export const DEFAULT_MIDDLEWARE_STAGES: ReadonlyArray<z.infer<typeof EdgeMiddlewareStageSchema>> = [
+  "validate",
+  "map",
+  "cast",
+  "redact",
+  "trace",
+  "deliver",
+];
+
+export const EdgeMiddlewareConfigSchema = z.object({
+  stages: z.array(EdgeMiddlewareStageSchema).optional(),
+  sourcePort: z.string().optional(),
+  targetPort: z.string().optional(),
+  fieldMapping: z.record(z.string(), z.string()).optional(),
+  castTo: PortDataTypeSchema.optional(),
+  redactPatterns: z.array(z.string()).optional(),
+  strict: z.boolean().optional(),
+});
+
+export const GraphPolicySchema = z.object({
+  memoryRecallBefore: z.enum(["off", "entry", "decision", "all"]).default("decision"),
+  saveRunSummary: z.boolean().default(true),
+  autoCheckpointBefore: z.array(z.enum(["gpu", "yue2", "tool"])).default([]),
+  strictCompatibility: z.boolean().default(false),
+});
+
 export const PositionSchema = z.object({
   x: z.number(),
   y: z.number(),
@@ -22,6 +66,12 @@ const BaseNodeSchema = z.object({
   queue: TaskQueueSchema.optional(),
   retryMaxAttempts: z.number().int().min(1).max(10).optional(),
   timeoutSeconds: z.number().int().min(5).max(3600).optional(),
+  modelId: z.string().optional(),
+  inputType: PortDataTypeSchema.optional(),
+  inputs: z.array(NodePortSchema).optional(),
+  outputs: z.array(NodePortSchema).optional(),
+  outputVisibility: OutputVisibilitySchema.optional(),
+  isOutput: z.boolean().optional(),
 });
 
 export const AgentNodeSchema = BaseNodeSchema.extend({
@@ -100,6 +150,7 @@ export const GraphEdgeSchema = z.object({
   source: z.string().min(1),
   target: z.string().min(1),
   condition: z.string().optional(), // Matches DecisionNode branch name or "approve" / "reject" for CheckpointNode
+  middleware: EdgeMiddlewareConfigSchema.optional(),
 });
 
 export const GraphDefinitionSchema = z.object({
@@ -109,10 +160,17 @@ export const GraphDefinitionSchema = z.object({
   version: z.number().int().min(1).default(1),
   entryNode: z.string().min(1),
   maxSteps: z.number().int().min(1).max(200).default(50),
+  policy: GraphPolicySchema.optional(),
   nodes: z.array(GraphNodeSchema).min(1),
   edges: z.array(GraphEdgeSchema),
 });
 
+export type PortDataType = z.infer<typeof PortDataTypeSchema>;
+export type NodePort = z.infer<typeof NodePortSchema>;
+export type OutputVisibility = z.infer<typeof OutputVisibilitySchema>;
+export type EdgeMiddlewareStage = z.infer<typeof EdgeMiddlewareStageSchema>;
+export type EdgeMiddlewareConfig = z.infer<typeof EdgeMiddlewareConfigSchema>;
+export type GraphPolicy = z.infer<typeof GraphPolicySchema>;
 export type GraphDefinition = z.infer<typeof GraphDefinitionSchema>;
 export type GraphNode = z.infer<typeof GraphNodeSchema>;
 export type GraphEdge = z.infer<typeof GraphEdgeSchema>;
@@ -142,6 +200,17 @@ export interface NodeExecutionLog {
   queue?: TaskQueue;
   durationMs?: number;
   traceId?: string;
+  middlewareTraces?: string[];
+  memoryRecall?: {
+    query: string;
+    count: number;
+    preview?: string;
+  };
+  decisionLog?: {
+    chosenBranch: string;
+    modelId?: string;
+    reason?: string;
+  };
 }
 
 export type StepExecutionRecord = NodeExecutionLog;
@@ -215,7 +284,106 @@ export function validateGraph(raw: unknown): GraphDefinition {
         );
       }
     }
+
+    if (graph.policy?.strictCompatibility) {
+      const tgt = nodeMap.get(edge.target);
+      if (tgt) {
+        const srcPorts = src.outputs?.length ? src.outputs : deriveDefaultPorts(src).outputs;
+        const tgtPorts = tgt.inputs?.length ? tgt.inputs : deriveDefaultPorts(tgt).inputs;
+        const srcPort =
+          (edge.middleware?.sourcePort ? srcPorts.find((p) => p.id === edge.middleware?.sourcePort) : undefined) ??
+          srcPorts[0];
+        const tgtPort =
+          (edge.middleware?.targetPort ? tgtPorts.find((p) => p.id === edge.middleware?.targetPort) : undefined) ??
+          tgtPorts[0];
+        if (srcPort && tgtPort) {
+          const compat = checkPortCompatibility(srcPort.type, tgtPort.type, true);
+          if (compat === "incompatible") {
+            throw new GraphValidationError(
+              `Edge '${edge.id}' connects incompatible ports (${src.id}:${srcPort.type} -> ${tgt.id}:${tgtPort.type}) in strict mode`,
+            );
+          }
+        }
+      }
+    }
   }
 
   return graph;
+}
+
+export function deriveDefaultPorts(node: Pick<GraphNode, "type"> & Record<string, unknown>): {
+  inputs: NodePort[];
+  outputs: NodePort[];
+} {
+  const inputType = (node.inputType as PortDataType | undefined) ?? "any";
+  const outputKey = typeof node.outputKey === "string" && node.outputKey ? node.outputKey : "output";
+
+  switch (node.type) {
+    case "agent":
+    case "subagent":
+    case "skill":
+      return {
+        inputs: [{ id: "in", name: "input", type: inputType === "any" ? "text" : inputType, required: false }],
+        outputs: [{ id: outputKey, name: outputKey, type: "markdown" }],
+      };
+    case "decision": {
+      const branches = Array.isArray(node.branches) ? (node.branches as string[]) : ["yes", "no"];
+      return {
+        inputs: [{ id: "in", name: "context", type: inputType }],
+        outputs: branches.map((b) => ({ id: b, name: b, type: "text" as const })),
+      };
+    }
+    case "tool": {
+      const outType: PortDataType = node.toolKind === "yue2" ? "audio" : "text";
+      return {
+        inputs: [{ id: "in", name: "args", type: inputType }],
+        outputs: [{ id: outputKey, name: outputKey, type: outType }],
+      };
+    }
+    case "memory":
+      return {
+        inputs: [{ id: "in", name: "query", type: inputType === "any" ? "text" : inputType }],
+        outputs: [{ id: outputKey, name: outputKey, type: "memory" }],
+      };
+    case "checkpoint":
+      return {
+        inputs: [{ id: "in", name: "state", type: "any" }],
+        outputs: [
+          { id: "approve", name: "approve", type: "any" },
+          { id: "reject", name: "reject", type: "any" },
+        ],
+      };
+    default:
+      return {
+        inputs: [{ id: "in", name: "input", type: inputType }],
+        outputs: [{ id: outputKey, name: outputKey, type: "any" }],
+      };
+  }
+}
+
+export type PortCompatibility = "compatible" | "cast" | "incompatible";
+
+const CASTABLE_TYPES: Record<PortDataType, PortDataType[]> = {
+  any: ["text", "json", "number", "boolean", "markdown", "audio", "memory", "any"],
+  text: ["markdown", "json", "any"],
+  markdown: ["text", "any"],
+  json: ["text", "markdown", "any"],
+  number: ["text", "json", "any"],
+  boolean: ["text", "json", "any"],
+  memory: ["text", "json", "markdown", "any"],
+  audio: ["any"],
+};
+
+export function checkPortCompatibility(
+  sourceType: PortDataType,
+  targetType: PortDataType,
+  strict = false,
+): PortCompatibility {
+  if (sourceType === targetType || sourceType === "any" || targetType === "any") {
+    return "compatible";
+  }
+  if (!strict && CASTABLE_TYPES[sourceType]?.includes(targetType)) {
+    return "cast";
+  }
+  return "incompatible";
 }

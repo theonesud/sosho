@@ -58,7 +58,30 @@ export function createWorkflowsRoutes(ctx: StudioContext): Hono {
       }
     }
     writeFileSync(outPath, `${JSON.stringify(validated, null, 2)}\n`, "utf8");
-    return c.json({ ok: true, id: validated.id, path: outPath });
+    const label = c.req.header("x-version-label") || "Saved";
+    const versionRecord = ctx.engine.store.saveVersion(validated, label);
+    return c.json({ ok: true, id: validated.id, path: outPath, versionId: versionRecord.versionId });
+  });
+
+  app.get("/:id/versions", (c) => {
+    const id = decodeURIComponent(c.req.param("id"));
+    if (!isSafeWorkflowId(id)) {
+      throw new HttpError(400, "Invalid workflow ID");
+    }
+    const versions = ctx.engine.store.listVersions(id, 30);
+    return c.json({ versions });
+  });
+
+  app.post("/:id/versions", async (c) => {
+    const id = decodeURIComponent(c.req.param("id"));
+    if (!isSafeWorkflowId(id)) {
+      throw new HttpError(400, "Invalid workflow ID");
+    }
+    const body = await readJsonObject(c);
+    const graph = validateGraph({ ...(body.graph as Record<string, unknown>), id });
+    const label = typeof body.label === "string" && body.label.trim() ? body.label.trim() : "Autosave";
+    const versionRecord = ctx.engine.store.saveVersion(graph, label);
+    return c.json({ ok: true, version: versionRecord });
   });
 
   app.delete("/:id", (c) => {

@@ -126,10 +126,73 @@ export function createSystemRoutes(ctx: StudioContext): Hono {
     });
 
     const skills = listSkills(ctx.skillsDir);
+    const modelCatalog: Array<{
+      id: string;
+      name: string;
+      provider: string;
+      contextWindow?: number;
+      tags: string[];
+    }> = [];
+
+    for (const [providerName, providerCfg] of Object.entries(providers)) {
+      const isLocal = providerName.startsWith("llama") || providerName === "yue2";
+      for (const rawModel of providerCfg.models ?? []) {
+        const m = rawModel as {
+          id: string;
+          name?: string;
+          contextWindow?: number;
+          reasoning?: boolean;
+          input?: string[];
+        };
+        const tags: string[] = [isLocal ? "local" : "cloud"];
+        if (m.reasoning) tags.push("reasoning");
+        if (Array.isArray(m.input) && m.input.includes("image")) tags.push("vision");
+        if (m.id.toLowerCase().includes("coder") || m.id.toLowerCase().includes("code")) tags.push("code");
+        if (m.id.toLowerCase().includes("1.7b") || providerName === "llama-decision") {
+          tags.push("small", "decision");
+        } else {
+          tags.push("large");
+        }
+        if (
+          providerName === "refuseless" ||
+          m.id.toLowerCase().includes("abliterated") ||
+          providerName === "llama.cpp"
+        ) {
+          tags.push("uncensored");
+        }
+        modelCatalog.push({
+          id: m.id,
+          name: m.name || m.id,
+          provider: providerName,
+          contextWindow: m.contextWindow,
+          tags: Array.from(new Set(tags)),
+        });
+      }
+    }
+
+    if (!modelCatalog.some((m) => m.tags.includes("emb"))) {
+      modelCatalog.push({
+        id: "nomic-embed-text-v1.5",
+        name: "Nomic Embed Text v1.5",
+        provider: "llama-embed",
+        contextWindow: 8192,
+        tags: ["local", "small", "emb"],
+      });
+    }
+    if (!modelCatalog.some((m) => m.tags.includes("music gen"))) {
+      modelCatalog.push({
+        id: "yue2-music-gen",
+        name: "YuE2 Music Generator",
+        provider: "yue2",
+        tags: ["local", "music gen"],
+      });
+    }
+
     return c.json({
       services,
       roles,
       providers: Object.keys(providers),
+      modelCatalog,
       skills,
     });
   });

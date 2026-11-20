@@ -5,17 +5,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { apiJson, authHeaders } from "@/api";
 import { useWorkflowStore } from "@/stores/workflow-store";
-import {
-  type RawGraph,
-  type RunDetail,
-  type RunSummary,
-  type SystemStatusResponse,
-  WORKFLOW_TEMPLATES,
-  type WorkflowSummary,
+import type {
+  NodeKind,
+  RawGraph,
+  RunDetail,
+  RunSummary,
+  SystemStatusResponse,
+  WorkflowSummary,
+  WorkflowVersion,
 } from "@/types";
 import { CheckpointBar } from "./CheckpointBar";
 import { ObsidianGraphStage } from "./ObsidianGraphStage";
-import { WorkflowSidebar } from "./WorkflowSidebar";
+import { SourceDrawer } from "./SourceDrawer";
 
 interface WorkflowsWorkbenchProps {
   runId?: string;
@@ -30,10 +31,13 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
   const isDirty = useWorkflowStore((s) => s.isDirty);
   const saveStatus = useWorkflowStore((s) => s.saveStatus);
   const setGraph = useWorkflowStore((s) => s.setGraph);
+  const addNode = useWorkflowStore((s) => s.addNode);
+  const selectNode = useWorkflowStore((s) => s.selectNode);
   const markSaved = useWorkflowStore((s) => s.markSaved);
   const setSaveStatus = useWorkflowStore((s) => s.setSaveStatus);
   const forkSnapshot = useWorkflowStore((s) => s.forkSnapshot);
 
+  const [drawerOpen, setDrawerOpen] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isStartingRun, setIsStartingRun] = useState(false);
 
@@ -80,7 +84,6 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
     },
   });
 
-  // Resolve target workflow ID cleanly via URL param or first saved workflow
   const urlWorkflowId = searchParams.get("workflow");
   const isLocalUnsavedGraph = Boolean(graph && !workflows.some((w) => w.id === graph.id));
   const targetWorkflowId = !runId ? urlWorkflowId || (isLocalUnsavedGraph ? null : (workflows[0]?.id ?? null)) : null;
@@ -96,6 +99,19 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
     staleTime: 30_000,
   });
 
+  const activeWorkflowId = graph?.id ?? targetWorkflowId;
+  const { data: versions = [] } = useQuery({
+    queryKey: ["workflow-versions", activeWorkflowId],
+    queryFn: async () => {
+      if (!activeWorkflowId) return [];
+      const res = await apiJson<{ versions: WorkflowVersion[] }>(
+        `/api/workflows/${encodeURIComponent(activeWorkflowId)}/versions`,
+      );
+      return res.ok ? res.data.versions : [];
+    },
+    enabled: Boolean(activeWorkflowId) && !runId,
+  });
+
   useEffect(() => {
     if (runId || !fetchedWorkflow) return;
     if (graph?.id !== fetchedWorkflow.id) {
@@ -106,12 +122,12 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
 
   const handleSaveWorkflow = useCallback(async () => {
     const current = useWorkflowStore.getState().graph;
-    if (!current || isSaving) return;
+    if (!current || isSaving || current.nodes.length === 0) return;
     setIsSaving(true);
     setSaveStatus("Saving...");
     const res = await apiJson<{ ok: boolean; id: string }>("/api/workflows", {
       method: "POST",
-      headers: authHeaders({ "Content-Type": "application/json" }),
+      headers: authHeaders({ "Content-Type": "application/json", "X-Version-Label": "Manual save" }),
       body: JSON.stringify(current),
     });
     setIsSaving(false);
@@ -119,10 +135,28 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
       markSaved("Saved");
       queryClient.setQueryData(["workflow", current.id], structuredClone(current));
       await queryClient.invalidateQueries({ queryKey: ["workflows"] });
+      await queryClient.invalidateQueries({ queryKey: ["workflow-versions", current.id] });
     } else {
       setSaveStatus(res.data.error || "Save failed");
     }
   }, [isSaving, markSaved, queryClient, setSaveStatus]);
+
+  // Debounced autosave snapshot to version history when dirty
+  useEffect(() => {
+    if (runId || !isDirty || !graph || graph.nodes.length === 0) return;
+    const timer = setTimeout(() => {
+      void apiJson(`/api/workflows/${encodeURIComponent(graph.id)}/versions`, {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ graph, label: "Autosave" }),
+      }).then((res) => {
+        if (res.ok) {
+          void queryClient.invalidateQueries({ queryKey: ["workflow-versions", graph.id] });
+        }
+      });
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [runId, isDirty, graph, queryClient]);
 
   // Cmd+S / Ctrl+S shortcut
   useEffect(() => {
@@ -146,37 +180,49 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
         name: "Untitled Workflow",
         description: "",
         version: 1,
-        entryNode: "agent_1",
-        maxSteps: 12,
-        nodes: [
-          {
-            id: "agent_1",
-            type: "agent",
-            label: "Primary Agent",
-            tier: "main",
-            position: { x: 0, y: 0 },
-            promptTemplate: "Analyze {{topic}}",
-            outputKey: "result",
-          },
-        ],
+        entryNode: "",
+        maxSteps: 20,
+        policy: {
+          memoryRecallBefore: "decision",
+          saveRunSummary: true,
+          autoCheckpointBefore: [],
+          strictCompatibility: false,
+        },
+        nodes: [],
         edges: [],
       },
-      true,
+      false,
     );
     router.push("/");
   };
 
-  const handleLoadTemplate = (templateKey: string) => {
-    const tpl = WORKFLOW_TEMPLATES[templateKey];
-    if (!tpl) return;
-    setGraph(
-      {
-        ...structuredClone(tpl),
-        id: `${tpl.id}-${Date.now().toString(36).slice(-3)}`,
-      },
-      true,
-    );
-    if (runId) router.push("/");
+  const handleCreateStarterGraph = (kind: NodeKind) => {
+    const id = graph?.id || `wf-${Date.now().toString(36).slice(-4)}`;
+    if (!graph) {
+      setGraph(
+        {
+          id,
+          name: "Untitled Workflow",
+          description: "",
+          version: 1,
+          entryNode: "",
+          maxSteps: 20,
+          policy: {
+            memoryRecallBefore: "decision",
+            saveRunSummary: true,
+            autoCheckpointBefore: [],
+            strictCompatibility: false,
+          },
+          nodes: [],
+          edges: [],
+        },
+        true,
+      );
+    }
+    const created = addNode(kind, { position: { x: 0, y: 0 } });
+    if (created) {
+      selectNode(created.id);
+    }
   };
 
   const handleDeleteWorkflow = async (workflowId: string) => {
@@ -201,31 +247,13 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
     }
   };
 
-  const handleStartRunForWorkflow = async (workflowId: string, initialData: Record<string, unknown>) => {
-    if (isStartingRun) return;
+  const handleStartRun = async (initialData: Record<string, unknown>) => {
+    if (!graph || isStartingRun) return;
     setIsStartingRun(true);
-    let targetGraph: RawGraph | null = graph?.id === workflowId ? graph : null;
-    if (!targetGraph) {
-      const cached = queryClient.getQueryData<RawGraph>(["workflow", workflowId]);
-      if (cached) {
-        targetGraph = cached;
-      } else {
-        const fetched = await apiJson<RawGraph>(`/api/workflows/${encodeURIComponent(workflowId)}`);
-        if (fetched.ok && fetched.data.id) {
-          targetGraph = fetched.data;
-        }
-      }
-    }
-    if (!targetGraph) {
-      setIsStartingRun(false);
-      setSaveStatus("Could not load workflow");
-      return;
-    }
-
     const res = await apiJson<{ runId: string; status: string }>("/api/runs", {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ graph: targetGraph, initialData }),
+      body: JSON.stringify({ graph, initialData }),
     });
     setIsStartingRun(false);
     if (res.ok && res.data.runId) {
@@ -236,13 +264,22 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
     }
   };
 
-  const handleCancelRun = async (id: string) => {
-    await apiJson<{ ok: boolean }>(`/api/runs/${encodeURIComponent(id)}/cancel`, {
+  const handleRollbackRun = async (toStep?: number) => {
+    if (!runId) return;
+    const res = await apiJson<{ ok: boolean; runId: string }>(`/api/runs/${encodeURIComponent(runId)}/rollback`, {
       method: "POST",
-      headers: authHeaders(),
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(toStep !== undefined ? { toStep } : {}),
     });
-    await queryClient.invalidateQueries({ queryKey: ["runs"] });
-    if (id === runId) void refetchRun();
+    if (res.ok) {
+      await queryClient.invalidateQueries({ queryKey: ["runs"] });
+      void refetchRun();
+    }
+  };
+
+  const handleRestoreVersion = (version: WorkflowVersion) => {
+    setGraph(version.graph, true);
+    setSaveStatus(`Restored ${version.label}`);
   };
 
   const isSwitchingWorkflow = Boolean(!runId && targetWorkflowId && graph?.id !== targetWorkflowId && workflowLoading);
@@ -256,29 +293,25 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
 
   return (
     <div className="flex h-full w-full overflow-hidden">
-      <WorkflowSidebar
+      <SourceDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
         workflows={workflows}
         workflowsLoading={workflowsLoading}
         runs={runs}
         runsLoading={runsLoading}
         activeGraph={displayedGraph}
         activeRunId={runId}
-        isDirty={isDirty}
-        saveStatus={saveStatus}
-        isSaving={isSaving}
-        isStartingRun={isStartingRun}
         onSelectWorkflow={(id) => {
           router.push(`/?workflow=${encodeURIComponent(id)}`);
         }}
-        onLoadTemplate={handleLoadTemplate}
+        onSelectRun={(id) => {
+          router.push(`/runs/${encodeURIComponent(id)}`);
+        }}
         onNewWorkflow={handleNewWorkflow}
-        onSaveWorkflow={handleSaveWorkflow}
         onDeleteWorkflow={handleDeleteWorkflow}
-        onStartRun={handleStartRunForWorkflow}
-        onCancelRun={handleCancelRun}
       />
 
-      {/* Center Flow Canvas Stage (Persistent instance, zero remount flicker) */}
       <div className="relative min-w-0 flex-1 overflow-hidden">
         {runDetail?.status === "waiting_checkpoint" && runDetail.pausedCheckpoint ? (
           <CheckpointBar
@@ -296,7 +329,19 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
           runDetail={runDetail}
           isLoading={stageLoading}
           readOnly={isReadOnly}
+          drawerOpen={drawerOpen}
+          onToggleDrawer={() => setDrawerOpen((v) => !v)}
+          isDirty={isDirty}
+          isSaving={isSaving}
+          isStartingRun={isStartingRun}
+          saveStatus={saveStatus}
+          versions={versions}
           availableSkills={systemData?.skills ?? []}
+          modelCatalog={systemData?.modelCatalog ?? []}
+          onSaveWorkflow={handleSaveWorkflow}
+          onStartRun={handleStartRun}
+          onRestoreVersion={handleRestoreVersion}
+          onCreateStarterGraph={handleCreateStarterGraph}
           onEditGraph={
             runDetail?.graph
               ? () => {
@@ -313,6 +358,7 @@ export function WorkflowsWorkbench({ runId }: WorkflowsWorkbenchProps) {
                 }
               : undefined
           }
+          onRollbackRun={handleRollbackRun}
         />
       </div>
     </div>

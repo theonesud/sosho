@@ -15,6 +15,10 @@ const checkpointSchema = z.object({
   note: z.string().optional(),
 });
 
+const rollbackSchema = z.object({
+  toStep: z.number().int().min(1).optional(),
+});
+
 export function createRunsRoutes(ctx: StudioContext): Hono {
   const app = new Hono();
 
@@ -58,6 +62,13 @@ export function createRunsRoutes(ctx: StudioContext): Hono {
       note: body.note,
     });
     return c.json({ ok: true, runId: updated.runId, status: updated.status });
+  });
+
+  app.post("/:id/rollback", async (c) => {
+    const runId = decodeURIComponent(c.req.param("id"));
+    const body = await parseValidatedBody(c, rollbackSchema).catch(() => ({ toStep: undefined }));
+    const updated = await ctx.engine.rollbackRun(runId, body.toStep);
+    return c.json({ ok: true, runId: updated.runId, status: updated.status, currentNodeId: updated.currentNodeId });
   });
 
   app.get("/:id", (c) => {

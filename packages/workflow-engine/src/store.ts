@@ -21,6 +21,15 @@ export interface PausedCheckpoint {
   nodeId: string;
   message: string;
   allowStateEdit: boolean;
+  synthetic?: boolean;
+}
+
+export interface WorkflowVersionRecord {
+  versionId: string;
+  graphId: string;
+  label: string;
+  graph: GraphDefinition;
+  createdAt: string;
 }
 
 export interface PersistedWorkflowRun extends WorkflowRunState {
@@ -69,6 +78,14 @@ function openSqlite(dbPath: string): SqliteDb {
     );
     CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status);
     CREATE INDEX IF NOT EXISTS idx_workflow_runs_updated ON workflow_runs(updated_at DESC);
+    CREATE TABLE IF NOT EXISTS workflow_versions (
+      version_id TEXT PRIMARY KEY,
+      graph_id TEXT NOT NULL,
+      label TEXT NOT NULL,
+      graph_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_workflow_versions_graph ON workflow_versions(graph_id, created_at DESC);
   `);
 
   return db;
@@ -149,6 +166,43 @@ export class WorkflowRunStore {
       .prepare("SELECT * FROM workflow_runs WHERE status = 'running' ORDER BY created_at ASC")
       .all();
     return rows.map(rowToRun);
+  }
+
+  saveVersion(graph: GraphDefinition, label = "Autosave"): WorkflowVersionRecord {
+    const createdAt = new Date().toISOString();
+    const versionId = `${graph.id}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    this.db
+      .prepare(
+        `INSERT INTO workflow_versions (version_id, graph_id, label, graph_json, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(versionId, graph.id, label, JSON.stringify(graph), createdAt);
+    return { versionId, graphId: graph.id, label, graph, createdAt };
+  }
+
+  listVersions(graphId: string, limit = 25): WorkflowVersionRecord[] {
+    const rows = this.db
+      .prepare("SELECT * FROM workflow_versions WHERE graph_id = ? ORDER BY created_at DESC LIMIT ?")
+      .all(graphId, limit);
+    return rows.map((row) => ({
+      versionId: String(row.version_id),
+      graphId: String(row.graph_id),
+      label: String(row.label),
+      graph: JSON.parse(String(row.graph_json)) as GraphDefinition,
+      createdAt: String(row.created_at),
+    }));
+  }
+
+  getVersion(versionId: string): WorkflowVersionRecord | null {
+    const row = this.db.prepare("SELECT * FROM workflow_versions WHERE version_id = ?").get(versionId);
+    if (!row) return null;
+    return {
+      versionId: String(row.version_id),
+      graphId: String(row.graph_id),
+      label: String(row.label),
+      graph: JSON.parse(String(row.graph_json)) as GraphDefinition,
+      createdAt: String(row.created_at),
+    };
   }
 
   close(): void {

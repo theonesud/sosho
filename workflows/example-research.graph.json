@@ -8,9 +8,12 @@
   "nodes": [
     {
       "id": "recall_mem",
-      "type": "memory",
       "label": "Recall Relevant Memory",
-      "position": { "x": 80, "y": 140 },
+      "position": {
+        "x": 80,
+        "y": 140
+      },
+      "type": "memory",
       "operation": "search",
       "scope": "both",
       "queryOrTitleTemplate": "{{topic}}",
@@ -18,19 +21,28 @@
     },
     {
       "id": "route_depth",
-      "type": "decision",
       "label": "Route: Quick vs Deep",
-      "position": { "x": 360, "y": 140 },
+      "position": {
+        "x": 360,
+        "y": 140
+      },
+      "type": "decision",
       "tier": "decision",
       "promptTemplate": "Topic: {{topic}}\nExisting memory: {{recalled_memory}}\nChoose 'quick' if existing memory mostly answers it, or 'deep' if thorough synthesis is needed.",
-      "branches": ["quick", "deep"],
+      "branches": [
+        "quick",
+        "deep"
+      ],
       "outputKey": "route"
     },
     {
       "id": "quick_answer",
-      "type": "subagent",
       "label": "Quick Synthesis (Subagent)",
-      "position": { "x": 660, "y": 40 },
+      "position": {
+        "x": 660,
+        "y": 40
+      },
+      "type": "subagent",
       "role": "Quick Synthesizer",
       "tier": "subagent",
       "promptTemplate": "Synthesize a concise brief on {{topic}} using this memory:\n{{recalled_memory}}",
@@ -38,41 +50,82 @@
     },
     {
       "id": "deep_research",
-      "type": "agent",
       "label": "Deep Analysis (Main)",
-      "position": { "x": 660, "y": 240 },
+      "position": {
+        "x": 660,
+        "y": 240
+      },
+      "type": "agent",
       "tier": "main",
       "promptTemplate": "Produce a thorough, structured technical brief on {{topic}}. Existing context:\n{{recalled_memory}}",
       "outputKey": "draft_brief"
     },
     {
       "id": "hitl_review",
-      "type": "checkpoint",
       "label": "Human Review & Approve",
-      "position": { "x": 960, "y": 140 },
+      "position": {
+        "x": 960,
+        "y": 140
+      },
+      "type": "checkpoint",
       "message": "Review draft_brief before committing to long-term Project memory.",
       "allowStateEdit": true
     },
     {
       "id": "save_mem",
-      "type": "memory",
       "label": "Commit to Project Memory",
-      "position": { "x": 1240, "y": 140 },
+      "position": {
+        "x": 1240,
+        "y": 140
+      },
+      "type": "memory",
       "operation": "save",
       "scope": "project",
-      "memoryType": "semantic",
       "queryOrTitleTemplate": "Research Brief: {{topic}}",
       "contentTemplate": "{{draft_brief}}",
+      "memoryType": "semantic",
       "outputKey": "saved_memory"
     }
   ],
   "edges": [
-    { "id": "e1", "source": "recall_mem", "target": "route_depth" },
-    { "id": "e2", "source": "route_depth", "target": "quick_answer", "condition": "quick" },
-    { "id": "e3", "source": "route_depth", "target": "deep_research", "condition": "deep" },
-    { "id": "e4", "source": "quick_answer", "target": "hitl_review" },
-    { "id": "e5", "source": "deep_research", "target": "hitl_review" },
-    { "id": "e6", "source": "hitl_review", "target": "save_mem", "condition": "approve" },
-    { "id": "e7", "source": "hitl_review", "target": "deep_research", "condition": "reject" }
+    {
+      "id": "e1",
+      "source": "recall_mem",
+      "target": "route_depth"
+    },
+    {
+      "id": "e2",
+      "source": "route_depth",
+      "target": "quick_answer",
+      "condition": "quick"
+    },
+    {
+      "id": "e3",
+      "source": "route_depth",
+      "target": "deep_research",
+      "condition": "deep"
+    },
+    {
+      "id": "e4",
+      "source": "quick_answer",
+      "target": "hitl_review"
+    },
+    {
+      "id": "e5",
+      "source": "deep_research",
+      "target": "hitl_review"
+    },
+    {
+      "id": "e6",
+      "source": "hitl_review",
+      "target": "save_mem",
+      "condition": "approve"
+    },
+    {
+      "id": "e7",
+      "source": "hitl_review",
+      "target": "deep_research",
+      "condition": "reject"
+    }
   ]
 }

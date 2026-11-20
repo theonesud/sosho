@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { NodeKind, RawGraph, RawGraphEdge, RawGraphNode } from "@/types";
+import type { GraphPolicy, NodeKind, RawGraph, RawGraphEdge, RawGraphNode } from "@/types";
 
 function defaultNodeProps(kind: NodeKind, index: number): RawGraphNode {
   const id = `${kind}_${index}`;
@@ -78,15 +78,17 @@ interface WorkflowState {
 
   setGraph: (graph: RawGraph | null, dirty?: boolean) => void;
   updateGraphMeta: (patch: Partial<Pick<RawGraph, "id" | "name" | "description" | "entryNode" | "maxSteps">>) => void;
+  updatePolicy: (patch: Partial<GraphPolicy>) => void;
   addNode: (
     kind: NodeKind,
-    options?: { position?: { x: number; y: number }; connectFromId?: string },
+    options?: { position?: { x: number; y: number }; connectFromId?: string; condition?: string },
   ) => RawGraphNode | null;
   updateNode: (nodeId: string, patch: Record<string, unknown>) => void;
   setNodePositions: (updates: Array<{ id: string; position: { x: number; y: number } }>) => void;
   removeNodes: (nodeIds: string[]) => void;
   addEdge: (source: string, target: string, condition?: string) => void;
   updateEdge: (edgeId: string, patch: Partial<RawGraphEdge>) => void;
+  rewireEdge: (edgeId: string, source: string, target: string, condition?: string) => void;
   removeEdges: (edgeIds: string[]) => void;
   selectNode: (nodeId: string | null) => void;
   selectEdge: (edgeId: string | null) => void;
@@ -127,6 +129,27 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       };
     }),
 
+  updatePolicy: (patch) =>
+    set((state) => {
+      if (!state.graph) return state;
+      return {
+        graph: {
+          ...state.graph,
+          policy: {
+            memoryRecallBefore: "decision",
+            saveRunSummary: true,
+            autoCheckpointBefore: [],
+            strictCompatibility: false,
+            ...state.graph.policy,
+            ...patch,
+          },
+        },
+        past: pushHistory(state.past, state.graph),
+        future: [],
+        isDirty: true,
+      };
+    }),
+
   addNode: (kind, options) => {
     const current = get().graph;
     if (!current) return null;
@@ -145,7 +168,11 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const nextEdges = [...current.edges];
     if (options?.connectFromId && current.nodes.some((n) => n.id === options.connectFromId)) {
       const edgeId = `e_${options.connectFromId}_${created.id}_${Date.now().toString(36).slice(-4)}`;
-      nextEdges.push({ id: edgeId, source: options.connectFromId, target: created.id });
+      nextEdges.push(
+        options.condition
+          ? { id: edgeId, source: options.connectFromId, target: created.id, condition: options.condition }
+          : { id: edgeId, source: options.connectFromId, target: created.id },
+      );
     }
     set((state) => ({
       graph: {
@@ -245,6 +272,22 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         graph: {
           ...state.graph,
           edges: state.graph.edges.map((e) => (e.id === edgeId ? { ...e, ...patch } : e)),
+        },
+        past: pushHistory(state.past, state.graph),
+        future: [],
+        isDirty: true,
+      };
+    }),
+
+  rewireEdge: (edgeId, source, target, condition) =>
+    set((state) => {
+      if (!state.graph || !source || !target || source === target) return state;
+      return {
+        graph: {
+          ...state.graph,
+          edges: state.graph.edges.map((e) =>
+            e.id === edgeId ? { ...e, source, target, condition: condition ?? e.condition } : e,
+          ),
         },
         past: pushHistory(state.past, state.graph),
         future: [],
