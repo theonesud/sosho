@@ -1,9 +1,16 @@
-.PHONY: help autotune doctor test up down restart status logs logs-llm logs-langfuse logs-music music-up music-down decision-up embed-up studio-api studio-ui test-memory clean install-cli
+.PHONY: help autotune doctor test check-agents up down restart status logs logs-llm logs-langfuse logs-music music-up music-down decision-up embed-up studio-api studio-ui test-memory clean install-cli
+
+# Compose profiles started by `make up`. Override per machine in local.mk
+# (gitignored), e.g. `PROFILES := decision embed` to skip the big LLM and music.
+PROFILES ?= llm decision embed music
+-include local.mk
+PROFILE_FLAGS := $(addprefix --profile ,$(PROFILES))
 
 # Default target: display help
 help:
 	@echo "Sosho Management Commands:"
 	@echo "  make autotune      - Auto-tune config to max out any CPU/GPU/RAM"
+	@echo "  make check-agents  - Verify cross-agent governance docs and invariants"
 	@echo "  make up            - Start all on-demand services + Sosho Studio (:3000 & :4101)"
 	@echo "  make decision-up   - Start local CPU decision model (:8081, 0 GPU VRAM)"
 	@echo "  make embed-up      - Start local CPU embeddinggemma model (:8082, 0 GPU VRAM)"
@@ -21,7 +28,7 @@ help:
 	@echo "  make install-cli   - Install pi & yue2-music launchers into ~/.local/bin"
 
 up:
-	docker compose --profile decision --profile embed --profile music up -d
+	docker compose $(PROFILE_FLAGS) up -d
 	@mkdir -p .pi
 	@if ! ss -ltn 2>/dev/null | grep -q ':4101 '; then \
 		nohup npm --prefix apps/studio run dev:api > .pi/studio-api.log 2>&1 & echo $$! > .pi/studio-api.pid; \
@@ -58,19 +65,19 @@ down:
 	@for f in .pi/studio-ui.pid .pi/studio-api.pid; do \
 		if [ -f "$$f" ]; then kill "$$(cat "$$f")" 2>/dev/null || true; rm -f "$$f"; fi; \
 	done
-	docker compose --profile music --profile agent --profile decision --profile embed down
+	docker compose --profile llm --profile music --profile agent --profile decision --profile embed down
 
 restart:
-	docker compose restart llama-cpp
+	docker compose --profile llm restart llama-cpp
 
 status:
-	docker compose ps
+	docker compose $(PROFILE_FLAGS) ps
 
 logs:
-	docker compose logs -f
+	docker compose $(PROFILE_FLAGS) logs -f
 
 logs-llm:
-	docker compose logs -f llama-cpp
+	docker compose --profile llm logs -f llama-cpp
 
 logs-langfuse:
 	docker compose -f docker/compose.langfuse.yaml logs -f
@@ -92,6 +99,9 @@ doctor:
 
 test:
 	./tests/run_tests.sh
+
+check-agents:
+	./bin/check-agent-docs.sh
 
 clean-cache:
 	@echo "Cleaning local Pi agent cache and temporary logs..."

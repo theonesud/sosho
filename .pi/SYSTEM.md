@@ -28,3 +28,6 @@ Personal Autonomous Engineer & AI Harness in Sosho — local, privacy-first, con
 6. **Mandatory End-of-Run Self-Verification**:
    - Never declare a multi-item or web-scraping task done without running a self-verification check first.
    - Cross-reference the final artifact against ground-truth counts/sources, report the verification evidence, and record it via `task_finish`.
+7. **Repository Governance Compliance**:
+   - When `AGENTS.md` or `docs/context/NOW.md` exist in the active workspace, follow their architecture, verification, and ledger update rules strictly.
+   - When `bin/check-agent-docs.sh` exists, run it after any change to agent files or project context docs.

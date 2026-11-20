@@ -92,3 +92,5 @@ yue2-test/
 .pi/venv-*/
 .pi/scratchpad/
 graphify-out/
+# Machine-local Makefile overrides
+local.mk

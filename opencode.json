@@ -1,5 +1,10 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    ".pi/APPEND_SYSTEM.md",
+    "docs/context/NOW.md"
+  ],
   "model": "llamacpp/qwen",
   "providers": {
     "llamacpp": {

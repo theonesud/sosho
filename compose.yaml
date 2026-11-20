@@ -1,5 +1,5 @@
 # Usage:
-#   docker compose up -d                 # starts llama-cpp + langfuse stack
+#   docker compose --profile llm up -d   # starts llama-cpp + langfuse stack
 #   docker compose run --rm pi           # interactive pi agent in this workspace
 #   docker compose logs -f llama-cpp
 #
@@ -20,6 +20,7 @@ x-model: &model
 services:
   # One-shot init job: fetches the GGUFs if missing, then exits.
   model-download:
+    profiles: [llm]
     image: python:3.12-slim
     environment:
       <<: *model
@@ -37,11 +38,12 @@ services:
         if [ -e "$$dir/$$MODEL_FILE" ] && [ -e "$$dir/$$MMPROJ_FILE" ]; then
           echo "Models present in $$dir"; exit 0
         fi
-        pip install -q --root-user-action=ignore "huggingface_hub[cli,hf_xet]"
+        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]"
         hf download "$$HF_REPO" "$$MODEL_FILE" "$$MMPROJ_FILE" --local-dir "$$dir"
     restart: "no"
 
   llama-cpp:
+    profiles: [llm]
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     container_name: llama-cpp
     restart: always
@@ -134,7 +136,7 @@ services:
         if [ -e "$$dir/$$MODEL_FILE" ]; then
           echo "Decision model present in $$dir"; exit 0
         fi
-        pip install -q --root-user-action=ignore "huggingface_hub[cli,hf_xet]"
+        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]"
         hf download "$$HF_REPO" "$$MODEL_FILE" --local-dir "$$dir"
     restart: "no"
 
@@ -196,7 +198,7 @@ services:
         if [ -e "$$dir/$$MODEL_FILE" ]; then
           echo "Embedding model present in $$dir"; exit 0
         fi
-        pip install -q --root-user-action=ignore "huggingface_hub[cli,hf_xet]"
+        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]"
         hf download "$$HF_REPO" "$$MODEL_FILE" --local-dir "$$dir"
     restart: "no"
 
@@ -266,7 +268,7 @@ services:
         if [ $$missing -eq 0 ]; then
           echo "YuE2 models present in /models"; exit 0
         fi
-        pip install -q --root-user-action=ignore "huggingface_hub[cli,hf_xet]"
+        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]"
         hf download "$$HF_REPO" $$need --local-dir /models
     restart: "no"
 
@@ -315,6 +317,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.yue2-gateway
     image: yue2-gateway:latest
+    pull_policy: build
     container_name: yue2-gateway
     restart: unless-stopped
     depends_on:

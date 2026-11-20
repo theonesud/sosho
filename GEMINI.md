@@ -38,3 +38,9 @@ Before you send a reply, do these steps:
 3. Find each synonym and replace it with the approved term.
 4. Find each sentence with two instructions and split it.
 5. Find each noun cluster longer than three words and rewrite it.
+
+# Antigravity Adapter
+
+Follow the canonical repository standard in [AGENTS.md](AGENTS.md).
+Read [docs/context/NOW.md](docs/context/NOW.md) at the start of each engineering task.
+Run `make check-agents` after you update any agent file or context ledger document.
