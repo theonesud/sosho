@@ -26,3 +26,14 @@ Update this file whenever you complete a milestone, change a port or invariant, 
 1. Reconcile port numbers in [PRODUCT.md](../../PRODUCT.md) and [readme.md](../../readme.md) with actual runtime ports.
 2. Expand automated verification for Studio Phase 2 Playground and Phase 3 Memory, Audio, and System screens.
 3. Keep `docs/context/NOW.md` and `docs/context/DECISIONS.md` current in every feature commit.
+
+## Rebuild Stage 1
+
+Date: 2026-11-20.
+
+- Rewrote `AGENTS.md` as a short index. It is the single standard for all four agents.
+- Moved the Claude adapter to `.claude/CLAUDE.md`. Removed root `CLAUDE.md` and `GEMINI.md`. Linked `.claude/skills` to `.agents/skills`.
+- Replaced the hook scripts with one guard in `bin/agent-guard.sh`. Rewrote `bin/check-agent-docs.sh` and `opencode.json`.
+- Deferred: coding standards, documentation, architecture, and structure stages. The port table and Studio security rules remain in `docs/context/DECISIONS.md`.
+- Deferred: git pre-commit hook in stage 2.
+

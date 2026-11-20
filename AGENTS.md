@@ -1,99 +1,97 @@
-# Sosho Agent Governance Standard
+# Agent Standard
 
-This document is the canonical engineering standard for all Artificial Intelligence, or AI, agents in this repository.
-Pi, Claude Code, Antigravity, and OpenCode must follow every rule in this file without exception.
+## 1 Scope
 
-## 1. Mandatory Output Style
+1.1 This file is the single standard for Claude Code, pi, OpenCode, and Antigravity on this repository.
 
-Follow ASD-STE100 Simplified Technical English Issue 8 for all prose.
-This rule covers chat replies, plans, reports, commit messages, and documentation.
-Read the exact style rules in [.pi/APPEND_SYSTEM.md](.pi/APPEND_SYSTEM.md).
-Code, identifiers, commands, file paths, and quoted text are exempt.
+1.2 Tool adapter files add tool facts only. Adapter files never copy rules from this file.
 
-## 2. Zero-Trust Governance Rules
+## 2 Output Standard
 
-Do not rely on memory or assumptions.
-Verify every fact against disk files and command output.
+2.1 Write all prose in ASD-STE100 Simplified Technical English. This covers replies, plans, reports, commit messages, documents, and code comments.
 
-1. **Ground-Truth First:** Read actual source files before you state ports, routes, schemas, types, or dependencies.
-2. **Evidence Before Claim:** Never claim that a build, lint check, or test passes unless you run that command in the current turn and observe exit code 0.
-3. **No Silent Shortcuts:** Never skip tests, weaken assertions, or add `@ts-ignore`, `@ts-expect-error`, or `as any` to silence errors.
-4. **No Stubbed Fixes:** Diagnose root causes and deliver complete, production-ready code.
-5. **Protected Configurations:** Keep `.env`, `.pi/model-roles.json`, and `.pi/models.json` strictly read-only in the User Interface, or UI. Never commit secrets or edit `.env` unless the user asks explicitly.
-6. **Hardware and Security Boundaries:**
-   - Never mount `/var/run/docker.sock` into any container.
-   - Never bypass `SOSHO_STUDIO_TOKEN` bearer authentication on `POST`, `PUT`, or `DELETE` routes in the Studio Application Programming Interface, or API.
-   - Never widen Studio Cross-Origin Resource Sharing, or CORS, beyond loopback origins.
-   - Respect concurrency caps: `local-gpu` is `1`, `host-browser` is `2`, and `cloud-io` is `8`.
-   - Enforce secret redaction in both `global` and `project` memory scopes.
-7. **Mandatory Ledger Updates:** Update [docs/context/NOW.md](docs/context/NOW.md) when you finish a task, change a phase, or discover drift. Record architectural changes in [docs/context/DECISIONS.md](docs/context/DECISIONS.md) in the same commit.
+2.2 Language rules:
 
-## 3. Repository Architecture
+- Limit an instruction sentence to 20 words. Limit a descriptive sentence to 25 words.
+- Write one instruction in each sentence. Start it with an imperative verb.
+- Put the condition before the command.
+- Use the active voice. Use simple tenses only.
+- Do not use "-ing" forms as verbs or nouns.
+- Use one term for one meaning. Do not use synonyms for variety.
+- Write an abbreviation in full at its first use.
+- Do not use idioms, slang, or contractions.
+- Use a vertical list for three or more items.
+- Do not put necessary information in parentheses.
+- Do not use a dash or a slash to join ideas. Write "or".
 
-| Path | Ownership | Scoped Guide |
-| :--- | :--- | :--- |
-| `apps/studio/` | Next.js App Router UI (`:3000`) and Hono API (`:4101`) | [apps/studio/AGENTS.md](apps/studio/AGENTS.md) |
-| `packages/workflow-engine/` | Zod graph validation, edge middleware, and SQLite Write-Ahead Log, or WAL, workflow engine | [packages/workflow-engine/AGENTS.md](packages/workflow-engine/AGENTS.md) |
-| `packages/memory/` | Two-tier Markdown memory, SQLite FTS5, local vectors, and entity graph | [packages/memory/AGENTS.md](packages/memory/AGENTS.md) |
-| `packages/llm/` | Shared `@sosho/llm` client, role routing, Langfuse tracing, and Pi subagent runtime | [packages/llm/AGENTS.md](packages/llm/AGENTS.md) |
-| `yue2/` | FastAPI async music gateway (`:8021`) and single-GPU handoff | [yue2/AGENTS.md](yue2/AGENTS.md) |
-| `.pi/` | Pi harness config, model roles, extensions, and sandbox skills | [.pi/SYSTEM.md](.pi/SYSTEM.md) |
-| `.agents/` | Cross-agent skills such as `impeccable` | [.agents/skills/impeccable/SKILL.md](.agents/skills/impeccable/SKILL.md) |
-| `bin/` | Launchers, diagnostics, hardware autotune, and governance checks | [Makefile](Makefile) |
-| `docker/` | Sandbox image, Langfuse stack, and ClickHouse memory caps | [compose.yaml](compose.yaml) |
-| `workflows/` | Versioned `*.graph.json` workflow definitions | [workflows/example-research.graph.json](workflows/example-research.graph.json) |
+2.3 Quality rules:
 
-## 4. Verified Service Ports
+- Give the answer or the result first.
+- State only verified facts. Write "not verified" for all other facts.
+- Report failures and skipped steps plainly.
+- Do not use filler or praise.
+- Quote exact error text.
+- Write a code reference as `path:line`.
 
-| Port | Service | Source of Truth |
-| :--- | :--- | :--- |
-| `3000` | Sosho Studio UI (Next.js App Router) | `apps/studio/package.json` |
-| `3001` | Langfuse v4 UI and telemetry | `docker/compose.langfuse.yaml` |
-| `4101` | Sosho Studio API, SQLite DAG engine, and SSE server | `apps/studio/server/index.ts` |
-| `8021` | YuE2 async music gateway | `compose.yaml` |
-| `8080` | `llama-cpp` local GPU model (`Qwen3.6-35B-A3B`) | `compose.yaml` |
-| `8081` | `llama-decision` local CPU router (`Qwen3-1.7B`) | `compose.yaml` |
-| `8082` | `llama-embed` local CPU embeddings (`embeddinggemma-300M`) | `compose.yaml` |
-| `9090` | Langfuse MinIO storage | `docker/compose.langfuse.yaml` |
+2.4 NOTE: Code, identifiers, commands, paths, and quoted text are exempt from section 2.
 
-## 5. Mandatory AI Workflow Loop
+## 3 Safety Rules
 
-Follow this six-step loop for every non-trivial task:
+WARNING: Do not read or edit `.env`. Do not print secrets.
 
-1. **Orient:** Read [docs/context/NOW.md](docs/context/NOW.md) and the scoped `AGENTS.md` for each subsystem you plan to touch.
-2. **Check Decisions:** Read [docs/context/DECISIONS.md](docs/context/DECISIONS.md) before you change architecture, ports, schemas, or security rules.
-3. **Plan:** Define exact files to change, invariants to preserve, and verification commands to run.
-4. **Implement:** Make small, typed, modular edits. Keep diffs focused on the task.
-5. **Verify:** Run targeted tests first. Then run `make check-agents` and `make test` (or report any blocked Docker suite explicitly).
-6. **Govern:** Update [docs/context/NOW.md](docs/context/NOW.md) or [docs/context/DECISIONS.md](docs/context/DECISIONS.md) if state or architecture changed.
+3.1 Do not commit secrets.
 
-## 6. Verification Commands
+WARNING: Do not mount `/var/run/docker.sock` into a container.
 
-Run these commands to verify changes:
+3.2 Do not edit `.pi/models.json` or `.pi/model-roles.json` unless the owner asks.
 
-```bash
-# Governance and documentation sync gate
-make check-agents
+CAUTION: A weak test hides a defect.
 
-# Full automated verification suite (all 10 suites)
-make test
+3.3 Do not weaken a test, an assertion, or a type to pass a check. Do not add `@ts-ignore`, `@ts-expect-error`, `as any`, or `# type: ignore`.
 
-# Targeted package suites
-(cd packages/llm && npm run typecheck && npx tsx test/llm.test.ts && npx tsx test/subagents.test.ts)
-(cd packages/memory && npm run typecheck && npx tsx test/memory.test.ts && npx tsx test/capture.test.ts)
-(cd packages/workflow-engine && npm run typecheck && npx tsx test/schema.test.ts && npx tsx test/max-steps.test.ts && npx tsx test/activities.test.ts && npx tsx test/engine.test.ts)
-(cd apps/studio && npm run typecheck && npm run lint && npm run build && npx tsx server/server.test.ts)
-(cd yue2/gateway && pytest -q test_gateway.py)
-```
+3.4 Do not claim that a check passes unless you ran it in this session and saw exit code 0.
 
-## 7. Project Context and Reference Index
+CAUTION: Destructive and outward-facing actions are hard to undo.
 
-Read these documents on demand to keep context lean:
+3.5 Ask the owner before you push, publish, or delete files outside the task scope.
 
-- **Present state and active tasks:** [docs/context/NOW.md](docs/context/NOW.md)
-- **Architecture decisions:** [docs/context/DECISIONS.md](docs/context/DECISIONS.md)
-- **Past milestones:** [docs/context/HISTORY.md](docs/context/HISTORY.md)
-- **Future roadmap:** [docs/context/ROADMAP.md](docs/context/ROADMAP.md)
-- **Product specification:** [PRODUCT.md](PRODUCT.md)
-- **Studio design system:** [DESIGN.md](DESIGN.md)
-- **Full repository overview:** [readme.md](readme.md)
+## 4 Work Procedure
+
+4.1 Orient. Read each file in section 6 whose "Read when" entry matches the task.
+
+4.2 Plan. List the files to change, the invariants to keep, and the checks to run.
+
+4.3 Implement. Make small diffs that stay on the task.
+
+4.4 Verify. Run the checks from section 5 and from each standard that applies.
+
+4.5 Record. Update `docs/context/NOW.md` when the state changes. Update `docs/context/DECISIONS.md` when the architecture changes.
+
+## 5 Verification
+
+5.1 Run `make check-agents` after any change to agent files.
+
+5.2 NOTE: Each later standard adds its own check commands to this section.
+
+## 6 Reference Index
+
+| Read when | File |
+| :--- | :--- |
+| You plan any structural work | [REFACTOR_PLAN.md](REFACTOR_PLAN.md) |
+| You need the present state | [docs/context/NOW.md](docs/context/NOW.md) |
+| You change architecture, ports, schemas, or security | [docs/context/DECISIONS.md](docs/context/DECISIONS.md) |
+| You need product scope | [PRODUCT.md](PRODUCT.md) |
+| You do UI work | [DESIGN.md](DESIGN.md) |
+
+NOTE: Later stages add rows for coding standards, documentation, architecture, and structure.
+
+## 7 Tool Adapters
+
+| Tool | Files it reads |
+| :--- | :--- |
+| Claude Code | `.claude/CLAUDE.md`, `.claude/settings.json` |
+| pi | `AGENTS.md` natively |
+| OpenCode | `AGENTS.md` natively, `opencode.json` |
+| Antigravity | `AGENTS.md` natively |
+
+7.1 Put only tool-specific facts in adapter files.
