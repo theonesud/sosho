@@ -9,6 +9,8 @@ dist/
 
 # Project Specific
 logs/
+*.log
+*.pid
 .env
 .DS_Store
 *.db

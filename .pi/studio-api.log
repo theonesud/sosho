@@ -1,6 +1,0 @@
-
-> @sosho/studio@0.1.0 dev:api
-> tsx server/index.ts
-
-[Sosho Studio API] Listening on http://127.0.0.1:4101 (root: /home/vegeta/sosho)
-[Sosho Studio API] Generated session bearer token (set SOSHO_STUDIO_TOKEN to override): sosho-local-dev

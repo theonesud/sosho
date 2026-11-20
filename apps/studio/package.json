@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -H 127.0.0.1 -p 3000",
+    "dev": "rm -rf .next && next dev -H 127.0.0.1 -p 3000",
     "dev:api": "tsx server/index.ts",
-    "dev:ui": "next dev -H 127.0.0.1 -p 3000",
-    "build": "next build",
+    "dev:ui": "rm -rf .next && next dev -H 127.0.0.1 -p 3000",
+    "build": "rm -rf .next && next build",
     "start": "next start -H 127.0.0.1 -p 3000",
     "lint": "biome check src server",
     "format": "biome format --write src server",
