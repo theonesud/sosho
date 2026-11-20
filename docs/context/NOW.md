@@ -37,3 +37,13 @@ Date: 2026-11-20.
 - Deferred: coding standards, documentation, architecture, and structure stages. The port table and Studio security rules remain in `docs/context/DECISIONS.md`.
 - Deferred: git pre-commit hook in stage 2.
 
+
+## Rebuild Stage 2
+
+Date: 2026-11-20.
+
+- Added coding standards in `docs/standards/`: `code.md`, `typescript.md`, `python.md`, `testing.md`, and `git.md`.
+- Added path-scoped rules in `.claude/rules/` and `.agents/rules/`. Each rule file points to one standard and `code.md`.
+- Updated `AGENTS.md` sections 4, 5, and 6 with the command contract, the hook rule, the legacy rule, and five index rows.
+- Extended `bin/check-agent-docs.sh` to check standards files, links, rule file length, and Antigravity frontmatter.
+- Stage 2A toolchain configuration is a separate change. Folder structure remains for stage 5.

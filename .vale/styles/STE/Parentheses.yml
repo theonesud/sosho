@@ -1,0 +1,6 @@
+extends: existence
+message: "Do not use parentheses for necessary information. Write a separate sentence."
+level: suggestion
+nonword: true
+tokens:
+  - '\('

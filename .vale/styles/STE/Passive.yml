@@ -1,0 +1,7 @@
+extends: existence
+message: "'%s' can be passive voice. Use the active voice and name the actor."
+level: warning
+ignorecase: true
+tokens:
+  - '\b(?:is|are|was|were|be|been)\s+\w+ed\b'
+  - '\b(?:is|are|was|were|be|been)\s+(?:written|given|taken|shown|made|done|run|built|known|chosen|kept|set|sent|seen)\b'

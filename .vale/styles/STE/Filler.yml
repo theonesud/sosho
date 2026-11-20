@@ -1,0 +1,12 @@
+extends: existence
+message: "Remove the filler word '%s'."
+level: warning
+ignorecase: true
+tokens:
+  - just
+  - simply
+  - basically
+  - actually
+  - really
+  - very
+  - obviously

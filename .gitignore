@@ -42,7 +42,6 @@ node_modules
 /build
 
 # misc
-.DS_Store
 *.pem
 
 # debug
@@ -67,7 +66,6 @@ next-env.d.ts
 .terraform.*
 terraform.tfstate
 bun.lock
-uv.lock
 package-lock.json
 yarn-lock.json
 
@@ -94,3 +92,12 @@ yue2-test/
 graphify-out/
 # Machine-local Makefile overrides
 local.mk
+
+# Local tool state
+/.pi/run/
+.mise.local.toml
+.ruff_cache/
+.pytest_cache/
+.pyright/
+coverage/
+.vitest/

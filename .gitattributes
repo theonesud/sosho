@@ -1,0 +1,24 @@
+* text=auto eol=lf
+
+# Lockfiles are generated. Hide them from diffs and language stats.
+*.lock linguist-generated=true
+pnpm-lock.yaml linguist-generated=true -diff
+uv.lock linguist-generated=true -diff
+
+# Binary types
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.wav binary
+*.mp3 binary
+*.mp4 binary
+*.gguf binary
+*.safetensors binary
+*.db binary
+*.sqlite binary

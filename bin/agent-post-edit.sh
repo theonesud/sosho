@@ -17,6 +17,7 @@ print(ti.get("file_path") or ti.get("path") or "")
 REL="${FILE#"$ROOT"/}"
 
 case "$REL" in
-  AGENTS.md|.claude/*|opencode.json|bin/agent-guard.sh|bin/check-agent-docs.sh|docs/context/*)
-    "$ROOT/bin/check-agent-docs.sh" ;;
+  AGENTS.md | .claude/* | opencode.json | bin/agent-guard.sh | bin/check-agent-docs.sh | docs/context/*)
+    "$ROOT/bin/check-agent-docs.sh"
+    ;;
 esac

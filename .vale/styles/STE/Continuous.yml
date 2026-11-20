@@ -1,0 +1,6 @@
+extends: existence
+message: "'%s' is a continuous tense. Use a simple tense."
+level: warning
+ignorecase: true
+tokens:
+  - '\b(?:is|are|was|were|am|be|been)\s+\w+ing\b'

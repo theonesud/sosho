@@ -1,0 +1,8 @@
+extends: existence
+message: "Do not use the contraction '%s'. Write the full words."
+level: warning
+ignorecase: true
+tokens:
+  - '\b(?:can|don|won|isn|aren|wasn|weren|doesn|didn|couldn|wouldn|shouldn|hasn|haven|hadn)[''’]t\b'
+  - '\b(?:it|that|there|here|what|let|he|she|who)[''’]s\b'
+  - '\b(?:I|you|we|they|who)[''’](?:re|ve|ll|d|m)\b'

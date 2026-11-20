@@ -65,13 +65,31 @@ CAUTION: Destructive and outward-facing actions are hard to undo.
 
 4.4 Verify. Run the checks from section 5 and from each standard that applies.
 
-4.5 Record. Update `docs/context/NOW.md` when the state changes. Update `docs/context/DECISIONS.md` when the architecture changes.
+4.5 Legacy paths are reference only. Do not extend legacy code. Build new code to the standards in section 6.
+
+4.6 Record. Update `docs/context/NOW.md` when the state changes. Update `docs/context/DECISIONS.md` when the architecture changes.
 
 ## 5 Verification
 
-5.1 Run `make check-agents` after any change to agent files.
+5.1 Run `make check` after any change. Run it also after any change to agent files.
+5.2 Use these commands. Make is the entry point.
 
-5.2 NOTE: Each later standard adds its own check commands to this section.
+| Command | Purpose |
+| :--- | :--- |
+| `make setup` | Install tools, dependencies, and git hooks. Run it one time on each machine. |
+| `make check` | Run all checks and tests. It does not change files. |
+| `make fix` | Format and fix files. |
+
+5.3 These actions run automatically:
+
+- After an agent edit, `bin/agent-format.sh` formats the edited file.
+- At pre-commit, the hook fixes and re-stages staged files. It also scans for secrets and warns on prose.
+- At commit-msg, the hook checks the Conventional Commits format.
+- At pre-push, the hook runs `make check`.
+
+5.4 The hooks must pass. Never use `--no-verify`.
+
+5.5 NOTE: Each later standard adds its own check commands to this section.
 
 ## 6 Reference Index
 
@@ -82,8 +100,13 @@ CAUTION: Destructive and outward-facing actions are hard to undo.
 | You change architecture, ports, schemas, or security | [docs/context/DECISIONS.md](docs/context/DECISIONS.md) |
 | You need product scope | [PRODUCT.md](PRODUCT.md) |
 | You do UI work | [DESIGN.md](DESIGN.md) |
+| You write or change any code | [docs/standards/code.md](docs/standards/code.md) |
+| You edit a `.ts` or `.tsx` file | [docs/standards/typescript.md](docs/standards/typescript.md) |
+| You edit a `.py` file | [docs/standards/python.md](docs/standards/python.md) |
+| You write or change a test | [docs/standards/testing.md](docs/standards/testing.md) |
+| You commit | [docs/standards/git.md](docs/standards/git.md) |
 
-NOTE: Later stages add rows for coding standards, documentation, architecture, and structure.
+NOTE: Later stages add rows for documentation, architecture, and structure.
 
 ## 7 Tool Adapters
 

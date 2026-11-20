@@ -1,0 +1,20 @@
+{
+  "name": "sosho",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.21.0",
+  "engines": {
+    "node": ">=26.13.1"
+  },
+  "scripts": {
+    "check": "biome check --no-errors-on-unmatched .",
+    "fix": "biome check --write --no-errors-on-unmatched .",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "@types/node": "26.6.6",
+    "typescript": "7.0.2",
+    "vitest": "5.1.1"
+  }
+}

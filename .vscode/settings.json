@@ -1,94 +1,28 @@
 {
-  "git.ignoreLimitWarning": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "biomejs.biome",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.biome": "explicit",
+    "source.organizeImports.biome": "explicit"
+  },
+  "[typescript]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[typescriptreact]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[javascript]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[json]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[jsonc]": { "editor.defaultFormatter": "biomejs.biome" },
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
-    "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
-      "source.fixAll": "explicit",
-      "source.organizeImports": "explicit"
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
     }
   },
-  "[javascript]": {
-    "editor.defaultFormatter": "biomejs.biome",
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.biome": "explicit",
-      "source.organizeImports.biome": "explicit"
-    }
-  },
-  "[typescript]": {
-    "editor.defaultFormatter": "biomejs.biome",
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.biome": "explicit",
-      "source.organizeImports.biome": "explicit"
-    }
-  },
-  "[javascriptreact]": {
-    "editor.defaultFormatter": "biomejs.biome",
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.biome": "explicit",
-      "source.organizeImports.biome": "explicit"
-    }
-  },
-  "[typescriptreact]": {
-    "editor.defaultFormatter": "biomejs.biome",
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.biome": "explicit",
-      "source.organizeImports.biome": "explicit"
-    }
-  },
-  "[json]": {
-    "editor.defaultFormatter": "vscode.json-language-features",
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.biome": "explicit",
-      "source.organizeImports.biome": "explicit"
-    }
-  },
-  "[jsonc]": {
-    "editor.defaultFormatter": "biomejs.biome",
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.biome": "explicit",
-      "source.organizeImports.biome": "explicit"
-    }
-  },
-  "[css]": {
-    "editor.defaultFormatter": "biomejs.biome",
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.biome": "explicit",
-      "source.organizeImports.biome": "explicit"
-    }
-  },
-  "editor.formatOnSave": true,
+  "[toml]": { "editor.defaultFormatter": "tamasfe.even-better-toml" },
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.languageServer": "None",
   "python.testing.pytestEnabled": true,
-  "python.testing.pytestArgs": ["tests"],
-  "editor.wordWrap": "on",
-  "workbench.colorTheme": "Monokai",
-  "explorer.confirmDelete": false,
-  "editor.minimap.enabled": false,
-  "git.autofetch": true,
-  "diffEditor.renderSideBySide": true,
-  "files.autoSave": "onFocusChange",
-  "security.workspace.trust.untrustedFiles": "open",
-  "git.confirmSync": false,
-  "explorer.confirmPasteNative": false,
-  "explorer.confirmDragAndDrop": false,
-  "securecoder.enabled": true,
-  "python.languageServer": "Default",
-  "extensions.ignoreRecommendations": true,
-  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
-  "ruff.path": ["${workspaceFolder}/backend/.venv/bin/ruff"],
-  "ruff.interpreter": ["${workspaceFolder}/backend/.venv/bin/python"],
-  "biome.configurationPath": "./frontend/biome.json",
-  "biome.lsp.bin": {
-    "darwin-arm64": "./frontend/node_modules/@biomejs/cli-darwin-arm64/biome",
-    "darwin-x64": "./frontend/node_modules/@biomejs/cli-darwin-x64/biome",
-    "linux-x64": "./frontend/node_modules/@biomejs/cli-linux-x64/biome",
-    "win32-x64": ".\\frontend\\node_modules\\@biomejs\\cli-win32-x64\\biome.exe"
-  }
+  "python.testing.unittestEnabled": false,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "files.eol": "\n",
+  "vale.valeCLI.config": "${workspaceFolder}/.vale.ini"
 }
