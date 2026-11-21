@@ -1,13 +1,3 @@
 {
-  "recommendations": [
-    "biomejs.biome",
-    "charliermarsh.ruff",
-    "ms-python.python",
-    "ms-pyright.pyright",
-    "tamasfe.even-better-toml",
-    "timonwong.shellcheck",
-    "chrischinchilla.vale-vscode",
-    "editorconfig.editorconfig",
-    "hverlin.mise-vscode"
-  ]
+  "recommendations": ["biomejs.biome", "charliermarsh.ruff"]
 }
