@@ -44,3 +44,10 @@ Add a new Architecture Decision Record, or ADR, whenever you introduce a lasting
 - **Decision:** Use root [AGENTS.md](../../AGENTS.md) as the canonical standard for Pi, Claude Code, Antigravity, and OpenCode, enforce ASD-STE100 Issue 8 across all four agents, and verify compliance via `bin/check-agent-docs.sh` inside [tests/run_tests.sh](../../tests/run_tests.sh).
 - **Rationale:** Separate tool-specific files drift fast. Mechanical verification catches broken links, port drift, and style divergence automatically.
 - **Invariants:** Keep `.pi/SYSTEM.md` generic for external repositories because `bin/pi-launcher.sh` copies it. Keep `GEMINI.md` synced with `.pi/APPEND_SYSTEM.md`. Import `@AGENTS.md` and `@.pi/APPEND_SYSTEM.md` in `CLAUDE.md`. Include `AGENTS.md`, `.pi/APPEND_SYSTEM.md`, and `docs/context/NOW.md` in `opencode.json`.
+
+## ADR-007: LiteLLM Proxy Gateway
+
+- **Status:** Accepted.
+- **Decision:** Run **LiteLLM Proxy** on port `4000` in [compose.yaml](../../compose.yaml) configured by [litellm.config.yaml](../../litellm.config.yaml) for `main`, `subagent`, `subagent-code`, `decision`, `embed`, and `local-uncensored`.
+- **Rationale:** One OpenAI-compatible gateway centralizes mid-request fallbacks, rate-limit cooldowns, and Langfuse callbacks for both `pi` and `@sosho/llm`.
+- **Invariants:** Route `.pi/models.json` and `@sosho/llm` through `litellm` when configured. Keep `DEEPINFRA_API_KEY`, `LITELLM_MASTER_KEY`, and Langfuse keys in `.env`.

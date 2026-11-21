@@ -206,6 +206,33 @@ try {
     await new Promise<void>((resolve) => streamServer.close(() => resolve()));
   }
 
+  // 4. LiteLLM gateway routing when litellm provider is configured
+  writeFileSync(
+    join(soshoDir, ".pi", "models.json"),
+    JSON.stringify({
+      providers: {
+        litellm: { baseUrl: "http://127.0.0.1:4000/v1", apiKey: "sk-test-litellm" },
+        deepinfra: { baseUrl: "https://api.deepinfra.com/v1/openai" },
+      },
+    }),
+    "utf8",
+  );
+  writeFileSync(
+    join(soshoDir, ".pi", "model-roles.json"),
+    JSON.stringify({
+      roles: {
+        main: { provider: "deepinfra", model: "deepseek-ai/DeepSeek-V4.1-Flash-1017", concurrency: 2 },
+        decision: { provider: "llama-decision", model: "Qwen3-1.7B", concurrency: 4 },
+      },
+    }),
+    "utf8",
+  );
+  const litellmEp = await resolveRoleEndpoint("decision", { cwd: wsDir, soshoRoot: soshoDir });
+  assert.equal(litellmEp.provider, "litellm");
+  assert.equal(litellmEp.model, "decision");
+  assert.equal(litellmEp.baseUrl, "http://127.0.0.1:4000/v1");
+  assert.equal(litellmEp.apiKey, "sk-test-litellm");
+
   console.log("ALL LLM PACKAGE TESTS PASSED");
 } finally {
   rmSync(tmp, { recursive: true, force: true });

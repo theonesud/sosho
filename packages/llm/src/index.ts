@@ -193,6 +193,7 @@ export function resolveProviderApiKey(
 // 15-second health check cache
 const healthCache = new Map<string, { ok: boolean; expiresAt: number }>();
 export const DEFAULT_HEALTH_TTL_MS = 15_000;
+export const DEFAULT_LITELLM_BASE_URL = "http://127.0.0.1:4000/v1";
 
 export function clearHealthCache(): void {
   healthCache.clear();
@@ -239,6 +240,22 @@ export async function resolveRoleEndpoint(
   const roleCfg = rolesFile.roles[roleName] || rolesFile.roles.main;
   if (!roleCfg) {
     throw new Error(`Unknown model role: ${roleName}`);
+  }
+
+  const litellmCfg = modelsFile.providers.litellm;
+  const litellmEnvUrl = env.LITELLM_BASE_URL?.trim();
+  if (litellmEnvUrl || litellmCfg?.baseUrl) {
+    const baseUrl = (litellmEnvUrl || litellmCfg?.baseUrl || DEFAULT_LITELLM_BASE_URL).replace(/\/+$/, "");
+    const apiKey = env.LITELLM_MASTER_KEY?.trim() || resolveProviderApiKey("litellm", litellmCfg, env);
+    return {
+      role: roleName,
+      provider: "litellm",
+      model: rolesFile.roles[roleName] ? roleName : "main",
+      baseUrl,
+      apiKey,
+      concurrency: roleCfg.concurrency ?? 2,
+      usedFallback: false,
+    };
   }
 
   let provider = roleCfg.provider;

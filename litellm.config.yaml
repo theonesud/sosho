@@ -1,0 +1,55 @@
+model_list:
+  - model_name: main
+    litellm_params:
+      model: openai/deepseek-ai/DeepSeek-V4.1-Flash-1017
+      api_base: https://api.deepinfra.com/v1/openai
+      api_key: os.environ/DEEPINFRA_API_KEY
+
+  - model_name: subagent
+    litellm_params:
+      model: openai/Qwen/Qwen3-32B
+      api_base: https://api.deepinfra.com/v1/openai
+      api_key: os.environ/DEEPINFRA_API_KEY
+
+  - model_name: subagent-code
+    litellm_params:
+      model: openai/Qwen/Qwen3-Coder-30B-A3B-Instruct
+      api_base: https://api.deepinfra.com/v1/openai
+      api_key: os.environ/DEEPINFRA_API_KEY
+
+  - model_name: decision
+    litellm_params:
+      model: openai/Qwen3-1.7B
+      api_base: http://llama-decision:8081/v1
+      api_key: local
+
+  - model_name: embed
+    litellm_params:
+      model: openai/embeddinggemma
+      api_base: http://llama-embed:8082/v1
+      api_key: local
+
+  - model_name: local-uncensored
+    litellm_params:
+      model: openai/Qwen3.6-35B-A3B
+      api_base: http://llama-cpp:8080/v1
+      api_key: local
+
+router_settings:
+  routing_strategy: simple-shuffle
+  enable_pre_call_checks: true
+  num_retries: 2
+  timeout: 60
+  allowed_fails: 2
+  cooldown_time: 30
+  retry_after: 5
+  fallbacks:
+    - decision: ["subagent-code"]
+    - main: ["subagent"]
+    - local-uncensored: ["main"]
+
+litellm_settings:
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
+  drop_params: true
+  request_timeout: 120
