@@ -22,7 +22,7 @@ Update this file whenever you complete a milestone, change a port or invariant, 
 
 ## Immediate Next Priorities
 
-1. Execute Phase 4 of `REFACTOR_PLAN.md` (`pi` CLI Integration and Execution Targets).
+1. Execute Phase 5 of `REFACTOR_PLAN.md` (Browser Automation Extension).
 2. Expand automated verification for Studio Phase 2 Playground and Phase 3 Memory, Audio, and System screens.
 3. Keep `docs/context/NOW.md` and `docs/context/DECISIONS.md` current in every feature commit.
 

@@ -374,23 +374,22 @@ services:
       dockerfile: docker/Dockerfile.pi
     image: pi-sandbox:latest
     container_name: pi-agent
-    network_mode: host
-    pid: host
+    networks: [webui-net]
     user: "${UID:-1000}:${GID:-1000}"
     stdin_open: true
     tty: true
     working_dir: ${PWD}
     environment:
       HOME: ${HOME}
-      LLAMA_BASE_URL: ${LLAMA_BASE_URL:-http://127.0.0.1:8080}
+      LITELLM_BASE_URL: ${LITELLM_BASE_URL:-http://litellm:4000/v1}
       PI_CODING_AGENT_DIR: ${PWD}/.pi
       XDG_CACHE_HOME: ${PWD}/.pi/.cache
       XDG_CONFIG_HOME: ${PWD}/.pi/.config
-      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://127.0.0.1:3001}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://langfuse-web:3000}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}
-      YUE2_GATEWAY_URL: ${YUE2_GATEWAY_URL:-http://127.0.0.1:8021}
-      YUE2_API_KEY: ${YUE2_API_KEY:-}
+      LANGGRAPH_URL: ${LANGGRAPH_URL:-http://langgraph:8123}
+      LANGFLOW_URL: ${LANGFLOW_URL:-http://langflow:7860}
     tmpfs:
       - ${HOME}:uid=${UID:-1000},gid=${GID:-1000},mode=0755
     volumes:

@@ -58,3 +58,10 @@ Add a new Architecture Decision Record, or ADR, whenever you introduce a lasting
 - **Decision:** Run **LangGraph** on port `8123` and **Langflow** on port `7860` on `webui-net`, expose `packages/memory/`, `yue2/gateway/`, and `pi` via MCP (`packages/memory/src/mcp.ts`) and `/api/tools/*`, and proxy Studio runs and Playground chat when `LANGGRAPH_URL` or `LANGFLOW_URL` are set.
 - **Rationale:** Separating orchestration and visual flow building from the Studio UI gateway keeps token auth, loopback CORS, and 1-megabyte body caps enforced in one place.
 - **Invariants:** Keep `packages/workflow-engine/src/engine.ts` as fallback until live LangGraph parity passes all tests. Keep `SOSHO_STUDIO_TOKEN` and loopback CORS on all Studio routes.
+
+## ADR-009: Isolated `pi` Execution Targets and MCP
+
+- **Status:** Accepted.
+- **Decision:** Populate [.pi/mcp.json](../../.pi/mcp.json) with `memory`, `langgraph`, and `langflow` MCP servers, isolate the `pi` service on `webui-net` without `network_mode: host` or `pid: host`, and support `local`, `container`, and `ssh` targets in [bin/pi-launcher.sh](../../bin/pi-launcher.sh).
+- **Rationale:** Removing host network and PID sharing limits container blast radius to LiteLLM, Langfuse, and MCP endpoints while preserving local and remote SSH workflows.
+- **Invariants:** Expose only LiteLLM, Langfuse, and MCP endpoints to the isolated `pi` container on `webui-net`.
