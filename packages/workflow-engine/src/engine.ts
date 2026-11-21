@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { Semaphore } from "../../llm/src/subagent-runtime.ts";
-import { searchMemoryAsync, upsertMemory } from "../../memory/src/store.ts";
+import { Semaphore } from "@sosho/llm/subagent-runtime";
+import { searchMemoryAsync, upsertMemory } from "@sosho/memory";
 import { type ActivityResult, type ActivityRuntimeOptions, executeNodeActivity } from "./activities.ts";
 import {
   type CheckpointDecisionSignal,

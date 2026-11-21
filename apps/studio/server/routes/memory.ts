@@ -10,7 +10,7 @@ import {
   rebuildCoreProfile,
   searchMemoryAsync,
   upsertMemory,
-} from "../../../../packages/memory/src/store.ts";
+} from "@sosho/memory";
 import { HttpError, parseValidatedBody, type StudioContext } from "../context.ts";
 
 const MEMORY_TYPES = ["semantic", "episodic", "procedural", "entity"] as const;

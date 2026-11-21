@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import type { ZodType } from "zod";
-import type { WorkflowEngine } from "../../../packages/workflow-engine/src/engine.ts";
+import type { WorkflowEngine } from "@sosho/workflow-engine";
 import type { SseHub } from "./sse.ts";
 
 export const MAX_BODY_BYTES = 1024 * 1024; // 1 MiB

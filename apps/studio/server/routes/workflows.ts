@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
-import { validateGraph } from "../../../../packages/workflow-engine/src/schema.ts";
+import { validateGraph } from "@sosho/workflow-engine/schema";
 import { HttpError, isSafeWorkflowId, readJsonObject, type StudioContext } from "../context.ts";
 
 export function createWorkflowsRoutes(ctx: StudioContext): Hono {

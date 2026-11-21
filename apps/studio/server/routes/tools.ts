@@ -2,8 +2,8 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { Hono } from "hono";
 import { z } from "zod";
-import { loadEnvMap } from "../../../../packages/llm/src/index.ts";
-import { searchMemoryAsync, upsertMemory } from "../../../../packages/memory/src/store.ts";
+import { loadEnvMap } from "@sosho/llm";
+import { searchMemoryAsync, upsertMemory } from "@sosho/memory";
 import { HttpError, parseValidatedBody, type StudioContext } from "../context.ts";
 
 const execFileAsync = promisify(execFile);

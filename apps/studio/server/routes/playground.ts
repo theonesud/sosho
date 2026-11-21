@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { type ChatMessage, chatCompletionStream } from "../../../../packages/llm/src/index.ts";
-import { executeNodeActivity } from "../../../../packages/workflow-engine/src/activities.ts";
+import { type ChatMessage, chatCompletionStream } from "@sosho/llm";
+import { executeNodeActivity } from "@sosho/workflow-engine/activities";
 import { parseValidatedBody, type StudioContext } from "../context.ts";
 
 const chatSchema = z.object({

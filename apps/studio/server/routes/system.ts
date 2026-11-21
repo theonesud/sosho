@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { Hono } from "hono";
 import { z } from "zod";
-import { loadEnvMap, loadModelRoles, loadModelsConfig } from "../../../../packages/llm/src/index.ts";
+import { loadEnvMap, loadModelRoles, loadModelsConfig } from "@sosho/llm";
 import { HttpError, parseValidatedBody, type StudioContext } from "../context.ts";
 import { listSkills } from "./skills.ts";
 

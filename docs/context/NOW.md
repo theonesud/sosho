@@ -22,7 +22,7 @@ Update this file whenever you complete a milestone, change a port or invariant, 
 
 ## Immediate Next Priorities
 
-1. Execute Phase 6 of `REFACTOR_PLAN.md` (Package Refactor and End-to-End Tests).
+1. All 6 phases of `REFACTOR_PLAN.md` are implemented. Verify live Docker services (`litellm`, `langgraph`, `langflow`, `playwright`) and run `pnpm install` for workspace package resolution and E2E tests.
 2. Expand automated verification for Studio Phase 2 Playground and Phase 3 Memory, Audio, and System screens.
 3. Keep `docs/context/NOW.md` and `docs/context/DECISIONS.md` current in every feature commit.
 

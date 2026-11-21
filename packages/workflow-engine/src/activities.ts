@@ -2,14 +2,14 @@ import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { chatCompletion, getDefaultSoshoRoot, loadEnvMap, resolveRoleEndpoint } from "../../llm/src/index.ts";
+import { chatCompletion, getDefaultSoshoRoot, loadEnvMap, resolveRoleEndpoint } from "@sosho/llm";
 import {
   drainInboxToEpisodic,
   type MemoryScope,
   rebuildCoreProfile,
   searchMemoryAsync,
   upsertMemory,
-} from "../../memory/src/store.ts";
+} from "@sosho/memory";
 import type { GraphNode } from "./schema.ts";
 
 const execFileAsync = promisify(execFile);

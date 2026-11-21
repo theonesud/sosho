@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { validateGraph } from "../../../../packages/workflow-engine/src/schema.ts";
+import { validateGraph } from "@sosho/workflow-engine/schema";
 import { HttpError, parseValidatedBody, type StudioContext } from "../context.ts";
 
 const startRunSchema = z.object({

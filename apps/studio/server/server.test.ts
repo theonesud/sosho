@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { GraphDefinition } from "../../../packages/workflow-engine/src/schema.ts";
+import type { GraphDefinition } from "@sosho/workflow-engine/schema";
 import { createStudioServer } from "./index.ts";
 
 const tmp = mkdtempSync(join(tmpdir(), "sosho-studio-test-"));
