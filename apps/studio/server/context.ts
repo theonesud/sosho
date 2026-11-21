@@ -22,6 +22,8 @@ export interface StudioContext {
   port: number;
   engine: WorkflowEngine;
   sse: SseHub;
+  langgraphUrl?: string;
+  langflowUrl?: string;
 }
 
 export function isSafeWorkflowId(id: string): boolean {

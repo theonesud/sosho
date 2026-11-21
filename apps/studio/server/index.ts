@@ -17,6 +17,7 @@ import { createPlaygroundRoutes } from "./routes/playground.ts";
 import { createRunsRoutes } from "./routes/runs.ts";
 import { createSkillsRoutes } from "./routes/skills.ts";
 import { createSystemRoutes } from "./routes/system.ts";
+import { createToolsRoutes } from "./routes/tools.ts";
 import { createWorkflowsRoutes } from "./routes/workflows.ts";
 import { SseHub } from "./sse.ts";
 
@@ -62,6 +63,8 @@ export interface StudioServerOptions {
   dbPath?: string;
   executor?: NodeExecutor;
   heartbeatMs?: number;
+  langgraphUrl?: string;
+  langflowUrl?: string;
 }
 
 export function createStudioServer(options: StudioServerOptions = {}): {
@@ -97,6 +100,9 @@ export function createStudioServer(options: StudioServerOptions = {}): {
   // Recover any interrupted 'running' runs on startup
   engine.recoverInterruptedRuns();
 
+  const langgraphUrl = (options.langgraphUrl ?? process.env.LANGGRAPH_URL)?.trim().replace(/\/+$/, "") || undefined;
+  const langflowUrl = (options.langflowUrl ?? process.env.LANGFLOW_URL)?.trim().replace(/\/+$/, "") || undefined;
+
   const ctx: StudioContext = {
     root: ROOT,
     workflowsDir: WORKFLOWS_DIR,
@@ -104,6 +110,8 @@ export function createStudioServer(options: StudioServerOptions = {}): {
     port: PORT,
     engine,
     sse,
+    langgraphUrl,
+    langflowUrl,
   };
 
   const app = new Hono();
@@ -157,6 +165,10 @@ export function createStudioServer(options: StudioServerOptions = {}): {
       "/api/playground/chat",
       "/api/playground/compare",
       "/api/playground/skill",
+      "/api/tools/memory/search",
+      "/api/tools/memory/add",
+      "/api/tools/music/generate",
+      "/api/tools/pi/run",
       "/api/events",
       "/api/openapi.json",
       "/api/docs",
@@ -174,6 +186,7 @@ export function createStudioServer(options: StudioServerOptions = {}): {
   app.route("/api/playground", createPlaygroundRoutes(ctx));
   app.route("/api/system", createSystemRoutes(ctx));
   app.route("/api/skills", createSkillsRoutes(ctx));
+  app.route("/api/tools", createToolsRoutes(ctx));
   app.route("/api/events", createEventsRoutes(ctx));
   app.route("/api", createOpenApiRoutes());
 

@@ -57,17 +57,41 @@ export function createPlaygroundRoutes(ctx: StudioContext): Hono {
         };
 
         try {
-          for await (const ev of chatCompletionStream({
-            role: body.role,
-            messages,
-            temperature: body.temperature,
-            maxTokens: body.maxTokens,
-            cwd: ctx.root,
-            soshoRoot: ctx.root,
-            signal: ac.signal,
-            traceName: "studio.playground.chat",
-          })) {
-            send(ev as unknown as Record<string, unknown>);
+          if (ctx.langflowUrl) {
+            const lfRes = await fetch(`${ctx.langflowUrl}/api/v1/run/default`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                input_value: body.prompt,
+                output_type: "chat",
+                input_type: "chat",
+                tweaks: { role: body.role, systemPrompt: body.systemPrompt },
+              }),
+              signal: ac.signal,
+            });
+            if (!lfRes.ok) {
+              throw new Error(`Langflow HTTP ${lfRes.status}`);
+            }
+            const lfData = (await lfRes.json()) as { result?: string; outputs?: Array<{ outputs?: Array<{ results?: { message?: { text?: string } } }> }> };
+            const text =
+              lfData.result ||
+              lfData.outputs?.[0]?.outputs?.[0]?.results?.message?.text ||
+              "";
+            if (text) send({ type: "delta", content: text });
+            send({ type: "done", content: text, provider: "langflow", model: body.role, durationMs: 0, fallbackUsed: false });
+          } else {
+            for await (const ev of chatCompletionStream({
+              role: body.role,
+              messages,
+              temperature: body.temperature,
+              maxTokens: body.maxTokens,
+              cwd: ctx.root,
+              soshoRoot: ctx.root,
+              signal: ac.signal,
+              traceName: "studio.playground.chat",
+            })) {
+              send(ev as unknown as Record<string, unknown>);
+            }
           }
         } catch (err) {
           if (!ac.signal.aborted) {

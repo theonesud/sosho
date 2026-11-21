@@ -20,6 +20,10 @@ import {
 } from "./schema.ts";
 import { type PersistedWorkflowRun, WorkflowRunStore } from "./store.ts";
 
+/**
+ * @deprecated Legacy in-process SQLite DAG execution loop.
+ * Retained for fallback until live LangGraph parity passes all tests.
+ */
 export interface StepLimitCheck {
   exceeded: boolean;
   status: WorkflowRunState["status"];

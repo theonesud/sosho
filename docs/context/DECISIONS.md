@@ -51,3 +51,10 @@ Add a new Architecture Decision Record, or ADR, whenever you introduce a lasting
 - **Decision:** Run **LiteLLM Proxy** on port `4000` in [compose.yaml](../../compose.yaml) configured by [litellm.config.yaml](../../litellm.config.yaml) for `main`, `subagent`, `subagent-code`, `decision`, `embed`, and `local-uncensored`.
 - **Rationale:** One OpenAI-compatible gateway centralizes mid-request fallbacks, rate-limit cooldowns, and Langfuse callbacks for both `pi` and `@sosho/llm`.
 - **Invariants:** Route `.pi/models.json` and `@sosho/llm` through `litellm` when configured. Keep `DEEPINFRA_API_KEY`, `LITELLM_MASTER_KEY`, and Langfuse keys in `.env`.
+
+## ADR-008: LangGraph, Langflow, and Studio Adapter
+
+- **Status:** Accepted.
+- **Decision:** Run **LangGraph** on port `8123` and **Langflow** on port `7860` on `webui-net`, expose `packages/memory/`, `yue2/gateway/`, and `pi` via MCP (`packages/memory/src/mcp.ts`) and `/api/tools/*`, and proxy Studio runs and Playground chat when `LANGGRAPH_URL` or `LANGFLOW_URL` are set.
+- **Rationale:** Separating orchestration and visual flow building from the Studio UI gateway keeps token auth, loopback CORS, and 1-megabyte body caps enforced in one place.
+- **Invariants:** Keep `packages/workflow-engine/src/engine.ts` as fallback until live LangGraph parity passes all tests. Keep `SOSHO_STUDIO_TOKEN` and loopback CORS on all Studio routes.

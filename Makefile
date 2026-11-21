@@ -106,7 +106,7 @@ down:
 	@for f in .pi/run/studio-ui.pid .pi/run/studio-api.pid; do \
 		if [ -f "$$f" ]; then kill "$$(cat "$$f")" 2>/dev/null || true; rm -f "$$f"; fi; \
 	done
-	$(RUN) docker compose --profile llm --profile music --profile agent --profile decision --profile embed down
+	$(RUN) docker compose --profile llm --profile music --profile agent --profile decision --profile embed --profile orchestration down
 
 logs:
 	$(RUN) docker compose $(PROFILE_FLAGS) logs -f $(S)

@@ -402,9 +402,56 @@ services:
       - ${HOME}/.gitconfig:${HOME}/.gitconfig:ro
     command: ["--approve"]
 
+  langgraph:
+    profiles: [orchestration]
+    image: langchain/langgraph-api:latest
+    container_name: langgraph
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LANGGRAPH_PORT:-8123}:8123"
+    networks: [webui-net]
+    environment:
+      PORT: "8123"
+      OPENAI_API_BASE: http://litellm:4000/v1
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-sosho-local}
+      LANGFUSE_HOST: ${LANGFUSE_INTERNAL_URL:-http://langfuse-web:3000}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}
+      SOSHO_STUDIO_API_URL: http://host.docker.internal:4101
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8123/ok || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  langflow:
+    profiles: [orchestration]
+    image: langflowai/langflow:latest
+    container_name: langflow
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LANGFLOW_PORT:-7860}:7860"
+    networks: [webui-net]
+    environment:
+      LANGFLOW_HOST: 0.0.0.0
+      LANGFLOW_PORT: "7860"
+      OPENAI_API_BASE: http://litellm:4000/v1
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-sosho-local}
+      SOSHO_STUDIO_API_URL: http://host.docker.internal:4101
+    volumes:
+      - langflow-data:/app/langflow
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:7860/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+
 networks:
   webui-net:
     name: webui-net
 
 volumes:
   hf-cache:
+  langflow-data:

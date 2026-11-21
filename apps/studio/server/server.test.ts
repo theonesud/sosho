@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { GraphDefinition } from "../../../packages/workflow-engine/src/schema.ts";
@@ -300,6 +301,57 @@ try {
     headers: { Authorization: `Bearer ${TOKEN}` },
   });
   assert.equal(wfDel.status, 200);
+
+  // 13. HTTP tool endpoints (/api/tools/memory/add & /api/tools/memory/search)
+  const toolAdd = await fetch(`${s2.baseUrl}/api/tools/memory/add`, {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({ scope: "project", type: "semantic", title: "LangGraph", content: "Orchestration runs on port 8123" }),
+  });
+  assert.equal(toolAdd.status, 201);
+
+  const toolSearch = await fetch(`${s2.baseUrl}/api/tools/memory/search`, {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({ query: "LangGraph", scope: "project" }),
+  });
+  assert.equal(toolSearch.status, 200);
+  const toolSearchData = (await toolSearch.json()) as { results: unknown[] };
+  assert.ok(toolSearchData.results.length >= 1);
+
+  // 14. LangGraph proxy adapter mode
+  const mockLg = createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/runs") {
+      res.writeHead(202, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ run_id: "lg-run-1", status: "pending" }));
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ run_id: "lg-run-1", status: "success" }));
+  });
+  await new Promise<void>((resolve) => mockLg.listen(0, "127.0.0.1", resolve));
+  const lgAddr = mockLg.address();
+  const lgPort = typeof lgAddr === "object" && lgAddr ? lgAddr.port : 0;
+  const s3 = createStudioServer({
+    root: tmp,
+    port: 0,
+    token: TOKEN,
+    dbPath,
+    langgraphUrl: `http://127.0.0.1:${lgPort}`,
+  });
+  await new Promise<void>((resolve) => s3.server.listen(0, "127.0.0.1", resolve));
+  const s3Addr = s3.server.address();
+  const s3Port = typeof s3Addr === "object" && s3Addr ? s3Addr.port : 0;
+  const lgRunRes = await fetch(`http://127.0.0.1:${s3Port}/api/runs`, {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({ graph: sampleGraph }),
+  });
+  assert.equal(lgRunRes.status, 202);
+  const lgRunData = (await lgRunRes.json()) as { runId: string };
+  assert.equal(lgRunData.runId, "lg-run-1");
+  s3.closeAll();
+  await new Promise<void>((resolve) => mockLg.close(() => resolve()));
 
   s2.closeAll();
   console.log("ALL STUDIO SERVER TESTS PASSED");
