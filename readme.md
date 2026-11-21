@@ -33,7 +33,7 @@
 - **SQLite Write-Ahead Log (WAL) Directed Acyclic Graph (DAG) Engine (`packages/workflow-engine/src/engine.ts`, `store.ts`):** Runs inside the Studio server process with zero external workflow containers. Persists runs, step logs, state data, and paused checkpoints in `.pi/workflows/runs.sqlite`. Executes unconditional branches in parallel, waits at join nodes, recovers interrupted runs at startup, and fails cyclic runs with `max_steps_exceeded`.
 - **Resource Queue Semaphores:** Enforces in-process concurrency caps across `cloud-io` (`8`), `local-gpu` (`1`), and `host-browser` (`2`) to protect graphics card memory and host Chrome tabs.
 - **Real Activity Execution (`packages/workflow-engine/src/activities.ts`):** Calls `@sosho/llm` for pure Large Language Model (LLM) nodes. Runs `pi --print --no-session` for tool-capable `skill` nodes and skill-enabled `subagent` nodes. Submits and waits on async `yue2` jobs and downloads audio and ABC score files. Supports nested dot templates such as `{{result.summary}}`, per-node retries with exponential delay, and `AbortSignal.timeout`.
-- **Visual Studio Editor (`apps/studio/`):** React Flow canvas on port `4100` connected to the Studio API on port `4101`. Provides editable forms for all seven node types, an edge condition editor, an `entryNode` selector, skills dropdowns, a recent runs list with cancel controls, Memory Explorer create and archive forms, and persistent run state over Server-Sent Events (SSE) with 15-second heartbeats.
+- **Visual Studio Editor (`apps/studio/`):** React Flow canvas on port `3000` connected to the Studio API on port `4101`. Provides editable forms for all seven node types, an edge condition editor, an `entryNode` selector, skills dropdowns, a recent runs list with cancel controls, Memory Explorer create and archive forms, and persistent run state over Server-Sent Events (SSE) with 15-second heartbeats.
 
 ### 2. Two-Tier Memory Engine
 
@@ -64,7 +64,7 @@
 
 ### 5. Security, Container Limits, and External Repositories
 
-- **Studio Server Security (`apps/studio/server/index.ts`):** Restricts `Access-Control-Allow-Origin` to `http://127.0.0.1:4100` and `http://localhost:4100`. Requires `SOSHO_STUDIO_TOKEN` bearer authentication on all `POST`, `PUT`, and `DELETE` routes. Caps request bodies at 1 megabyte (`HTTP 413`), rejects invalid JSON (`HTTP 400`), and blocks path traversal in workflow IDs.
+- **Studio Server Security (`apps/studio/server/index.ts`):** Restricts `Access-Control-Allow-Origin` to `http://127.0.0.1:3000` and `http://localhost:3000`. Requires `SOSHO_STUDIO_TOKEN` bearer authentication on all `POST`, `PUT`, and `DELETE` routes. Caps request bodies at 1 megabyte (`HTTP 413`), rejects invalid JSON (`HTTP 400`), and blocks path traversal in workflow IDs.
 - **Langfuse Memory Limits (`docker/compose.langfuse.yaml`, `docker/clickhouse-memory.xml`):** Parameterizes all secrets via `.env` and caps container memory: `clickhouse` (`1g`), `langfuse-web` (`1280m`), `langfuse-worker` (`512m`), `postgres` (`512m`), `minio` (`256m`), and `redis` (`256m`).
 - **Isolated Model Mounts (`compose.yaml`):** Mounts each model directory separately for `llama-cpp`, `llama-decision`, and `llama-embed`.
 - **External Repository Launcher (`bin/pi-launcher.sh`):** Symlinks `~/.local/bin/pi` to `bin/pi-launcher.sh`, mounts Sosho read-only at `/opt/sosho`, resolves extensions and skills in any external Git repository, and syncs compaction settings to the active default model `contextWindow`.
@@ -82,7 +82,7 @@ Available skills: `social-x`, `github-scout`, `youtube-digest`, `libdocs`, `data
 | `packages/llm/` | Shared `@sosho/llm` client, health cache, Langfuse trace emitter, and subagent runtime helpers |
 | `packages/memory/` | Two-tier Markdown plus SQLite FTS5, `embeddinggemma` vector, and entity graph memory engine |
 | `packages/workflow-engine/` | Zod graph validator, activity runners, and SQLite WAL DAG workflow engine |
-| `apps/studio/` | Sosho Studio API server (`:4101`) and React Flow visual editor (`:4100`) |
+| `apps/studio/` | Sosho Studio API server (`:4101`) and React Flow visual editor (`:3000`) |
 | `bin/` | `pi-launcher.sh`, `autotune.sh`, `doctor.sh`, and `chunk-read.sh` |
 | `docker/` | `Dockerfile.pi`, `compose.langfuse.yaml`, `clickhouse-memory.xml`, and `Dockerfile.yue2-gateway` |
 | `yue2/` | YuE2 gateway FastAPI service, pytest suite, and `generate.sh` CLI |
@@ -98,9 +98,9 @@ Available skills: `social-x`, `github-scout`, `youtube-digest`, `libdocs`, `data
 | `8080` | `llama-cpp` (`Qwen3.6-35B-A3B`) | Local GPU model server |
 | `8081` | `llama-decision` (`Qwen3-1.7B`) | Local CPU decision router |
 | `8082` | `llama-embed` (`embeddinggemma-300M`) | Local CPU memory embedding server |
-| `3000` | `langfuse-web` | Langfuse v4 UI and trace ingestion |
+| `3001` | `langfuse-web` | Langfuse v4 UI and trace ingestion |
 | `8021` | `yue2-gateway` | YuE2 async music generation API |
-| `4100` | Sosho Studio UI | React Flow visual editor |
+| `3000` | Sosho Studio UI | React Flow visual editor |
 | `4101` | Sosho Studio API | REST API, SSE stream, and SQLite DAG engine |
 
 ---
@@ -120,7 +120,7 @@ cp .env.example .env   # Optional: set DEEPINFRA_API_KEY and SOSHO_STUDIO_TOKEN
 make doctor            # Check Docker, Node, GPU, ports, and CLI links
 make autotune          # Generate hardware-tuned .env while preserving custom keys
 make install-cli       # Install pi and yue2-music symlinks into ~/.local/bin
-make up                # Start llama-cpp (:8080) and Langfuse (:3000)
+make up                # Start llama-cpp (:8080) and Langfuse (:3001)
 ```
 
 ### 2. Optional Local CPU Models and Sosho Studio
@@ -136,12 +136,12 @@ make embed-up
 (cd packages/workflow-engine && npm install)
 (cd apps/studio && npm install)
 
-# Start Studio API + SQLite DAG engine (:4101) and Studio UI (:4100)
+# Start Studio API + SQLite DAG engine (:4101) and Studio UI (:3000)
 SOSHO_STUDIO_TOKEN=local-dev-token make studio-api
 make studio-ui
 ```
 
-Open `http://127.0.0.1:4100` and paste `SOSHO_STUDIO_TOKEN` into the top-bar token field to save workflows, start runs, approve checkpoints, and manage memory.
+Open `http://127.0.0.1:3000` and paste `SOSHO_STUDIO_TOKEN` into the top-bar token field to save workflows, start runs, approve checkpoints, and manage memory.
 
 ### 3. Interactive Terminal Agent (`pi`)
 
@@ -154,7 +154,7 @@ pi
 
 ### 4. Automated Test Suite
 
-Run all seven verification suites (TypeScript typechecks, `pi-sandbox` extension smoke tests, memory, LLM and subagents, workflow engine, Studio server, and YuE2 gateway pytest):
+Run all ten verification suites (TypeScript typechecks, `pi-sandbox` extension smoke tests, memory, LLM and subagents, workflow engine, Studio server, and YuE2 gateway pytest):
 
 ```bash
 make test
@@ -169,15 +169,15 @@ make test
 | `make doctor` | Run full host, GPU, Node, port, and CLI diagnostics |
 | `make autotune` | Tune `.env` for host hardware and preserve custom keys |
 | `make install-cli` | Install `pi` and `yue2-music` symlinks into `~/.local/bin` |
-| `make up` | Start `llama-cpp` (`:8080`) and Langfuse v4 (`:3000`) |
+| `make up` | Start `llama-cpp` (`:8080`) and Langfuse v4 (`:3001`) |
 | `make decision-up` | Start local CPU `Qwen3-1.7B` decision router (`:8081`) |
 | `make embed-up` | Start local CPU `embeddinggemma` vector server (`:8082`) |
 | `make music-up` | Start YuE2 music engine and gateway (`:8021`) |
 | `make music-down` | Stop YuE2 music services |
 | `make studio-api` | Start Sosho Studio API, SQLite DAG engine, and SSE server (`:4101`) |
-| `make studio-ui` | Start Sosho Studio React Flow visual canvas (`:4100`) |
+| `make studio-ui` | Start Sosho Studio React Flow visual canvas (`:3000`) |
 | `make test-memory` | Run two-tier memory unit tests |
-| `make test` | Run all seven automated test suites |
+| `make test` | Run all ten automated test suites |
 | `make down` | Stop all containers across all Compose profiles |
 | `make restart` | Restart `llama-cpp` |
 | `make status` | Show Docker Compose container status |
@@ -226,7 +226,7 @@ Sosho stands on six technical pillars. Each pillar isolates a clear responsibili
 
 ### 6. Security, Observability, and Automated Verification (`apps/studio/`, `docker/`, `tests/`)
 
-- **Core design:** Pairs an always-on memory-capped Langfuse v4 telemetry stack (`:3000`) with a token-authenticated Studio API (`:4101`), an interactive React Flow editor (`:4100`), and a single fail-fast verification runner (`tests/run_tests.sh`).
+- **Core design:** Pairs an always-on memory-capped Langfuse v4 telemetry stack (`:3001`) with a token-authenticated Studio API (`:4101`), an interactive React Flow editor (`:3000`), and a single fail-fast verification runner (`tests/run_tests.sh`).
 - **Key guarantees:** Enforces strict container memory limits on ClickHouse, Postgres, MinIO, Redis, and Langfuse. Restricts Studio CORS to loopback UI origins, requires `SOSHO_STUDIO_TOKEN` on mutating endpoints, caps payloads at 1 megabyte, and rejects unsafe workflow IDs.
 - **Extensibility:** Override any secret or port in `.env`, subscribe custom dashboards to `GET /api/events` SSE streams, and add new package checks to `tests/run_tests.sh`.
 - **Primary use cases:** Full trace inspection in Langfuse, interactive graph editing with live node badges, safe local multi-service operation, and one-command regression testing via `make test`.

@@ -292,7 +292,7 @@ async function emitLangfuseGeneration(
 ): Promise<void> {
   const pk = env.LANGFUSE_PUBLIC_KEY?.trim();
   const sk = env.LANGFUSE_SECRET_KEY?.trim();
-  const baseUrl = (env.LANGFUSE_BASE_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
+  const baseUrl = (env.LANGFUSE_BASE_URL || "http://127.0.0.1:3001").replace(/\/+$/, "");
   if (!pk || !sk) return;
 
   const auth = Buffer.from(`${pk}:${sk}`).toString("base64");

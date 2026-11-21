@@ -25,8 +25,6 @@ export { isSafeWorkflowId };
 const DEFAULT_ALLOWED_ORIGINS = new Set([
   "http://127.0.0.1:3000",
   "http://localhost:3000",
-  "http://127.0.0.1:4100",
-  "http://localhost:4100",
 ]);
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "DELETE"]);

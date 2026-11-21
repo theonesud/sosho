@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-Next.js App Router on port 4100 with React 19, strict TypeScript, Tailwind CSS, Radix UI, shadcn/ui, `@xyflow/react`, Zustand, TanStack Query, `cmdk`, and Biome. Dedicated Hono TypeScript API server on port 4101 with Zod validation and OpenAPI docs.
+Next.js App Router on port 3000 with React 19, strict TypeScript, Tailwind CSS, Radix UI, shadcn/ui, `@xyflow/react`, Zustand, TanStack Query, `cmdk`, and Biome. Dedicated Hono TypeScript API server on port 4101 with Zod validation and OpenAPI docs.
 
 ## Users
 
@@ -24,13 +24,13 @@ Sosho Studio exposes local-first GPU and Video Random Access Memory, or VRAM, co
 
 ## Operating Context
 
-Developers run Studio locally at `http://127.0.0.1:4100` against the Studio API at `http://127.0.0.1:4101`. Infrastructure services run via Docker Compose (`llama-cpp`, `llama-decision`, `llama-embed`, `yue2-engine`, `yue2-gateway`, and `langfuse`). Desktop viewports of 1280 pixels and wider are the primary target.
+Developers run Studio locally at `http://127.0.0.1:3000` against the Studio API at `http://127.0.0.1:4101`. Infrastructure services run via Docker Compose (`llama-cpp`, `llama-decision`, `llama-embed`, `yue2-engine`, `yue2-gateway`, and `langfuse`). Desktop viewports of 1280 pixels and wider are the primary target.
 
 ## Capabilities and Constraints
 
 - Open `/` directly on the Workflows and Runs canvas.
 - Keep `.pi/model-roles.json`, `.pi/models.json`, and `.env` strictly read-only in the UI.
-- Preserve ports `4100` and `4101`, loopback Cross-Origin Resource Sharing, or CORS, and Bearer token authentication on write routes.
+- Preserve ports `3000` and `4101`, loopback Cross-Origin Resource Sharing, or CORS, and Bearer token authentication on write routes.
 - Build in sequence: Phase 1 Architecture and Workflows, Phase 2 Playground, Phase 3 Memory, Audio, and System.
 
 ## Brand Commitments

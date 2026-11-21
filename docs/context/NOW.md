@@ -1,6 +1,6 @@
 # Sosho Present State
 
-Last verified: 2026-11-20.
+Last verified: 2026-11-21.
 Update this file whenever you complete a milestone, change a port or invariant, or discover documentation drift.
 
 ## Active Focus
@@ -18,12 +18,11 @@ Update this file whenever you complete a milestone, change a port or invariant, 
 
 ## Known Drift to Resolve
 
-- [PRODUCT.md](../../PRODUCT.md) and [readme.md](../../readme.md) still mention port `4100` for Studio UI and port `3000` for Langfuse. Ground truth in [apps/studio/package.json](../../apps/studio/package.json), [Makefile](../../Makefile), and [docker/compose.langfuse.yaml](../../docker/compose.langfuse.yaml) uses port `3000` for Studio UI and port `3001` for Langfuse.
-- [readme.md](../../readme.md) states seven test suites. Ground truth in [tests/run_tests.sh](../../tests/run_tests.sh) runs ten suites.
+- None currently recorded. Phase 1 reconciled Studio UI (`3000`), Langfuse (`3001`), and test suite count (`10`) across `PRODUCT.md`, `readme.md`, `packages/llm/src/index.ts`, and `apps/studio/server/index.ts`.
 
 ## Immediate Next Priorities
 
-1. Reconcile port numbers in [PRODUCT.md](../../PRODUCT.md) and [readme.md](../../readme.md) with actual runtime ports.
+1. Execute Phase 2 of `REFACTOR_PLAN.md` (LiteLLM Proxy and Model Fallback).
 2. Expand automated verification for Studio Phase 2 Playground and Phase 3 Memory, Audio, and System screens.
 3. Keep `docs/context/NOW.md` and `docs/context/DECISIONS.md` current in every feature commit.
 

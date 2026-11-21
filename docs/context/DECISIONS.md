@@ -36,7 +36,7 @@ Add a new Architecture Decision Record, or ADR, whenever you introduce a lasting
 - **Status:** Accepted.
 - **Decision:** Run Sosho Studio UI on Next.js App Router at `127.0.0.1:3000` and the Hono TypeScript API at `127.0.0.1:4101`, with Langfuse on `127.0.0.1:3001`.
 - **Rationale:** Next.js App Router with React 19, Tailwind CSS, Radix UI, `@xyflow/react`, and Biome gives a strict, fast local developer workbench.
-- **Invariants:** Restrict Cross-Origin Resource Sharing, or CORS, to loopback origins (`:3000` and `:4100`). Require timing-safe `SOSHO_STUDIO_TOKEN` bearer authentication on all `POST`, `PUT`, and `DELETE` routes. Cap request bodies at 1 megabyte and block path traversal in workflow identifiers.
+- **Invariants:** Restrict Cross-Origin Resource Sharing, or CORS, to loopback origins (`:3000`). Require timing-safe `SOSHO_STUDIO_TOKEN` bearer authentication on all `POST`, `PUT`, and `DELETE` routes. Cap request bodies at 1 megabyte and block path traversal in workflow identifiers.
 
 ## ADR-006: Cross-Agent Governance and ASD-STE100 Standard
 
