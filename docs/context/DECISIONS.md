@@ -65,3 +65,10 @@ Add a new Architecture Decision Record, or ADR, whenever you introduce a lasting
 - **Decision:** Populate [.pi/mcp.json](../../.pi/mcp.json) with `memory`, `langgraph`, and `langflow` MCP servers, isolate the `pi` service on `webui-net` without `network_mode: host` or `pid: host`, and support `local`, `container`, and `ssh` targets in [bin/pi-launcher.sh](../../bin/pi-launcher.sh).
 - **Rationale:** Removing host network and PID sharing limits container blast radius to LiteLLM, Langfuse, and MCP endpoints while preserving local and remote SSH workflows.
 - **Invariants:** Expose only LiteLLM, Langfuse, and MCP endpoints to the isolated `pi` container on `webui-net`.
+
+## ADR-010: Headless Playwright MCP Default and Dokobot Boundary
+
+- **Status:** Accepted.
+- **Decision:** Keep `dokobot` with its two-tab host Chrome limit for authenticated personal-cookie tasks, and add headless `@playwright/mcp` to [.pi/mcp.json](../../.pi/mcp.json) as the default headless runner for parallel clicks and form fills.
+- **Rationale:** Deterministic accessibility-tree snapshots in Playwright MCP avoid per-step screenshot token costs compared to vision-heavy loops. Live cost-per-task benchmark against Browser Use is not verified offline.
+- **Invariants:** Keep `host-browser` semaphore at `2` for `dokobot`. Route unauthenticated parallel web tasks through headless `playwright` MCP.

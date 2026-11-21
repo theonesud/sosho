@@ -11,6 +11,10 @@
     "langflow": {
       "url": "http://langflow:7860/api/v1/mcp/sse",
       "transport": "sse"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest", "--headless"]
     }
   }
 }
