@@ -1,5 +1,3 @@
-"""Run lifecycle: start, resume after an interrupt, cancel, and event streams."""
-
 import asyncio
 import logging
 from collections.abc import AsyncIterator, Callable
@@ -30,17 +28,15 @@ RESTART_MESSAGE = "service restarted before the run finished"
 
 
 class RunNotFoundError(LookupError):
-    """Raised when a run id is unknown."""
+    pass
 
 
 class RunConflictError(ValueError):
-    """Raised when an action does not fit the current run status."""
+    pass
 
 
 @dataclass(frozen=True)
 class RunDetail:
-    """Status, data, and pending interrupts of one run."""
-
     run_id: str
     thread_id: str
     graph_id: str
@@ -54,8 +50,6 @@ class RunDetail:
 
 @dataclass
 class RunRecord:
-    """In-memory state of one run. The store keeps the durable copy."""
-
     run_id: str
     thread_id: str
     graph: GraphDefinition
@@ -71,8 +65,6 @@ class RunRecord:
 
 @dataclass(frozen=True)
 class RunDeps:
-    """Collaborators of the run manager."""
-
     store: RunStore
     checkpointer: Checkpointer
     registry: NodeRegistry
@@ -85,8 +77,6 @@ def _has_pending(record: RunRecord, index: int) -> bool:
 
 
 class RunManager:
-    """Owns the runs of this process. Every status change reaches the store."""
-
     def __init__(self, deps: RunDeps, clock: Callable[[], str], new_id: Callable[[], str]) -> None:
         self._store = deps.store
         self._checkpointer = deps.checkpointer
@@ -139,7 +129,6 @@ class RunManager:
     async def start(
         self, graph: GraphDefinition, input_data: dict[str, JsonValue], thread_id: str | None
     ) -> RunRecord:
-        """Compile the graph, record the run, and start it in the background."""
         app = self._compile(graph)
         now = self._clock()
         record = RunRecord(
@@ -158,7 +147,6 @@ class RunManager:
         return record
 
     async def resume(self, run_id: str, decision: HumanDecision) -> RunRecord:
-        """Resume a run that waits at a checkpoint with a human decision."""
         record = await self.require(run_id)
         self._require_waiting(record)
         if decision.node_id is not None:
@@ -186,7 +174,6 @@ class RunManager:
             raise RunConflictError(f"checkpoint '{node_id}' is not pending in '{record.run_id}'")
 
     async def cancel(self, run_id: str) -> RunRecord:
-        """Cancel a run. A terminal run raises RunConflictError."""
         record = await self.require(run_id)
         if record.status in TERMINAL_STATUSES:
             raise RunConflictError(f"run '{run_id}' is already '{record.status}'")
@@ -195,14 +182,12 @@ class RunManager:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
         if record.status not in TERMINAL_STATUSES:
-            # The task never started, so its cleanup did not run. Finish the run here.
             await self._set_status(record, "cancelled", None)
             await self._emit(record, EventDraft("done", None, {"status": "cancelled"}))
         record.task = None
         return record
 
     async def require(self, run_id: str) -> RunRecord:
-        """Return the run from memory, or load it from the store after a restart."""
         record = self._runs.get(run_id)
         if record is not None:
             return record
@@ -223,11 +208,9 @@ class RunManager:
         return record
 
     async def list_runs(self, limit: int) -> list[RunRow]:
-        """Return stored runs, newest first."""
         return await self._store.list_recent(limit)
 
     async def detail(self, run_id: str) -> RunDetail:
-        """Return the status, data, and pending interrupts of one run."""
         record = await self.require(run_id)
         snapshot = await record.app.aget_state(self._config(record))
         return RunDetail(
@@ -243,7 +226,6 @@ class RunManager:
         )
 
     async def stream_events(self, run_id: str, after: int = 0) -> AsyncIterator[RunEvent]:
-        """Yield the events after a sequence number. Stop after a done event."""
         record = await self.require(run_id)
         index = after
         while True:
@@ -258,7 +240,6 @@ class RunManager:
                 return
 
     async def wait(self, run_id: str) -> None:
-        """Wait until the current execution of a run ends."""
         record = await self.require(run_id)
         if record.task is not None:
             await asyncio.gather(record.task, return_exceptions=True)
@@ -295,11 +276,9 @@ class RunManager:
         await self._emit(record, EventDraft("done", None, {"status": "failed"}))
 
     async def fail_unfinished(self) -> int:
-        """Mark stored runs with status running as failed after a restart."""
         return await self._store.fail_unfinished(RESTART_MESSAGE, self._clock())
 
     async def shutdown(self) -> None:
-        """Cancel every active run and wait for the cancellations to finish."""
         tasks = [record.task for record in self._runs.values() if record.task is not None]
         for task in tasks:
             task.cancel()

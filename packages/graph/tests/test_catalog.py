@@ -1,5 +1,3 @@
-"""The catalog lists node kinds, and a new kind runs without any compiler change."""
-
 from pathlib import Path
 
 import pytest
@@ -40,13 +38,10 @@ def test_registry_rejects_a_duplicate_type_id() -> None:
 
 
 class EchoConfig(NodeConfig):
-    """Config for the test-only echo kind."""
-
     text: str = Field(min_length=1)
 
 
 async def run_echo(ctx: NodeContext, node: EchoConfig) -> NodeUpdate:
-    """Write the configured text to the run data."""
     return {"data": {"echo": node.text}}
 
 

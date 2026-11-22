@@ -1,5 +1,3 @@
-"""Start and stop the runtime. It owns the SQLite connection, store, and run manager."""
-
 import asyncio
 import uuid
 from collections.abc import AsyncGenerator
@@ -17,12 +15,10 @@ from sosho_graph.tracing import Tracing, close_tracing, open_tracing
 
 
 def utc_now() -> str:
-    """Return the current time in ISO 8601 with UTC offset."""
     return datetime.now(UTC).isoformat()
 
 
 def new_id() -> str:
-    """Return a random identifier."""
     return uuid.uuid4().hex
 
 
@@ -30,7 +26,6 @@ def new_id() -> str:
 async def open_runtime(
     settings: Settings, services: Services, registry: NodeRegistry
 ) -> AsyncGenerator[RunManager]:
-    """Open the checkpoint database and yield a run manager. Close everything on exit."""
     db_path = settings.sosho_graph_db
     await asyncio.to_thread(db_path.parent.mkdir, parents=True, exist_ok=True)
     tracing: Tracing = open_tracing(settings)

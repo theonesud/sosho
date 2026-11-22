@@ -8,7 +8,7 @@ from tests.conftest import LITELLM_URL, ROOT, require_service
 pytestmark = pytest.mark.integration
 
 HEALTH_TIMEOUT = 10.0
-MODEL_TIMEOUT = 180.0  # Local models load on the first call. Cloud calls can be slow.
+MODEL_TIMEOUT = 180.0
 CLOUD_ROLES = ("main", "subagent", "subagent-code", "cloud-uncensored")
 
 
@@ -56,7 +56,6 @@ def _config_roles() -> list[str]:
 
 
 def _auth(key: str) -> dict[str, str]:
-    # The key goes in a header only. Never print it or put it in an assertion message.
     return {"Authorization": f"Bearer {key}"}
 
 

@@ -1,5 +1,3 @@
-"""Test helpers: graph builders, fake models, fixed clock and ids, and a runtime factory."""
-
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from itertools import count
@@ -18,12 +16,10 @@ FIXED_TIME = "2026-01-01T00:00:00+00:00"
 
 
 def fixed_clock() -> str:
-    """Return one fixed timestamp for every event and row."""
     return FIXED_TIME
 
 
 def sequential_ids() -> Callable[[], str]:
-    """Return an id factory that counts from 1."""
     counter = count(1)
 
     def new_id() -> str:
@@ -33,8 +29,6 @@ def sequential_ids() -> Callable[[], str]:
 
 
 class FakeModels:
-    """One fake chat model for each role. Each role answers its replies in order."""
-
     def __init__(self, replies: dict[str, list[str]]) -> None:
         self._replies = replies
         self._models: dict[str, FakeListChatModel] = {}
@@ -49,7 +43,6 @@ class FakeModels:
 
 
 def make_settings(db_path: Path) -> Settings:
-    """Return settings that do not read the real environment for Langfuse or LiteLLM."""
     return Settings(
         litellm_api_key=SecretStr("test-key"),
         sosho_graph_db=db_path,
@@ -63,7 +56,6 @@ def make_settings(db_path: Path) -> Settings:
 async def runtime(
     db_path: Path, services: Services, registry: NodeRegistry | None = None
 ) -> AsyncGenerator[RunManager]:
-    """Open a run manager on a SQLite file in the test directory."""
     chosen = registry or default_registry()
     async with open_runtime(make_settings(db_path), services, chosen) as manager:
         yield manager
@@ -76,7 +68,6 @@ def build_graph(
     entry: str,
     max_steps: int = 50,
 ) -> GraphDefinition:
-    """Build a Studio-shaped graph from node dicts and (source, target, condition) tuples."""
     edge_dicts: list[JsonValue] = []
     for index, (source, target, condition) in enumerate(edges, start=1):
         edge: dict[str, JsonValue] = {"id": f"e{index}", "source": source, "target": target}
@@ -95,7 +86,6 @@ def build_graph(
 
 
 def agent(node_id: str, prompt: str, output_key: str, **extra: JsonValue) -> dict[str, JsonValue]:
-    """Return an agent node dict."""
     node: dict[str, JsonValue] = {
         "id": node_id,
         "type": "agent",
@@ -108,7 +98,6 @@ def agent(node_id: str, prompt: str, output_key: str, **extra: JsonValue) -> dic
 
 
 def node_of(node_id: str, node_type: str, **extra: JsonValue) -> dict[str, JsonValue]:
-    """Return a node dict of any type with a label equal to the id."""
     node: dict[str, JsonValue] = {"id": node_id, "type": node_type, "label": node_id}
     node.update(extra)
     return node

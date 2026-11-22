@@ -1,5 +1,3 @@
-"""Decision node kind. A model picks one branch. Outgoing edges use the branch as condition."""
-
 import json
 import re
 from collections.abc import Sequence
@@ -15,8 +13,6 @@ _JSON_OBJECT = re.compile(r"\{[\s\S]*\}")
 
 
 class DecisionConfig(NodeConfig):
-    """Config for the decision kind."""
-
     prompt_template: str = Field(min_length=1)
     branches: list[str] = Field(min_length=1)
     tier: Tier = "decision"
@@ -25,17 +21,10 @@ class DecisionConfig(NodeConfig):
 
 
 class _ReplyJson(BaseModel):
-    """The JSON reply of the router. Other keys are ignored."""
-
     branch: str | None = None
 
 
 def parse_branch(text: str, branches: Sequence[str]) -> str:
-    """Pick a branch from the model reply. Fall back to the first branch when unclear.
-
-    A reply with a JSON value is trusted. Its unknown branch maps to the first branch.
-    A reply without JSON uses the first branch name found in the text.
-    """
     match = _JSON_OBJECT.search(text)
     candidate = match.group(0) if match else text
     try:
@@ -73,7 +62,6 @@ def _system_prompt(branches: Sequence[str]) -> str:
 
 
 async def run_decision(ctx: NodeContext, node: DecisionConfig) -> NodeUpdate:
-    """Ask the model for one branch. Record it for the outgoing condition edges."""
     prompt = render_template(node.prompt_template, ctx.state["data"])
     text = await call_model(
         ctx, node.tier, _system_prompt(node.branches), prompt, node.timeout_seconds

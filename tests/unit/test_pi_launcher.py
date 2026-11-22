@@ -53,7 +53,6 @@ def sandbox(tmp_path: Path) -> Sandbox:
 def _run(
     box: Sandbox, args: list[str], extra_env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
-    # A temp SOSHO_ROOT keeps the real .pi config and env files out of the test.
     env = {
         "PATH": f"{box.bin_dir}:/usr/bin:/bin",
         "HOME": str(box.home),
@@ -143,3 +142,10 @@ def test_raw_mode_runs_host_pi_with_host_urls(sandbox: Sandbox) -> None:
     assert result.stdout.strip().splitlines()[-1] == "http://127.0.0.1:4000/v1"
     assert _calls(sandbox.pi_log) == [["--approve", "hello"]]
     assert not sandbox.docker_log.exists()
+
+
+def test_launcher_reads_config_from_sosho_root_only(sandbox: Sandbox) -> None:
+    result = _run(sandbox, ["hello"])
+    assert result.returncode == 0, result.stderr
+    assert (sandbox.workspace / ".pi").is_dir()
+    assert not (sandbox.workspace / ".pi" / "models.json").exists()

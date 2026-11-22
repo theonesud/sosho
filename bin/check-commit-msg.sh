@@ -1,7 +1,4 @@
 #!/bin/sh
-# Check a commit message against the Conventional Commits rules in docs/standards/git.md.
-# Usage: check-commit-msg.sh <message-file>
-# Exit 0 if the message is valid. Exit 1 and print the reason if it is not.
 
 set -eu
 
@@ -11,7 +8,6 @@ if [ -z "$file" ] || [ ! -f "$file" ]; then
   exit 1
 fi
 
-# Skip merge, revert, fixup, and squash messages that Git creates.
 first=$(sed -n '1p' "$file")
 case "$first" in
   "Merge "* | "Revert \""* | "fixup! "* | "squash! "*) exit 0 ;;
@@ -37,7 +33,6 @@ case "$first" in
   *.) fail "subject ends with a period" ;;
 esac
 
-# Line 2 must be blank when a body exists. Ignore comment lines from Git.
 second=$(sed -n '2p' "$file")
 if [ -n "$second" ] && [ "${second#\#}" = "$second" ]; then
   fail "line 2 must be blank before the body"

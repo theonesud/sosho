@@ -14,7 +14,6 @@ from tests.conftest import ROOT
 
 pytestmark = pytest.mark.integration
 
-# npx can download a package on the first start.
 START_TIMEOUT_SECONDS = 120.0
 CALL_TIMEOUT_SECONDS = 60.0
 
@@ -124,7 +123,6 @@ def _text_of(result: ToolResult) -> str:
 
 
 def test_memory_server_adds_then_finds_a_global_record(tmp_path: Path) -> None:
-    # A temp global store keeps the real memory files untouched.
     env = {**os.environ, "SOSHO_GLOBAL_MEMORY_DIR": str(tmp_path)}
     client = McpClient(_spec("memory"), env)
     try:
@@ -142,10 +140,28 @@ def test_memory_server_adds_then_finds_a_global_record(tmp_path: Path) -> None:
     finally:
         client.close()
     assert "zebra-quartz-17" in _text_of(found)
+    assert any("zebra-quartz-17" in f.read_text() for f in tmp_path.rglob("*.md"))
+
+
+def test_dockerfile_playwright_matches_the_mcp_dependency() -> None:
+    npm = shutil.which("npm")
+    if npm is None:
+        pytest.skip("npm not found on PATH")
+    mcp = next(arg for arg in _spec("playwright").args if arg.startswith("@playwright/mcp@"))
+    result = subprocess.run(  # noqa: S603
+        [npm, "view", mcp, "dependencies.playwright"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    if result.returncode != 0:
+        pytest.skip(f"npm registry not reachable: {result.stderr.strip()}")
+    dockerfile = (ROOT / "docker" / "Dockerfile.pi").read_text()
+    assert f"playwright@{result.stdout.strip()} install" in dockerfile
 
 
 def test_playwright_server_opens_a_page_headless(tmp_path: Path) -> None:
-    # Keep the page snapshots out of the repo.
     client = McpClient(_spec("playwright"), dict(os.environ), cwd=tmp_path)
     try:
         client.initialize()

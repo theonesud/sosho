@@ -1,15 +1,12 @@
-"""Start and end node kinds. They write no state. They mark the graph boundary."""
-
 from sosho_graph.registry import NodeConfig, NodeContext, TypedNodeKind
 from sosho_graph.state import NodeUpdate
 
 
 class NoConfig(NodeConfig):
-    """Config for kinds that take no fields."""
+    pass
 
 
 async def run_no_op(ctx: NodeContext, node: NoConfig) -> NodeUpdate:
-    """Pass the state through unchanged."""
     return {}
 
 

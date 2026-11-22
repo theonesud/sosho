@@ -9,7 +9,7 @@ from tests.conftest import LLAMA_URL, ROOT, require_service
 pytestmark = pytest.mark.integration
 
 HEALTH_TIMEOUT = 10.0
-MODEL_TIMEOUT = 180.0  # The first call loads the model into memory.
+MODEL_TIMEOUT = 180.0
 CHAT_MODEL = "Qwen3-1.7B"
 HEAVY_CHAT_MODEL = "Qwen3.6-35B-A3B"
 
@@ -46,7 +46,6 @@ class EmbeddingResponse(BaseModel):
 def _load_presets() -> configparser.ConfigParser:
     text = (ROOT / "docker" / "llama-models.ini").read_text(encoding="utf-8")
     parser = configparser.ConfigParser()
-    # The preset file has a `version` line that ini does not accept.
     parser.read_string("[_top]\n" + text)
     parser.remove_section("_top")
     return parser
@@ -71,7 +70,6 @@ def _assert_answered(model: str) -> None:
     result = _post_chat(model)
     assert result.choices, "no choices in chat response"
     message = result.choices[0].message
-    # Thinking models can fill reasoning_content first.
     text = (message.content or "") + (message.reasoning_content or "")
     assert text.strip(), f"empty answer from {model}"
 

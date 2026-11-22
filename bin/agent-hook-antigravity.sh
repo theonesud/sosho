@@ -1,15 +1,9 @@
 #!/bin/sh
-# Antigravity hook adapter. Usage: agent-hook-antigravity.sh pre|post
-# Input: hook JSON on stdin with toolCall.name and toolCall.args.
-# pre: run the shared guard. On a block, print a deny JSON object on stdout.
-# post: run the shared post-edit steps and print nothing.
-# Always exit 0. Assumes Antigravity runs hooks from the workspace root.
 
 root=$(cd "$(dirname "$0")/.." && pwd) || exit 0
 mode=${1:-}
 input=$(cat || true)
 
-# Convert the Antigravity payload to the shared payload shape.
 mapped=$(printf '%s' "$input" | python3 -c '
 import json, sys
 try:

@@ -1,0 +1,44 @@
+[[comment]]
+path = "packages/graph/src/sosho_graph/runs.py"
+text = "# Check and set the status without an await in between. Two resumes cannot start twice."
+reason = "An await between the check and the set lets two resume calls start the same run. No test can catch the race reliably."
+
+[[comment]]
+path = "compose.yaml"
+text = "# llama-cpp uses service_started, because yue2 can unload it."
+reason = "With service_healthy, LiteLLM stops after a music job unloads the router models."
+
+[[comment]]
+path = "compose.yaml"
+text = "# The LiteLLM image has no curl. Python is present."
+reason = "A curl healthcheck fails in this image and marks a working LiteLLM as unhealthy."
+
+[[comment]]
+path = "mise.toml"
+text = "# Python 3.13 is the newest version that both LangGraph and Langflow list as supported."
+reason = "The newest-version rule invites a bump to Python 3.14, which these libraries do not support."
+
+[[comment]]
+path = "lefthook.yml"
+text = "# lefthook 2 reads `exclude` as a list of globs. A regex string has no effect."
+reason = "A lefthook defect makes a regex exclude silently do nothing, so a reader would think the files are excluded."
+
+[[comment]]
+path = "lefthook.yml"
+text = "# Secrets scanning covers every path, legacy paths included."
+reason = "A reader would copy the legacy exclude list to gitleaks and stop the secret scan of legacy files."
+
+[[comment]]
+path = "docker/llama-models.ini"
+text = "# The router controls host, port, API key, and alias. Do not set them here."
+reason = "The llama.cpp preset format accepts these keys, but setting them breaks the router."
+
+[[comment]]
+path = "bin/pi-launcher.sh"
+text = "# Default bridge network: the update needs internet only, not the compose services."
+reason = "Moving the updater to sosho-net gives a network update step access to internal services."
+
+[[comment]]
+path = "tests/unit/test_configs.py"
+text = "# The output is not printed. It can hold values from .env."
+reason = "Printing the compose config output on failure leaks secret values into logs."

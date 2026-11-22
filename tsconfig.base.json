@@ -1,10 +1,7 @@
 {
-  // Strict base for all new TypeScript projects. Each project extends this file.
-  // Legacy projects live in legacy/ and extend legacy/tsconfig.legacy.json until the rebuild replaces them.
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023"],
-    // NodeNext matches the real Node ESM resolver. A web app project can override it with Bundler.
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,

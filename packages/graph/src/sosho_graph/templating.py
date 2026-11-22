@@ -1,5 +1,3 @@
-"""Prompt templates. Port of the TypeScript renderTemplate in activities.ts."""
-
 import json
 import re
 from collections.abc import Mapping
@@ -10,7 +8,6 @@ _PLACEHOLDER = re.compile(r"\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}")
 
 
 def resolve_path(data: Mapping[str, JsonValue], path: str) -> object:
-    """Return the value at a flat key or a dotted path. Return None when missing."""
     if path in data:
         return data[path]
     current: object = data
@@ -22,7 +19,6 @@ def resolve_path(data: Mapping[str, JsonValue], path: str) -> object:
 
 
 def render_template(template: str, data: Mapping[str, JsonValue]) -> str:
-    """Replace each placeholder with its value. Missing values become empty text."""
 
     def replace(match: re.Match[str]) -> str:
         value = resolve_path(data, match.group(1))

@@ -1,21 +1,3 @@
-# Minimal Langfuse Stack (v3 / v4 architecture) for Sosho
-#
-# Services:
-#   1. langfuse-web (UI & Ingestion API receiver on port 3000, host port 3001)
-#   2. langfuse-worker (Background processor for async trace ingestion)
-#   3. postgres (Application state, users, orgs, projects)
-#   4. clickhouse (High-speed OLAP trace & observation storage)
-#   5. redis (Message queue between web and worker)
-#   6. minio (Local S3 object store for large payloads / media)
-#
-# This file is included by the root compose.yaml. Run Docker commands from the root.
-# All services join the shared sosho-net network.
-#
-# Zero-configuration auto-initialization:
-#   Login: admin@local.dev / password123
-#   Project: Pi-Agent (id: pi-agent)
-#   Keys: pk-lf-local-pi / sk-lf-local-pi
-#
 
 name: sosho-langfuse
 
@@ -40,17 +22,14 @@ services:
       ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?Run make setup to create it}
       NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3001}
       TELEMETRY_ENABLED: "false"
-      # ClickHouse
       CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
       CLICKHOUSE_URL: http://clickhouse:8123
       CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-clickhouse}
       CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse}
       CLICKHOUSE_CLUSTER_ENABLED: "false"
-      # Redis
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_AUTH: ${LANGFUSE_REDIS_AUTH:-localredis}
-      # MinIO (Local S3)
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
       LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
       LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
@@ -64,7 +43,6 @@ services:
       LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_USER:-minio}
       LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
-      # Headless Auto-Initialization (Zero UI setup needed)
       LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-local-org}
       LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-Local}
       LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-pi-agent}
@@ -108,12 +86,10 @@ services:
       start_period: 2s
 
   minio:
-    # Chainguard publishes only the latest tag for free images. Pin the digest.
     image: cgr.dev/chainguard/minio@sha256:d88920d6a50bd0b088223b688be3b76c63e6205dbe494437f67ba1240ea12880
     restart: unless-stopped
     mem_limit: 256m
     entrypoint: sh
-    # Automatically ensures the 'langfuse' bucket exists before starting
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
     networks: [sosho-net]
     environment:
@@ -131,7 +107,6 @@ services:
       start_period: 2s
 
   redis:
-    # Digest pin. The tag 7.4.11-alpine now points to a newer build.
     image: redis@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
     restart: unless-stopped
     mem_limit: 256m
@@ -144,7 +119,6 @@ services:
       retries: 5
 
   postgres:
-    # Digest pin. The tag 17.11-alpine now points to a newer build.
     image: postgres@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
     restart: unless-stopped
     mem_limit: 512m

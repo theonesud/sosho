@@ -1,5 +1,3 @@
-"""Envelope models for the Studio graph JSON. Node type fields live in node configs."""
-
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -7,8 +5,6 @@ ENVELOPE_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True, fr
 
 
 class Position(BaseModel):
-    """Canvas position. The service does not use it for execution."""
-
     model_config = ENVELOPE_CONFIG
 
     x: float
@@ -16,8 +12,6 @@ class Position(BaseModel):
 
 
 class GraphNode(BaseModel):
-    """One Studio node. Extra fields stay in the model for the node kind to read."""
-
     model_config = ConfigDict(
         alias_generator=to_camel, populate_by_name=True, frozen=True, extra="allow"
     )
@@ -29,8 +23,6 @@ class GraphNode(BaseModel):
 
 
 class GraphEdge(BaseModel):
-    """One directed edge. Edge middleware is not executed by this service."""
-
     model_config = ConfigDict(
         alias_generator=to_camel, populate_by_name=True, frozen=True, extra="ignore"
     )
@@ -42,8 +34,6 @@ class GraphEdge(BaseModel):
 
 
 class GraphDefinition(BaseModel):
-    """A Studio graph. Unknown top-level fields are ignored."""
-
     model_config = ENVELOPE_CONFIG
 
     id: str = Field(min_length=1)

@@ -126,3 +126,8 @@ def test_inline_installs_in_compose_use_exact_versions() -> None:
     packages = re.findall(r"pip install [^\n]*?\"([^\"]+)\"", text)
     assert packages
     assert [pkg for pkg in packages if not EXACT_PY.match(pkg)] == []
+
+
+def test_mise_does_not_manage_node() -> None:
+    tools = tomllib.loads((ROOT / "mise.toml").read_text())["tools"]
+    assert "node" not in tools

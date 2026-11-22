@@ -1,5 +1,3 @@
-# Graph service. Runs Studio graph JSON on the open source LangGraph library.
-# Build context is the repository root. docker/Dockerfile.graph.dockerignore limits it.
 
 FROM ghcr.io/astral-sh/uv:0.13.9 AS uv
 

@@ -1,6 +1,5 @@
 FROM node:26.13.1-bookworm-slim
 
-# Browser install path. The non-root user reads it at run time.
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 
 RUN apt-get update \
@@ -15,7 +14,6 @@ RUN apt-get update \
     python3-venv=3.11.2-1+b1 \
   && rm -rf /var/lib/apt/lists/*
 
-# Playwright version that @playwright/mcp@0.0.86 depends on. Keep both in step.
 RUN npm install -g \
     @earendil-works/pi-coding-agent@1.6.0 \
     @dokobot/cli@2.11.0 \

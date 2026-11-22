@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Tool-agnostic PreToolUse guard. Reads one JSON payload on stdin.
-# Exit 2 blocks the action. The reason goes to stderr.
-# The Bash check is best-effort. The git pre-commit hook is the final gate.
 exec python3 -c '
 import json, os, re, sys
 
@@ -19,7 +16,6 @@ def first_str(d, keys):
             return v
     return ""
 
-# Claude Code, pi, OpenCode, and Antigravity use different key names.
 tool = first_str(p, ("tool_name", "toolName", "tool")).lower()
 ti = p
 for k in ("tool_input", "toolInput", "input", "args", "arguments"):
@@ -32,7 +28,6 @@ cmd = first_str(ti, ("command", "cmd", "CommandLine", "command_line"))
 
 READ_TOOLS = ("read", "view", "view_file", "read_file", "readfile")
 SAFE_ENV = (".env.example", ".env.sample")
-# Matches a protected file name as a whole path token.
 PROT = r"(?:\.env(?:\.[\w.-]+)?|[\w./-]*\.(?:pem|key)|(?:[\w./-]*/)?\.pi/(?:models|model-roles)\.json)"
 
 def secret(f):
@@ -52,7 +47,6 @@ def block(msg):
     sys.exit(2)
 
 if tool in READ_TOOLS:
-    # Reads of the model config stay allowed. Only secret files are blocked.
     if path and secret(path):
         block("Do not read protected file " + path + ".")
     sys.exit(0)

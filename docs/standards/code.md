@@ -58,6 +58,10 @@ WARNING: A secret in source code can leak to other people.
 7.6 Do not commit commented-out code.
 7.7 Give each TODO an owner reference.
 7.8 If you change a file, remove the comments in your diff that break this section.
+7.9 `bin/check-comments.py` finds every comment and Python docstring. `make test` fails on each one that `comments-allow.toml` does not list.
+7.10 To keep a necessary comment, add an entry to `comments-allow.toml` with the path, the exact text, and a reason. Tell the owner about each new entry in your report.
+7.11 Do not add an entry to avoid the work in 7.3. The owner reviews each entry.
+7.12 Tool directives are not comments. Examples: `# noqa:`, `# shellcheck`, `# gitleaks:allow`, `// biome-ignore`, and a first-line `#!`.
 
 ## 8 Dead Code
 

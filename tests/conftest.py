@@ -40,7 +40,6 @@ def require_service(name: str, url: str) -> None:
 
 @pytest.fixture(scope="session")
 def litellm_key() -> str:
-    # Never print the key.
     key = os.environ.get("LITELLM_MASTER_KEY", "")
     if key:
         return key

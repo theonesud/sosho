@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Post-edit hook: run the agent-file check after an edit to a watched path.
-# Input: one tool JSON payload on stdin. Any supported agent payload works.
 set -euo pipefail
 
 ROOT="${CLAUDE_PROJECT_DIR:-$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"

@@ -8,7 +8,6 @@ from tests.conftest import GRAPH_URL, require_service
 
 pytestmark = pytest.mark.integration
 
-# The first model call can load the decision model on the router.
 RUN_TIMEOUT_SECONDS = 180.0
 
 

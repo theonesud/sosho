@@ -1,7 +1,4 @@
-# Local git hooks are the quality gate. There is no CI.
 # lefthook 2 reads `exclude` as a list of globs. A regex string has no effect.
-# The legacy list holds code that is not yet at docs/standards. The rebuild stages remove items from it.
-
 x-legacy: &legacy
   - "legacy/**"
   - "apps/**"
@@ -69,7 +66,6 @@ pre-commit:
       # Secrets scanning covers every path, legacy paths included.
       run: mise exec -- gitleaks git --staged --no-banner --redact
     vale:
-      # Warn only. The hook never fails because of Vale.
       glob: "*.md"
       exclude: *legacy-docs
       run: mise exec -- vale --no-exit {staged_files}
@@ -80,7 +76,6 @@ commit-msg:
     conventional:
       run: sh bin/check-commit-msg.sh {1}
     vale:
-      # Warn only. The hook never fails because of Vale.
       run: mise exec -- vale --no-exit --ext=.md {1} || true
 
 pre-push:

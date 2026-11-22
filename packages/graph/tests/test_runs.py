@@ -1,5 +1,3 @@
-"""Run lifecycle: interrupt and resume, cancel, restart recovery, and the event stream."""
-
 import asyncio
 from pathlib import Path
 
@@ -16,13 +14,10 @@ from support import FakeModels, agent, build_graph, node_of, runtime
 
 
 class SleepConfig(NodeConfig):
-    """Config for the test-only sleep kind."""
-
     seconds: float = Field(default=60.0, ge=0)
 
 
 async def run_sleep(ctx: NodeContext, node: SleepConfig) -> NodeUpdate:
-    """Wait without writing state. Cancel tests use this kind."""
     await asyncio.sleep(node.seconds)
     return {}
 

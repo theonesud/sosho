@@ -1,4 +1,3 @@
-# Python Standard
 __pycache__/
 *.py[cod]
 *$py.class
@@ -7,7 +6,6 @@ build/
 dist/
 *.egg-info/
 
-# Project Specific
 logs/
 *.log
 *.pid
@@ -19,9 +17,7 @@ logs/
 *.sqlite-shm
 .coverage
 
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
 node_modules
 /.pnp
 .pnp.*
@@ -31,34 +27,26 @@ node_modules
 !.yarn/releases
 !.yarn/versions
 
-# testing
 /coverage
 
-# next.js
 .next/
 /out/
 
-# production
 /build
 
-# misc
 *.pem
 *.key
 
-# debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
 .env*
 !.env.example
 
-# vercel
 .vercel
 
-# typescript
 *.tsbuildinfo
 next-env.d.ts
 .npm-cache
@@ -77,7 +65,6 @@ pi-codebase/
 yue2-data/
 yue2-test/
 
-# Pi Agent local runtime & secrets
 .pi/auth.json
 .pi/sessions/
 .pi/bin/
@@ -93,10 +80,8 @@ yue2-test/
 .pi/venv-*/
 .pi/scratchpad/
 graphify-out/
-# Machine-local Makefile overrides
 local.mk
 
-# Local tool state
 /.pi/run/
 .mise.local.toml
 .ruff_cache/
@@ -106,3 +91,4 @@ coverage/
 .vitest/
 
 .playwright-mcp/
+.claude/settings.local.json

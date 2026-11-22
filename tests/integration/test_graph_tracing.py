@@ -13,7 +13,6 @@ from tests.conftest import GRAPH_URL, LANGFUSE_URL, require_service
 
 pytestmark = pytest.mark.integration
 
-# Langfuse ingests events in batches, so a trace shows up after a delay.
 TRACE_TIMEOUT_SECONDS = 90.0
 RUN_TIMEOUT_SECONDS = 180.0
 
@@ -33,7 +32,6 @@ class RunState(BaseModel):
 
 
 def _graph_env(name: str) -> str:
-    # Never print the key.
     value = os.environ.get(name, "")
     docker = shutil.which("docker")
     if value or docker is None:
@@ -87,7 +85,6 @@ def test_graph_run_sends_a_node_span_to_langfuse() -> None:
     deadline = time.monotonic() + TRACE_TIMEOUT_SECONDS
     names: set[str | None] = set()
     while time.monotonic() < deadline:
-        # Langfuse v4 runs in events_only mode, so read from the v2 observations endpoint.
         response = httpx.get(
             f"{LANGFUSE_URL}/api/public/v2/observations",
             params={"limit": 100, "fromStartTime": since},

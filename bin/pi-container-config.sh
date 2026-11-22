@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# ==============================================================================
-# Write container copies of pi config files. Host URLs become compose URLs.
-# Usage: pi-container-config.sh OUT_DIR SOURCE_FILE...
-# Prints each written path. Never prints file contents.
-# ==============================================================================
 set -euo pipefail
 
 OUT_DIR="${1:-}"
@@ -14,7 +9,6 @@ fi
 shift
 mkdir -p "$OUT_DIR"
 
-# Match whole origins only. The next character must be "/" or a quote.
 rewrite_file() {
   local src="$1" dst="$2"
   sed -E \

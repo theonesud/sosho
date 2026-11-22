@@ -1,5 +1,3 @@
-"""LiteLLM model factory. Each role name is a LiteLLM model name."""
-
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 
@@ -10,7 +8,6 @@ MODEL_MAX_RETRIES = 2
 
 
 def litellm_model_factory(settings: Settings) -> ModelFactory:
-    """Return a factory that builds an OpenAI-compatible client for a role name."""
 
     def make_model(role: str) -> BaseChatModel:
         return ChatOpenAI(

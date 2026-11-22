@@ -1,5 +1,3 @@
-"""HTTP API over ASGI. Each test runs the app lifespan with a fake model."""
-
 import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -137,7 +135,6 @@ async def test_resume_with_wrong_node_id_returns_409(tmp_path: Path) -> None:
 
 
 def _last_seq(sse_text: str) -> int:
-    """Return the sequence number of the last event in an SSE body."""
     seqs = [
         json.loads(line[len("data: ") :])["seq"]
         for line in sse_text.splitlines()

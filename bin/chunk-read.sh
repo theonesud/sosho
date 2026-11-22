@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# ==============================================================================
-# chunk-read: Bounded, context-safe file reader for large files and logs
-# Reads files in 50-80 line sliding windows to avoid context window blowup.
-# ==============================================================================
 set -euo pipefail
 
 FILE="${1:-}"

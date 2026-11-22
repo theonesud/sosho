@@ -1,5 +1,3 @@
-"""Graph validation returns every problem, and the compiler refuses invalid graphs."""
-
 from pathlib import Path
 
 import pytest

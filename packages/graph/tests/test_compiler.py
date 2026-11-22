@@ -1,5 +1,3 @@
-"""The compiler runs linear, branch, cycle, and fan-out graphs on LangGraph."""
-
 from pathlib import Path
 
 import pytest

@@ -1,5 +1,3 @@
-"""Compile Studio graph JSON into a LangGraph StateGraph."""
-
 from collections import defaultdict
 from collections.abc import Callable, Mapping
 
@@ -16,8 +14,6 @@ _CONDITION_LABELS: dict[str, frozenset[str]] = {"checkpoint": frozenset({"approv
 
 
 class GraphBuildError(ValueError):
-    """Raised when a graph fails validation. The errors list holds one text per problem."""
-
     def __init__(self, errors: list[str]) -> None:
         super().__init__("; ".join(errors))
         self.errors = errors
@@ -81,7 +77,6 @@ def _edge_errors(
 
 
 def _decision_branches(graph: GraphDefinition) -> dict[str, list[str]]:
-    """Map each decision node to its branch names. Invalid decision configs are skipped."""
     found: dict[str, list[str]] = {}
     for node in graph.nodes:
         if node.type != "decision":
@@ -94,7 +89,6 @@ def _decision_branches(graph: GraphDefinition) -> dict[str, list[str]]:
 
 
 def validate_graph(graph: GraphDefinition, registry: NodeRegistry) -> list[str]:
-    """Return every validation error. An empty list means the graph can compile."""
     errors: list[str] = []
     ids = [node.id for node in graph.nodes]
     if len(set(ids)) != len(ids):
@@ -137,11 +131,6 @@ def _router(
 
 
 class _NodeAdapter:
-    """Call one bound node with the LangGraph state and config.
-
-    A class keeps the parameter names. LangGraph matches the names state and config.
-    """
-
     def __init__(self, node_id: str, bound: BoundNode, services: Services) -> None:
         self._node_id = node_id
         self._bound = bound
@@ -157,7 +146,6 @@ def compile_graph(
     services: Services,
     checkpointer: Checkpointer,
 ) -> GraphApp:
-    """Build and compile the graph. Raise GraphBuildError when validation fails."""
     errors = validate_graph(graph, registry)
     if errors:
         raise GraphBuildError(errors)

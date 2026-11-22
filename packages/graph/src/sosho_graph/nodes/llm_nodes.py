@@ -1,5 +1,3 @@
-"""Agent and subagent node kinds. Both call one model role with a prompt template."""
-
 from pydantic import Field
 
 from sosho_graph.nodes.common import Tier, call_model
@@ -11,8 +9,6 @@ DEFAULT_AGENT_SYSTEM = "You are a precise, concise Sosho workflow agent."
 
 
 class AgentConfig(NodeConfig):
-    """Config for the agent kind."""
-
     prompt_template: str = Field(min_length=1)
     system_prompt: str | None = None
     tier: Tier = "main"
@@ -21,8 +17,6 @@ class AgentConfig(NodeConfig):
 
 
 class SubagentConfig(NodeConfig):
-    """Config for the subagent kind."""
-
     role: str = Field(min_length=1)
     prompt_template: str = Field(min_length=1)
     tier: Tier = "subagent"
@@ -31,7 +25,6 @@ class SubagentConfig(NodeConfig):
 
 
 async def run_agent(ctx: NodeContext, node: AgentConfig) -> NodeUpdate:
-    """Call the model with the rendered prompt. Write the reply under the output key."""
     prompt = render_template(node.prompt_template, ctx.state["data"])
     system = node.system_prompt or DEFAULT_AGENT_SYSTEM
     text = await call_model(ctx, node.tier, system, prompt, node.timeout_seconds)
@@ -39,7 +32,6 @@ async def run_agent(ctx: NodeContext, node: AgentConfig) -> NodeUpdate:
 
 
 async def run_subagent(ctx: NodeContext, node: SubagentConfig) -> NodeUpdate:
-    """Call the model with a role system prompt. Write the reply under the output key."""
     prompt = render_template(node.prompt_template, ctx.state["data"])
     system = f"You are a focused subagent ({node.role}). Return a concise structured result."
     text = await call_model(ctx, node.tier, system, prompt, node.timeout_seconds)

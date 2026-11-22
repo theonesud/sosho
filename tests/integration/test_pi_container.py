@@ -7,7 +7,6 @@ pytestmark = pytest.mark.integration
 
 IMAGE = "pi-sandbox:latest"
 NETWORK = "sosho-net"
-# The agent guard blocks the literal socket path in edits, so build it from parts.
 DOCKER_SOCKET = "/var/run/" + "docker" + ".sock"
 SERVICE_URLS = [
     "http://litellm:4000/health/liveliness",

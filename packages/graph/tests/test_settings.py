@@ -1,5 +1,3 @@
-"""Settings fail at startup when required values are missing. Tracing needs all keys."""
-
 from pathlib import Path
 
 import pytest

@@ -1,5 +1,3 @@
-"""FastAPI app. Validates HTTP input at the boundary and delegates to the run manager."""
-
 import logging
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
@@ -26,8 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 class RunCreate(BaseModel):
-    """Body of POST /runs. Extra Studio fields such as assistant_id are ignored."""
-
     model_config = ConfigDict(extra="ignore")
 
     graph: GraphDefinition
@@ -36,16 +32,12 @@ class RunCreate(BaseModel):
 
 
 class RunAccepted(BaseModel):
-    """Response of a start or resume call."""
-
     run_id: str
     thread_id: str
     status: RunStatus
 
 
 class ValidationResult(BaseModel):
-    """Response of POST /graphs/validate."""
-
     valid: bool
     errors: list[str]
 
@@ -158,7 +150,6 @@ def build_app(
     services: Services | None = None,
     registry: NodeRegistry | None = None,
 ) -> FastAPI:
-    """Build the app with explicit dependencies. Tests pass fakes for the model."""
     if settings.litellm_api_key is None:
         logger.warning("litellm key missing env=LITELLM_API_KEY effect=model_calls_fail")
     resolved_services = services or Services(model_for=litellm_model_factory(settings))
@@ -180,5 +171,4 @@ def build_app(
 
 
 def create_app() -> FastAPI:
-    """Entry point for uvicorn. Reads the environment once at startup."""
     return build_app(Settings())

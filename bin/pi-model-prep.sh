@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
-# ==============================================================================
-# Model config helpers for pi-launcher.sh. Source this file. Do not run it.
-# Syncs the llama.cpp context and compaction settings, then warms the local model.
-# ==============================================================================
 
-# Set the llama.cpp context window from LLM_CTX_SIZE in .env.
-# Remote providers keep their values.
 sync_llama_context() {
   local target_pi="$1" env_file="$2" ctx
   if [ ! -f "$env_file" ] || [ ! -f "$target_pi/models.json" ]; then
@@ -33,7 +27,6 @@ PY
   fi
 }
 
-# Set compaction in settings.json from the default model contextWindow.
 sync_compaction() {
   local target_pi="$1"
   if [ ! -f "$target_pi/settings.json" ] || [ ! -f "$target_pi/models.json" ]; then
@@ -78,9 +71,6 @@ if ctx and ctx > 0:
 PY
 }
 
-# Send one warm-up request to the local llama.cpp server when it is up.
-# The warm-up runs on the host in both modes, so it always reads the host models.json.
-# Args: target_pi, sosho_pi, skip_warmup (1 skips).
 warm_local_model() {
   local target_pi="$1" sosho_pi="$2" skip="$3" BASE_URL MODEL_ID HEALTH_URL WARM_PAYLOAD
   if [ "$skip" = "1" ] || [ ! -f "$target_pi/models.json" ]; then return 0; fi
@@ -104,7 +94,6 @@ PY
     http://127.0.0.1:* | http://localhost:* | http://0.0.0.0:*)
       if [ -z "$MODEL_ID" ]; then return 0; fi
       HEALTH_URL="${BASE_URL%/v1}/health"
-      # Check if model server is reachable first
       if ! curl -fsS -m 2 "$HEALTH_URL" >/dev/null 2>&1; then return 0; fi
       echo "Pre-warming local model $MODEL_ID (press Ctrl+C to skip, or use --no-warmup)..."
       WARM_PAYLOAD="$(

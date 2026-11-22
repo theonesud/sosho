@@ -1,5 +1,3 @@
-"""ASGI middleware that answers HTTP 413 when a request body passes a byte limit."""
-
 from dataclasses import dataclass
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -8,19 +6,15 @@ PAYLOAD_TOO_LARGE = 413
 
 
 class BodyTooLargeError(Exception):
-    """Raised inside the receive callable when the body passes the limit."""
+    pass
 
 
 @dataclass
 class _Overflow:
-    """Records that the body passed the limit. The app response is then dropped."""
-
     overflowed: bool = False
 
 
 class BodyLimitMiddleware:
-    """Stop reading a request body after max_bytes bytes. Return 413 for the request."""
-
     def __init__(self, app: ASGIApp, max_bytes: int) -> None:
         self._app = app
         self._max_bytes = max_bytes
@@ -58,7 +52,6 @@ class BodyLimitMiddleware:
 
 
 def _declared_length(scope: Scope) -> int:
-    """Return the Content-Length header value. Return 0 when it is missing or not a number."""
     for name, value in scope.get("headers", []):
         if name == b"content-length":
             try:

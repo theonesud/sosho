@@ -21,7 +21,6 @@ def test_langfuse_public_health_returns_200() -> None:
 
 
 def test_langflow_health_returns_200() -> None:
-    # Langflow can start before its health route answers.
     require_service("langflow", LANGFLOW_URL)
     status = _get_status(f"{LANGFLOW_URL}/health")
     assert status == 200, f"langflow health returned {status}"
@@ -29,6 +28,5 @@ def test_langflow_health_returns_200() -> None:
 
 def test_studio_health_returns_200_without_token() -> None:
     require_service("studio-api", STUDIO_API_URL)
-    # GET routes need no bearer token. Only mutating methods do.
     status = _get_status(f"{STUDIO_API_URL}/health")
     assert status == 200, f"studio health returned {status}"

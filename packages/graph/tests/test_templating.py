@@ -1,5 +1,3 @@
-"""Prompt templates replace placeholders with run data."""
-
 from pydantic import JsonValue
 from sosho_graph.templating import render_template
 

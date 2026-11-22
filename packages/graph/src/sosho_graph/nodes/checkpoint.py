@@ -1,5 +1,3 @@
-"""Checkpoint node kind. Pauses the run for a human decision with LangGraph interrupt()."""
-
 from typing import Literal
 
 from langgraph.types import interrupt
@@ -11,8 +9,6 @@ from sosho_graph.state import NodeUpdate
 
 
 class HumanDecision(BaseModel):
-    """Body that resumes a paused checkpoint. Keys follow the Studio camelCase form."""
-
     model_config = ConfigDict(
         alias_generator=to_camel, populate_by_name=True, frozen=True, extra="forbid"
     )
@@ -24,14 +20,11 @@ class HumanDecision(BaseModel):
 
 
 class CheckpointConfig(NodeConfig):
-    """Config for the checkpoint kind."""
-
     message: str = Field(min_length=1)
     allow_state_edit: bool = True
 
 
 async def run_checkpoint(ctx: NodeContext, node: CheckpointConfig) -> NodeUpdate:
-    """Pause until a decision arrives. Route on approve or reject."""
     raw = interrupt(
         {"nodeId": ctx.node_id, "message": node.message, "data": dict(ctx.state["data"])}
     )

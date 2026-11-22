@@ -1,16 +1,3 @@
-# Sosho Docker services.
-#
-# Always-on services: llama-cpp (GPU chat plus CPU decision and embed models), litellm,
-# graph, langflow, and the Langfuse stack (included below).
-# Optional services: yue2-* under the `music` profile.
-#
-# Usage:
-#   docker compose -p sosho up -d                   # always-on services
-#   docker compose -p sosho --profile music up -d   # add YuE2 music services
-#   docker compose -p sosho logs -f llama-cpp
-#
-# Host-specific values and secrets live in .env (see .env.example).
-# Every host port binds to 127.0.0.1.
 
 name: sosho
 
@@ -24,8 +11,6 @@ x-model: &model
   MMPROJ_FILE: mmproj-Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-f16.gguf
 
 services:
-  # One-shot download job for the main model. Skips when both files exist.
-  # Files: ./models/Qwen3.6-35B-A3B/<MODEL_FILE> and ./models/Qwen3.6-35B-A3B/<MMPROJ_FILE>
   model-download:
     image: python:3.12.15-slim
     networks: [sosho-net]
@@ -93,8 +78,6 @@ services:
       - --port
       - "8080"
 
-  # CPU decision model download. Served by llama-cpp router preset [Qwen3-1.7B].
-  # File: ./models/Qwen3-1.7B/Qwen3-1.7B-Q4_K_M.gguf
   decision-model-download:
     image: python:3.12.15-slim
     networks: [sosho-net]
@@ -120,8 +103,6 @@ services:
         hf download "$$HF_REPO" "$$MODEL_FILE" --local-dir "$$dir"
     restart: "no"
 
-  # CPU embedding model download. Served by llama-cpp router preset [embeddinggemma].
-  # File: ./models/embeddinggemma-300M/embeddinggemma-300M-Q8_0.gguf
   embed-model-download:
     image: python:3.12.15-slim
     networks: [sosho-net]
@@ -147,13 +128,13 @@ services:
         hf download "$$HF_REPO" "$$MODEL_FILE" --local-dir "$$dir"
     restart: "no"
 
-  # LiteLLM gateway. llama-cpp uses service_started, because yue2 can unload it.
   litellm:
     image: ghcr.io/berriai/litellm:v1.110.2
     container_name: litellm
     restart: unless-stopped
     depends_on:
       llama-cpp:
+        # llama-cpp uses service_started, because yue2 can unload it.
         condition: service_started
     ports:
       - "127.0.0.1:4000:4000"
@@ -176,10 +157,6 @@ services:
       retries: 20
       start_period: 10s
 
-  # YuE2 model download: GGUF weights and sidecars, once. Skips when all files exist.
-  # Files: ./models/yue2-3b/yue2-3b-q4_0.gguf, ./models/yue2-3b/yue2-vae-f16.gguf,
-  #        ./models/yue2-3b/sidecars/{yue2-model-config.json,yue2-generation-config.json,
-  #        yue2-vae-config.json,yue2-qwen.tiktoken}
   yue2-model-download:
     profiles: [music]
     image: python:3.12.15-slim
@@ -208,8 +185,6 @@ services:
         hf download "$$HF_REPO" $$need --local-dir /models
     restart: "no"
 
-  # YuE2 engine: one resident model, offline generation only.
-  # Start with: docker compose -p sosho --profile music up -d
   yue2-engine:
     profiles: [music]
     image: ghcr.io/0xshug0/audio.cpp:full-cuda12-20261122-337af0c
@@ -245,7 +220,6 @@ services:
       - cuda
       - --log
 
-  # Async job API in front of the engine (202 + id, poll, FLAC/ABC download).
   yue2-gateway:
     profiles: [music]
     build:
@@ -269,15 +243,12 @@ services:
       YUE2_UNLOAD_AFTER_JOB: ${YUE2_UNLOAD_AFTER_JOB:-true}
       YUE2_RETENTION_SECONDS: ${YUE2_RETENTION_SECONDS:-86400}
       YUE2_MAX_GIB: ${YUE2_MAX_GIB:-5}
-      # VRAM handshake: unload active models via the llama-cpp HTTP API (no Docker socket).
       YUE2_STOP_LLAMA: ${YUE2_STOP_LLAMA:-true}
       YUE2_LLAMA_URL: http://llama-cpp:8080
       YUE2_BIND_HOST: 127.0.0.1
     volumes:
       - ./yue2-data:/data
 
-  # Graph service. Compiles Studio graph JSON into LangGraph runs. Open source library, no license key.
-  # Build: docker/Dockerfile.graph. Checkpoints live in the graph-data volume.
   graph:
     build:
       context: .

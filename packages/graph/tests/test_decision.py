@@ -1,5 +1,3 @@
-"""Decision replies map to one branch, with the same fallbacks as the TypeScript engine."""
-
 from sosho_graph.nodes.decision import parse_branch
 
 BRANCHES = ["quick", "deep"]

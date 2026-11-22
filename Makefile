@@ -1,43 +1,19 @@
-# Sosho commands. There are six public targets.
-#
-#   make setup  Install mise if it is missing. Install the pinned tools and dependencies.
-#               Check nvm and load Node from .nvmrc. Link the pi and yue2-music launchers.
-#               Add PATH and mise lines to the shell rc files.
-#   make test   Run every non-mutating check and every test in one pass. Vale prints warnings only.
-#               Integration tests skip a service that does not answer. Run make up first.
-#               LIVE_STRICT=1 fails on a missing service. CLOUD=1 and HEAVY=1 add the opt-in tests.
-#   make fix    Apply safe auto-fixes (format and lint fixes).
-#   make up     Start the always-on Docker services (root compose.yaml). Then start the
-#               Studio API and UI dev servers. Print the service URLs.
-#   make down   Stop the Studio dev servers. Stop all Docker services, including the music profile.
-#   make logs   Follow Docker logs for all services, music profile included. Use S=<service> for one.
-#
-# The YuE2 music services are optional. Start them with: docker compose -p sosho --profile music up -d
-# Override variables in local.mk (gitignored) or on the command line.
-
 .PHONY: setup test fix up down logs
 
-# Path to mise. Use the copy on PATH, or the default installer path.
 MISE := $(shell command -v mise 2>/dev/null || echo $(HOME)/.local/bin/mise)
 
-# Node comes from nvm. The version comes from .nvmrc. Setup puts this bin directory first on PATH.
 NODE_VERSION := $(strip $(shell cat .nvmrc))
 NODE_BIN := $(HOME)/.nvm/versions/node/v$(NODE_VERSION)/bin
 
-# Run tools through mise so they work without an activated shell.
 RUN := $(MISE) exec --
 -include local.mk
 
-# Root compose file. The project name keeps the existing volumes.
 COMPOSE := docker compose -p sosho
 
-# Moved-in code. The strict gates skip it until it passes review against docs/standards.
-# packages/llm, packages/memory, packages/workflow-engine, and packages/yue2 are pending review.
 LEGACY := legacy apps workflows packages/llm packages/memory packages/workflow-engine packages/yue2 docker/Dockerfile.yue2-gateway .pi .agents/skills models
 LEGACY_DOCS := usecases.md
 EXCL := $(foreach p,$(LEGACY),':(exclude)$(p)')
 EXCL_MD := $(EXCL) $(foreach p,$(LEGACY_DOCS),':(exclude)$(p)')
-# List tracked and new files that exist on disk.
 LS := git ls-files -co --exclude-standard
 EXISTS := while read -r f; do [ -f "$$f" ] && echo "$$f"; done; true
 
@@ -47,21 +23,28 @@ TOML_FILES = $(shell $(LS) -- '*.toml' $(EXCL) | ($(EXISTS)))
 PY_FILES = $(shell $(LS) -- '*.py' $(EXCL) | ($(EXISTS)))
 TSCONFIGS = $(shell $(LS) -- ':(glob)**/tsconfig.json' $(EXCL) | ($(EXISTS)))
 MD_FILES = $(shell $(LS) -- '*.md' $(EXCL_MD) | ($(EXISTS)))
+ALL_FILES = $(shell $(LS) $(EXCL) | ($(EXISTS)))
 SHFMT := $(RUN) shfmt -i 2 -ci
 
-# Make needs a default goal. Print a pointer so a bare `make` changes nothing.
 .DEFAULT_GOAL := _usage
 _usage:
-	@echo "Targets: setup test fix up down logs. Read the top of the Makefile."
+	@echo "Sosho targets: setup, test, fix, up, down, logs."
+	@echo "make setup: install mise, the pinned tools, and dependencies. Link the pi and yue2-music launchers."
+	@echo "make test: run every non-mutating check and test. Vale prints warnings only."
+	@echo "  Integration tests skip a service that does not answer. Run make up first."
+	@echo "  LIVE_STRICT=1 fails on a missing service. CLOUD=1 and HEAVY=1 add the opt-in tests."
+	@echo "make fix: apply safe auto-fixes (format and lint fixes)."
+	@echo "make up: start the Docker services and the Studio dev servers. Print the service URLs."
+	@echo "make down: stop the Studio dev servers and all Docker services, music profile included."
+	@echo "make logs: follow Docker logs for all services. Use S=<service> for one service."
+	@echo "Music profile: docker compose -p sosho --profile music up -d"
+	@echo "Override variables in local.mk (gitignored) or on the command line."
 
-# Install mise when it is missing. Then trust the repo and install the pinned tools.
-# The mise postinstall hook runs pnpm install, uv sync, and lefthook install.
 setup:
 	@if [ ! -x "$(MISE)" ]; then \
 		echo "mise not found. Installing to $$HOME/.local/bin/mise."; \
 		curl -fsSL https://mise.run | sh; \
 	fi
-	@# Node comes from nvm and .nvmrc. Stop when nvm is missing. Do not install nvm here.
 	@if [ ! -s "$$HOME/.nvm/nvm.sh" ]; then \
 		echo "STOP: nvm not found at $$HOME/.nvm/nvm.sh. Node comes from nvm and .nvmrc."; \
 		echo "Install nvm with the official command from https://github.com/nvm-sh/nvm:"; \
@@ -74,21 +57,18 @@ setup:
 	PATH="$(NODE_BIN):$$PATH" $(MISE) install
 	@./bin/ensure-secrets.sh
 	@mkdir -p "$$HOME/.local/bin"
-	@# Link the pi launcher. Move a regular file to pi.bak once. Never overwrite an existing pi.bak.
 	@b="$$HOME/.local/bin"; t="$(CURDIR)/bin/pi-launcher.sh"; \
 	if [ -e "$$b/pi" ] && [ ! -L "$$b/pi" ]; then \
 		if [ -e "$$b/pi.bak" ]; then echo "STOP: $$b/pi.bak exists. Move $$b/pi aside by hand."; exit 1; fi; \
 		mv "$$b/pi" "$$b/pi.bak"; echo "Moved $$b/pi to $$b/pi.bak"; \
 	fi; \
 	ln -sf "$$t" "$$b/pi"; echo "Linked $$b/pi to $$t"
-	@# Link the yue2-music launcher with the same rule.
 	@b="$$HOME/.local/bin"; t="$(CURDIR)/packages/yue2/generate.sh"; \
 	if [ -e "$$b/yue2-music" ] && [ ! -L "$$b/yue2-music" ]; then \
 		if [ -e "$$b/yue2-music.bak" ]; then echo "STOP: $$b/yue2-music.bak exists. Move $$b/yue2-music aside by hand."; exit 1; fi; \
 		mv "$$b/yue2-music" "$$b/yue2-music.bak"; echo "Moved $$b/yue2-music to $$b/yue2-music.bak"; \
 	fi; \
 	ln -sf "$$t" "$$b/yue2-music"; echo "Linked $$b/yue2-music to $$t"
-	@# Add the PATH and mise lines once to each shell rc file. Skip a file that has the marker.
 	@changed=""; \
 	for pair in zsh:.zshrc bash:.bashrc; do \
 		sh=$${pair%%:*}; rc="$$HOME/$${pair#*:}"; \
@@ -104,7 +84,6 @@ setup:
 	done; \
 	if [ -n "$$changed" ]; then echo "Changed files:$$changed. Open a new shell to load them."; \
 	else echo "No shell rc file changed."; fi
-	@# Install Studio and root workspace dependencies when pnpm-workspace.yaml lists members.
 	@if [ -f pnpm-workspace.yaml ] && grep -q '^  - ' pnpm-workspace.yaml; then PATH="$(NODE_BIN):$$PATH" $(RUN) pnpm install; fi
 
 LEGACY_TS_TESTS := packages/llm/test packages/memory/test packages/workflow-engine/test apps/studio/server
@@ -112,6 +91,7 @@ LEGACY_TS_TESTS := packages/llm/test packages/memory/test packages/workflow-engi
 test:
 	@rc=0; \
 	echo "== agent docs"; ./bin/check-agent-docs.sh || rc=1; \
+	echo "== comments"; $(RUN) uv run python bin/check-comments.py $(ALL_FILES) || rc=1; \
 	echo "== biome"; $(RUN) pnpm exec biome check --no-errors-on-unmatched . || rc=1; \
 	echo "== tsc"; \
 	if [ -z "$(TSCONFIGS)" ]; then echo "NOTE: no TypeScript project found. Skip tsc."; \
@@ -148,7 +128,6 @@ test:
 	else $(RUN) vale --no-exit $(MD_FILES) || true; fi; \
 	exit $$rc
 
-# Safe auto-fixes only.
 fix:
 	$(RUN) pnpm exec biome check --write --no-errors-on-unmatched .
 	$(RUN) uv run ruff format .
@@ -156,8 +135,6 @@ fix:
 	@if [ -n "$(SH_FILES)" ]; then $(SHFMT) -w $(SH_FILES); fi
 	@if [ -n "$(TOML_FILES)" ]; then $(RUN) taplo fmt $(TOML_FILES); fi
 
-# Start the always-on Docker services. Then start the Studio dev servers in the background.
-# Logs and pids go to .pi/run/. A server that already listens on its port is left alone.
 up:
 	$(RUN) $(COMPOSE) up -d
 	@mkdir -p .pi/run
@@ -174,13 +151,11 @@ up:
 	@echo "LangGraph:   http://127.0.0.1:8123"
 	@echo "Langflow:    http://127.0.0.1:7860"
 
-# Stop the Studio dev servers. Then stop every Docker service, including the music profile.
 down:
 	@for f in .pi/run/studio-ui.pid .pi/run/studio-api.pid; do \
 		if [ -f "$$f" ]; then kill "$$(cat "$$f")" 2>/dev/null || true; rm -f "$$f"; fi; \
 	done
 	$(RUN) $(COMPOSE) --profile music down
 
-# Follow Docker logs for every service. Use S=<service> for one service.
 logs:
 	$(RUN) $(COMPOSE) --profile music logs -f $(S)

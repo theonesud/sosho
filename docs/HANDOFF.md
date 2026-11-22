@@ -35,7 +35,7 @@ The owner rebuilds Sosho as a local-first AI workbench on one GPU workstation. T
 | Node | Node v26.13.1 from nvm (`.nvmrc`). mise does not manage Node. |
 | Full checks | `make test` is the only check command. It runs all checks, unit tests, and integration tests. See section 6. |
 | Versions | Pin each dependency to its newest stable exact version. `tests/unit/test_pins.py` enforces exact pins. `make test` warns on outdated ones. |
-| Comments | No comments unless necessary. See `docs/standards/code.md` section 7. |
+| Comments | No comments unless necessary. `bin/check-comments.py` fails `make test` on each comment that `comments-allow.toml` does not list with a reason. |
 | Langfuse secrets | `make setup` writes `LANGFUSE_NEXTAUTH_SECRET`, `LANGFUSE_SALT`, and `LANGFUSE_ENCRYPTION_KEY` to `.env`. Compose has no default for them. |
 
 ## 3 Services and Ports
@@ -79,10 +79,9 @@ All containers use the Docker network `sosho-net`. Each model downloads to `./mo
 Do these in order unless the owner says otherwise.
 
 0. Finish the security and version work from 2026-11-22:
-   - The owner runs `make setup` to write new Langfuse secrets, then recreates Langfuse. The old values are in public git history.
    - Migrate Studio to `@xyflow/react` 13. It is held at 12.12.1. Version 13 removes `useStore` and changes the change handler types.
    - Rebuild `pi-sandbox:latest`. `docker/Dockerfile.pi` pins pi 1.6.0. The local image has pi 1.5.2.
-   - Remove the comments that break `docs/standards/code.md` section 7 in all other files.
+   - Remove comments in each legacy directory when it leaves the legacy list. `bin/check-comments.py` then checks it.
 1. Point Studio at the graph service. `apps/studio/server/routes/runs.ts` calls `/runs/:id/checkpoint` and `/runs/:id/rollback`. The service has `/runs/{id}/resume` and no rollback. Build the Studio palette from `GET /nodes`.
 2. Add `lfx` components to the graph node catalog. The spike in `/tmp/lfx-spike/` proved it works. That folder can disappear at a reboot. Start with Prompt Template, Split Text, Parse JSON, and the OpenAI chat component with the LiteLLM URL. Pin `lfx==1.13.3` and `lfx-openai==0.2.0` together.
 3. Port the remaining node kinds to `packages/graph`, after the owner decides on each: `tool shell`, `tool http`, `tool yue2`, `skill`, and the `memory` nodes.
@@ -132,6 +131,8 @@ The recommended plan: run the safe auto-fixes first. Then add each directory to 
 - The LiteLLM image has no `curl`. Its healthcheck uses Python.
 - Do not use a `latest` tag. `langflow:latest` moved to 1.13.3 and then required `LANGFLOW_SUPERUSER_PASSWORD`. `test_configs.py` now rejects an unpinned image.
 - The guard blocks any edit or command that contains the Docker socket path. Build that path from parts in a test.
+- A new Langfuse `SALT` breaks the stored project API keys. Delete the `api_keys` row and restart `langfuse-web` to create the key again.
+- pnpm 12 reads `saveExact` only from `pnpm-workspace.yaml`. npm reads `save-exact` from the `.npmrc` next to each `package.json`.
 
 ## 8 Commands
 

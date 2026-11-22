@@ -1,11 +1,6 @@
-# mise pins every tool version for this repo. Run `mise install` to fetch them.
-# Python tools (Ruff, Pyright, pytest) are pinned in pyproject.toml and run through uv.
-# TypeScript tools (Biome, TypeScript, Vitest) are pinned in package.json and run through pnpm.
-# Python 3.13 is the newest version that both LangGraph and Langflow list as supported.
-
 [tools]
-# Node comes from nvm and .nvmrc. Do not add node here.
 pnpm = "12.21.0"
+# Python 3.13 is the newest version that both LangGraph and Langflow list as supported.
 python = "3.13.18"
 uv = "0.13.9"
 lefthook = "2.2.2"
@@ -19,6 +14,5 @@ vale = "3.27.0"
 [settings]
 pin = true
 
-# Hooks run after `mise install`. They install dependencies and git hooks.
 [hooks]
 postinstall = "pnpm install && uv sync && lefthook install"

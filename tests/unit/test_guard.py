@@ -13,7 +13,6 @@ TIMEOUT_SECONDS = 10
 
 Payload = dict[str, object]
 
-# Built by concatenation so the literal shell text is not in this file.
 CAT_ENV = "cat " + ".env"
 CAT_ENV_EXAMPLE = "cat " + ".env.example"
 REDIRECT_INTO_ENV = "echo TOKEN=x > " + ".env"
@@ -73,7 +72,6 @@ AGENT_IDS: list[str] = [agent.name for agent in AGENTS]
 
 
 def run_script(args: list[str], stdin: str) -> subprocess.CompletedProcess[str]:
-    # No shell runs, so input cannot reach a shell.
     return subprocess.run(  # noqa: S603
         args,
         input=stdin,
@@ -178,7 +176,6 @@ def test_antigravity_hook_denies_write_to_pem_file() -> None:
         }
     )
     assert result.returncode == 0, result.stderr
-    # Antigravity reads the deny object from stdout.
     reply: dict[str, str] = json.loads(result.stdout)
     assert reply["decision"] == "deny"
     assert reply["reason"].startswith("BLOCKED:")

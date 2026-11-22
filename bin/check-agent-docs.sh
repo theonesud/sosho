@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Check the agent configuration files. Print one PASS line or one FAIL line per problem.
 cd -P "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
 
 python3 - <<'PY'
@@ -215,7 +214,6 @@ def argv(server):
 def check_mcp():
     oc = (jload("opencode.json") or {}).get("mcp", {})
     raw = {f: (jload(f) or {}).get("mcpServers", {}) for f in [".mcp.json", ".pi/mcp.json", ".agents/mcp_config.json"]}
-    # The deprecated form puts server names at the top level of "mcp".
     raw["opencode.json"] = oc.get("servers", oc)
     maps = {f: {n: argv(s) for n, s in servers.items()} for f, servers in raw.items()}
     base = maps[".mcp.json"]
@@ -244,7 +242,7 @@ def effect(rules, action, path):
     result = None
     for act, pattern, eff in rules:
         if act == action and pattern and fnmatch.fnmatchcase(path, pattern):
-            result = eff  # The last matching rule wins.
+            result = eff
     return result
 
 
