@@ -16,6 +16,9 @@ hadolint = "2.15.1"
 taplo = "0.10.0"
 vale = "3.27.0"
 
+[settings]
+pin = true
+
 # Hooks run after `mise install`. They install dependencies and git hooks.
 [hooks]
 postinstall = "pnpm install && uv sync && lefthook install"

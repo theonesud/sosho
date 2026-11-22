@@ -27,6 +27,7 @@ sosho-graph = { workspace = true }
 
 [tool.uv]
 package = false
+add-bounds = "exact"
 
 [tool.ruff]
 line-length = 100
