@@ -21,7 +21,7 @@ name: sosho-langfuse
 
 services:
   langfuse-web:
-    image: docker.langfuse.com/langfuse/langfuse:4
+    image: docker.langfuse.com/langfuse/langfuse:4.69.0
     restart: unless-stopped
     mem_limit: 1280m
     depends_on:
@@ -35,9 +35,9 @@ services:
     environment: &langfuse-env
       NODE_OPTIONS: --max-old-space-size=1024
       DATABASE_URL: postgresql://${LANGFUSE_PG_USER:-postgres}:${LANGFUSE_PG_PASSWORD:-postgres}@postgres:5432/${LANGFUSE_PG_DB:-postgres}
-      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-local-dev-secret-change-me}
-      SALT: ${LANGFUSE_SALT:-local-dev-salt-change-me}
-      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-736d927cc28b9ca18fc47a3c5f4a6ee5074deb57ba4f1b004b894e0c50f24144}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?Run make setup to create it}
+      SALT: ${LANGFUSE_SALT:?Run make setup to create it}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?Run make setup to create it}
       NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3001}
       TELEMETRY_ENABLED: "false"
       # ClickHouse
@@ -76,7 +76,7 @@ services:
       LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-password123}
 
   langfuse-worker:
-    image: docker.langfuse.com/langfuse/langfuse-worker:4
+    image: docker.langfuse.com/langfuse/langfuse-worker:4.69.0
     restart: unless-stopped
     mem_limit: 512m
     depends_on:
@@ -89,7 +89,7 @@ services:
       <<: *langfuse-env
 
   clickhouse:
-    image: clickhouse/clickhouse-server:25.12
+    image: clickhouse/clickhouse-server:25.12.11.4
     restart: unless-stopped
     mem_limit: 1g
     networks: [sosho-net]
@@ -108,7 +108,8 @@ services:
       start_period: 2s
 
   minio:
-    image: cgr.dev/chainguard/minio
+    # Chainguard publishes only the latest tag for free images. Pin the digest.
+    image: cgr.dev/chainguard/minio@sha256:d88920d6a50bd0b088223b688be3b76c63e6205dbe494437f67ba1240ea12880
     restart: unless-stopped
     mem_limit: 256m
     entrypoint: sh
@@ -130,7 +131,8 @@ services:
       start_period: 2s
 
   redis:
-    image: redis:7-alpine
+    # Digest pin. The tag 7.4.11-alpine now points to a newer build.
+    image: redis@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
     restart: unless-stopped
     mem_limit: 256m
     networks: [sosho-net]
@@ -142,7 +144,8 @@ services:
       retries: 5
 
   postgres:
-    image: postgres:17-alpine
+    # Digest pin. The tag 17.11-alpine now points to a newer build.
+    image: postgres@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
     restart: unless-stopped
     mem_limit: 512m
     networks: [sosho-net]

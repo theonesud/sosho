@@ -3,7 +3,9 @@
 #   make setup  Install mise if it is missing. Install the pinned tools and dependencies.
 #               Check nvm and load Node from .nvmrc. Link the pi and yue2-music launchers.
 #               Add PATH and mise lines to the shell rc files.
-#   make check  Run every non-mutating check in one pass. Vale prints warnings only.
+#   make test   Run every non-mutating check and every test in one pass. Vale prints warnings only.
+#               Integration tests skip a service that does not answer. Run make up first.
+#               LIVE_STRICT=1 fails on a missing service. CLOUD=1 and HEAVY=1 add the opt-in tests.
 #   make fix    Apply safe auto-fixes (format and lint fixes).
 #   make up     Start the always-on Docker services (root compose.yaml). Then start the
 #               Studio API and UI dev servers. Print the service URLs.
@@ -13,7 +15,7 @@
 # The YuE2 music services are optional. Start them with: docker compose -p sosho --profile music up -d
 # Override variables in local.mk (gitignored) or on the command line.
 
-.PHONY: setup check fix up down logs
+.PHONY: setup test fix up down logs
 
 # Path to mise. Use the copy on PATH, or the default installer path.
 MISE := $(shell command -v mise 2>/dev/null || echo $(HOME)/.local/bin/mise)
@@ -50,7 +52,7 @@ SHFMT := $(RUN) shfmt -i 2 -ci
 # Make needs a default goal. Print a pointer so a bare `make` changes nothing.
 .DEFAULT_GOAL := _usage
 _usage:
-	@echo "Targets: setup check fix up down logs. Read the top of the Makefile."
+	@echo "Targets: setup test fix up down logs. Read the top of the Makefile."
 
 # Install mise when it is missing. Then trust the repo and install the pinned tools.
 # The mise postinstall hook runs pnpm install, uv sync, and lefthook install.
@@ -70,6 +72,7 @@ setup:
 	@cd "$(CURDIR)" && bash -c '. "$$HOME/.nvm/nvm.sh" && nvm install && nvm use && test "$$(node --version)" = "v$(NODE_VERSION)"' || { echo "STOP: nvm did not select Node v$(NODE_VERSION). Read the nvm output above."; exit 1; }
 	$(MISE) trust
 	PATH="$(NODE_BIN):$$PATH" $(MISE) install
+	@./bin/ensure-secrets.sh
 	@mkdir -p "$$HOME/.local/bin"
 	@# Link the pi launcher. Move a regular file to pi.bak once. Never overwrite an existing pi.bak.
 	@b="$$HOME/.local/bin"; t="$(CURDIR)/bin/pi-launcher.sh"; \
@@ -104,8 +107,9 @@ setup:
 	@# Install Studio and root workspace dependencies when pnpm-workspace.yaml lists members.
 	@if [ -f pnpm-workspace.yaml ] && grep -q '^  - ' pnpm-workspace.yaml; then PATH="$(NODE_BIN):$$PATH" $(RUN) pnpm install; fi
 
-# Run every check, keep going after a failure, and exit non-zero if any check failed.
-check:
+LEGACY_TS_TESTS := packages/llm/test packages/memory/test packages/workflow-engine/test apps/studio/server
+
+test:
 	@rc=0; \
 	echo "== agent docs"; ./bin/check-agent-docs.sh || rc=1; \
 	echo "== biome"; $(RUN) pnpm exec biome check --no-errors-on-unmatched . || rc=1; \
@@ -126,9 +130,19 @@ check:
 	if [ -z "$(TOML_FILES)" ]; then echo "NOTE: no in-scope TOML file. Skip taplo."; \
 	else $(RUN) taplo check --no-schema $(TOML_FILES) || rc=1; $(RUN) taplo fmt --check $(TOML_FILES) || rc=1; fi; \
 	echo "== vitest"; $(RUN) pnpm exec vitest run --passWithNoTests || rc=1; \
-	echo "== pytest"; \
-	$(RUN) uv run pytest -q; t=$$?; \
+	echo "== legacy tsx tests"; \
+	for d in $(LEGACY_TS_TESTS); do pkg=$$(dirname "$$d"); for f in $$d/*.test.ts; do \
+		if out=$$(PATH="$(NODE_BIN):$$PATH" $(RUN) pnpm --dir "$$pkg" exec tsx "$${f#"$$pkg"/}" 2>&1); then echo "ok   $$f"; \
+		else echo "FAIL $$f"; printf '%s\n' "$$out" | grep -m3 -E 'Error|assert' || true; rc=1; fi; \
+	done; done; \
+	echo "== pytest (unit and integration)"; \
+	$(RUN) uv run pytest -q -rs; t=$$?; \
 	if [ $$t -eq 5 ]; then echo "NOTE: no pytest tests found. Skip."; elif [ $$t -ne 0 ]; then rc=1; fi; \
+	echo "== pytest (yue2 gateway)"; \
+	$(RUN) uv run pytest -q -p no:cacheprovider packages/yue2/gateway/test_gateway.py || rc=1; \
+	echo "== outdated dependencies (warnings only)"; \
+	$(RUN) pnpm outdated -r || true; \
+	$(RUN) uv pip list --outdated || true; \
 	echo "== vale (warnings only)"; \
 	if [ -z "$(MD_FILES)" ]; then echo "NOTE: no in-scope Markdown file. Skip Vale."; \
 	else $(RUN) vale --no-exit $(MD_FILES) || true; fi; \

@@ -43,6 +43,7 @@ node_modules
 
 # misc
 *.pem
+*.key
 
 # debug
 npm-debug.log*
@@ -67,7 +68,8 @@ next-env.d.ts
 terraform.tfstate
 bun.lock
 package-lock.json
-yarn-lock.json
+!.pi/extensions/langfuse/package-lock.json
+yarn.lock
 
 models/
 /legacy/models
@@ -102,3 +104,5 @@ local.mk
 .pyright/
 coverage/
 .vitest/
+
+.playwright-mcp/

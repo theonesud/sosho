@@ -599,9 +599,10 @@ export default function (pi: ExtensionAPI) {
     if (state) finalizeRoot({ cancelled: true });
 
     const sessionId = ctx.sessionManager.getSessionId();
-    const turnNumber = resolveTurnNumber(ctx, event.prompt);
-    const promptImages = extractImages(event.images);
-    const { text: promptText, meta: userMeta } = truncateText(event.prompt);
+    const prompt = event.messageType === "custom" ? "" : event.prompt;
+    const turnNumber = resolveTurnNumber(ctx, prompt);
+    const promptImages = event.messageType === "custom" ? [] : extractImages(event.images);
+    const { text: promptText, meta: userMeta } = truncateText(prompt);
     const userText = [promptText, ...promptImages.map(describeImage)].filter(Boolean).join("\n");
     lastPromptText = userText;
     const isSubagent = Boolean(inheritedParent);

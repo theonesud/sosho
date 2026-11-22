@@ -85,5 +85,5 @@ commit-msg:
 
 pre-push:
   commands:
-    check:
-      run: mise exec -- make check
+    test:
+      run: mise exec -- make test

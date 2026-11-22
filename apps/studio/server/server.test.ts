@@ -11,8 +11,8 @@ const dbPath = join(tmp, ".pi", "workflows", "runs.sqlite");
 const TOKEN = "test-studio-token-123";
 process.env.SOSHO_GLOBAL_MEMORY_DIR = join(tmp, "global-mem");
 
-// Seed a sample skill in tmp/.pi/skills/demo-skill/SKILL.md
-const demoSkillDir = join(tmp, ".pi", "skills", "demo-skill");
+// Seed a sample skill in tmp/.agents/skills/demo-skill/SKILL.md, the shared skills folder.
+const demoSkillDir = join(tmp, ".agents", "skills", "demo-skill");
 mkdirSync(demoSkillDir, { recursive: true });
 writeFileSync(
   join(demoSkillDir, "SKILL.md"),

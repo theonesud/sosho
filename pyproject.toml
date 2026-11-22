@@ -17,6 +17,7 @@ dev = [
   "httpx==0.28.1",
   "pyright==1.1.414",
   "pytest==9.2.0",
+  "pyyaml==6.0.4",
   "ruff==0.17.6",
   "sosho-graph",
 ]
@@ -103,6 +104,12 @@ exclude = [
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers --strict-config"
+pythonpath = ["."]
+markers = [
+  "integration: needs a running service from make up",
+  "cloud: sends a request to a cloud model. Runs only with CLOUD=1",
+  "heavy: loads the large GPU model. Runs only with HEAVY=1",
+]
 norecursedirs = [
   ".git",
   ".venv",

@@ -74,4 +74,4 @@ type Result = { ok: boolean; value?: string; error?: Error };
 | Command | Purpose |
 | :--- | :--- |
 | `make fix` | Format and fix with Biome |
-| `make check` | Lint, format check, `tsc`, and Vitest |
+| `make test` | Lint, format check, `tsc`, and Vitest |

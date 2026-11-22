@@ -27,7 +27,7 @@ services:
   # One-shot download job for the main model. Skips when both files exist.
   # Files: ./models/Qwen3.6-35B-A3B/<MODEL_FILE> and ./models/Qwen3.6-35B-A3B/<MMPROJ_FILE>
   model-download:
-    image: python:3.12-slim
+    image: python:3.12.15-slim
     networks: [sosho-net]
     environment:
       <<: *model
@@ -45,12 +45,12 @@ services:
         if [ -e "$$dir/$$MODEL_FILE" ] && [ -e "$$dir/$$MMPROJ_FILE" ]; then
           echo "Models present in $$dir"; exit 0
         fi
-        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]"
+        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]==2.4.0"
         hf download "$$HF_REPO" "$$MODEL_FILE" "$$MMPROJ_FILE" --local-dir "$$dir"
     restart: "no"
 
   llama-cpp:
-    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda-b12407
     container_name: llama-cpp
     restart: always
     depends_on:
@@ -96,7 +96,7 @@ services:
   # CPU decision model download. Served by llama-cpp router preset [Qwen3-1.7B].
   # File: ./models/Qwen3-1.7B/Qwen3-1.7B-Q4_K_M.gguf
   decision-model-download:
-    image: python:3.12-slim
+    image: python:3.12.15-slim
     networks: [sosho-net]
     environment:
       HF_REPO: unsloth/Qwen3-1.7B-GGUF
@@ -116,14 +116,14 @@ services:
         if [ -e "$$dir/$$MODEL_FILE" ]; then
           echo "Decision model present in $$dir"; exit 0
         fi
-        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]"
+        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]==2.4.0"
         hf download "$$HF_REPO" "$$MODEL_FILE" --local-dir "$$dir"
     restart: "no"
 
   # CPU embedding model download. Served by llama-cpp router preset [embeddinggemma].
   # File: ./models/embeddinggemma-300M/embeddinggemma-300M-Q8_0.gguf
   embed-model-download:
-    image: python:3.12-slim
+    image: python:3.12.15-slim
     networks: [sosho-net]
     environment:
       HF_REPO: ggml-org/embeddinggemma-300M-GGUF
@@ -143,7 +143,7 @@ services:
         if [ -e "$$dir/$$MODEL_FILE" ]; then
           echo "Embedding model present in $$dir"; exit 0
         fi
-        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]"
+        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]==2.4.0"
         hf download "$$HF_REPO" "$$MODEL_FILE" --local-dir "$$dir"
     restart: "no"
 
@@ -169,7 +169,8 @@ services:
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}
       LANGFUSE_HOST: http://langfuse-web:3000
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:4000/health/liveliness || exit 1"]
+      # The LiteLLM image has no curl. Python is present.
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=3)"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -181,7 +182,7 @@ services:
   #        yue2-vae-config.json,yue2-qwen.tiktoken}
   yue2-model-download:
     profiles: [music]
-    image: python:3.12-slim
+    image: python:3.12.15-slim
     networks: [sosho-net]
     environment:
       HF_REPO: audio-cpp/Yue2-3B-GGUF
@@ -203,7 +204,7 @@ services:
         if [ $$missing -eq 0 ]; then
           echo "YuE2 models present in /models"; exit 0
         fi
-        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]"
+        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]==2.4.0"
         hf download "$$HF_REPO" $$need --local-dir /models
     restart: "no"
 
@@ -211,7 +212,7 @@ services:
   # Start with: docker compose -p sosho --profile music up -d
   yue2-engine:
     profiles: [music]
-    image: ghcr.io/0xshug0/audio.cpp:full-cuda12
+    image: ghcr.io/0xshug0/audio.cpp:full-cuda12-20261122-337af0c
     container_name: yue2-engine
     restart: "no"
     depends_on:
@@ -301,7 +302,7 @@ services:
       - graph-data:/data
 
   langflow:
-    image: langflowai/langflow:latest
+    image: langflowai/langflow:1.13.3
     container_name: langflow
     restart: unless-stopped
     ports:
@@ -312,6 +313,8 @@ services:
     environment:
       LANGFLOW_HOST: 0.0.0.0
       LANGFLOW_PORT: "7860"
+      LANGFLOW_SUPERUSER: ${LANGFLOW_SUPERUSER:-admin}
+      LANGFLOW_SUPERUSER_PASSWORD: ${LANGFLOW_SUPERUSER_PASSWORD:-sosho-local}
       OPENAI_API_BASE: http://litellm:4000/v1
       OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-sosho-local}
       SOSHO_STUDIO_API_URL: http://host.docker.internal:4101

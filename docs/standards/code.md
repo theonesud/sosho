@@ -47,10 +47,17 @@ WARNING: A secret in source code can leak to other people.
 
 ## 7 Comments
 
-7.1 Explain why. Do not explain what.
-7.2 Write comments in ASD-STE100.
-7.3 Do not commit commented-out code.
-7.4 Give each TODO an owner reference.
+7.1 Do not write comments. This rule covers every file type: code, scripts, configuration, Dockerfiles, and Makefiles. It also covers docstrings and file headers.
+7.2 Write a comment only if the code cannot show a necessary fact. Examples:
+- A workaround for a defect in an external tool. Give the tool and the version.
+- A security or safety reason that a reader can remove by accident.
+- A constraint from an external format or protocol that the names cannot show.
+7.3 Before you write a comment, try a better name, a smaller function, or a test.
+7.4 Do not explain what the code does. Do not repeat the name. Do not write a section banner.
+7.5 Write a necessary comment in ASD-STE100. Keep it to one sentence when possible.
+7.6 Do not commit commented-out code.
+7.7 Give each TODO an owner reference.
+7.8 If you change a file, remove the comments in your diff that break this section.
 
 ## 8 Dead Code
 
@@ -71,8 +78,13 @@ WARNING: A secret in source code can leak to other people.
 ## 11 Dependencies
 
 11.1 Add a dependency only if it removes real code.
-11.2 Pin versions through a lockfile.
-11.3 Commit the lockfile.
+11.2 Pin each dependency to one exact version. This covers npm and Python packages, Docker images, Dockerfile base images, mise tools, and `npx` package arguments.
+11.3 Do not use a version range or a floating tag. Examples: `^1.2.0`, `~1.2`, `>=1.2`, `*`, `latest`, `7-alpine`.
+11.4 If an image has no exact version tag, pin it by `sha256` digest.
+11.5 Use the newest stable version when you add or update a dependency.
+11.6 Update outdated dependencies in a separate change. `make test` lists them as warnings.
+11.7 Commit each lockfile.
+NOTE: `peerDependencies` can use a range, because they state compatibility with the host. An image that this repository builds can use the `latest` tag.
 
 ## 12 Security
 

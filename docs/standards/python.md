@@ -73,4 +73,4 @@ data = path.read_bytes()  # inside async def
 | Command | Purpose |
 | :--- | :--- |
 | `make fix` | Format and fix with Ruff |
-| `make check` | Ruff check, Pyright, and pytest |
+| `make test` | Ruff check, Pyright, and pytest |

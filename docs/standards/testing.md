@@ -28,8 +28,11 @@ Read when: You write or change a test.
 ## 4 Integration Tests
 
 4.1 Mark each integration test. Use `describe.skipIf` or a Vitest project in TypeScript. Use `@pytest.mark.integration` in Python.
-4.2 Keep integration tests separate from unit tests.
-4.3 `make check` runs unit tests only.
+4.2 Keep integration tests separate from unit tests. Put Python integration tests in `tests/integration/`.
+4.3 `make test` runs unit tests and integration tests.
+4.4 If a service does not answer, the integration test skips with the reason. Set `LIVE_STRICT=1` to fail instead.
+4.5 Mark a test that calls a cloud model with `cloud`. It runs only with `CLOUD=1`.
+4.6 Mark a test that loads the large GPU model with `heavy`. It runs only with `HEAVY=1`.
 
 ## 5 Bug Fixes
 
@@ -48,6 +51,6 @@ CAUTION: A weak test hides a defect.
 
 | Command | Purpose |
 | :--- | :--- |
-| `make check` | Run all checks and all unit tests |
+| `make test` | Run all checks, unit tests, and integration tests |
 
-Run the legacy suite with `./tests/run_tests.sh`.
+`make test` also runs the legacy `tsx` test scripts. They move to Vitest when their package passes review.

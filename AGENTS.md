@@ -70,17 +70,18 @@ CAUTION: Destructive and outward-facing actions are hard to undo.
 - Write output to the exact path that the user names. Follow the order that the user specifies.
 - Account for every item before you report a batch as complete. Compare the result with the source before you report a multi-item task as done.
 - Do not write more than 100 lines in one tool call. Write large tool output to a file. Read that file in parts.
+- Write a comment only if it is necessary. Pin each dependency to its newest stable exact version. Follow `docs/standards/code.md` sections 7 and 11.
 
 ## 5 Verification
 
-5.1 Run `make check` after any change. Run it also after any change to agent files.
+5.1 Run `make test` after any change. Run it also after any change to agent files.
 
 5.2 Use these commands. Make is the entry point.
 
 | Command | Purpose |
 | :--- | :--- |
 | `make setup` | Install tools, dependencies, and git hooks. Run it one time on each machine. |
-| `make check` | Run all checks and tests. It does not change files. |
+| `make test` | Run all checks and all tests. It does not change files. |
 | `make fix` | Format and fix files. |
 
 5.3 These actions run automatically in every agent through its adapter file. Section 7 lists the adapter files.
@@ -89,11 +90,9 @@ CAUTION: Destructive and outward-facing actions are hard to undo.
 - After each edit, `bin/agent-post-edit.sh` runs. Then `bin/agent-format.sh` formats the edited file.
 - At pre-commit, the hook fixes and re-stages staged files. It also scans for secrets and warns on prose.
 - At commit-msg, the hook checks the Conventional Commits format.
-- At pre-push, the hook runs `make check`.
+- At pre-push, the hook runs `make test`.
 
 5.4 The hooks must pass. Never use `--no-verify`.
-
-5.5 NOTE: Each later standard adds its own check commands to this section.
 
 ## 6 Reference Index
 

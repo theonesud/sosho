@@ -9,7 +9,7 @@
       "DOM",
       "DOM.Iterable"
     ],
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
     "isolatedModules": true,
     "noEmit": true,
@@ -38,7 +38,8 @@
     "src/**/*.tsx",
     "server/**/*.ts",
     "next.config.ts",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

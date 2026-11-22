@@ -39,11 +39,11 @@
     "test:unit": "node --test test/unit.test.ts test/config.test.ts"
   },
   "dependencies": {
-    "@langfuse/otel": "^5.10.0",
-    "@langfuse/tracing": "^5.10.0",
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.221.0",
-    "@opentelemetry/sdk-trace-node": "^2.10.0"
+    "@langfuse/otel": "6.1.1",
+    "@langfuse/tracing": "6.1.1",
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/exporter-trace-otlp-http": "0.223.2",
+    "@opentelemetry/sdk-trace-node": "2.12.0"
   },
   "publishConfig": {
     "access": "public"
@@ -52,9 +52,9 @@
     "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.84.2",
-    "@types/node": "^24.0.0",
-    "npm": "11.15.0",
-    "typescript": "^5.7.0"
+    "@earendil-works/pi-coding-agent": "1.6.0",
+    "@types/node": "26.6.6",
+    "npm": "12.2.3",
+    "typescript": "7.0.2"
   }
 }

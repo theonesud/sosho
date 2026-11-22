@@ -19,6 +19,7 @@ function loadRootStudioToken(): string {
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  agentRules: false,
   env: {
     NEXT_PUBLIC_SOSHO_STUDIO_TOKEN: loadRootStudioToken(),
   },
