@@ -24,6 +24,9 @@ x-legacy-docs: &legacy-docs
   - "models/**"
   - "docs/usecases.md"
 
+output:
+  - failure
+
 pre-commit:
   parallel: true
   commands:
