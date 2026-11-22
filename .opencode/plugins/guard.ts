@@ -18,7 +18,7 @@ function runHook(script: string, payload: string) {
 export const GuardPlugin: Plugin = async () => ({
   "tool.execute.before": async (input, output) => {
     const payload = JSON.stringify({ tool_name: input.tool, tool_input: output.args });
-    const result = runHook("agent-guard.sh", payload);
+    const result = runHook("agent-guard.py", payload);
     if (result.status === 2) {
       throw new Error(result.stderr.trim());
     }

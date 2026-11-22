@@ -7,7 +7,7 @@ import pytest
 
 from tests.conftest import ROOT
 
-GUARD = ROOT / "bin" / "agent-guard.sh"
+GUARD = ROOT / "bin" / "agent-guard.py"
 HOOK = ROOT / "bin" / "agent-hook-antigravity.sh"
 TIMEOUT_SECONDS = 10
 

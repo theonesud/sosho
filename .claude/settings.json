@@ -3,6 +3,10 @@
   "permissions": {
     "deny": [
       "Read(./.env)",
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
       "Edit(./.env)",
       "Edit(./.pi/models.json)",
       "Edit(./.pi/model-roles.json)"
@@ -11,11 +15,11 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Read|Edit|Write|Bash",
+        "matcher": "Read|Edit|Write|Bash|Grep",
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}/bin/agent-guard.sh\"",
+            "command": "\"${CLAUDE_PROJECT_DIR}/bin/agent-guard.py\"",
             "timeout": 5
           }
         ]

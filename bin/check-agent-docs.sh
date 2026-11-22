@@ -10,10 +10,10 @@ ADAPTERS = {".pi/extensions/guard/src/index.ts": "pi", ".opencode/plugins/guard.
             "bin/agent-hook-antigravity.sh": "Antigravity"}
 REQUIRED = ["AGENTS.md", ".claude/CLAUDE.md", ".claude/settings.json", "opencode.json", ".mcp.json",
             ".pi/settings.json", ".pi/mcp.json", ".pi/models.json", ".pi/model-roles.json",
-            ".agents/hooks.json", ".agents/mcp_config.json", "bin/agent-guard.sh",
+            ".agents/hooks.json", ".agents/mcp_config.json", "bin/agent-guard.py",
             "bin/agent-post-edit.sh", "bin/agent-format.sh"] + list(ADAPTERS) + [f"docs/standards/{n}.md" for n in STD]
 JSON_FILES = [f for f in REQUIRED if f.endswith(".json")]
-SCRIPTS = ["agent-guard.sh", "agent-post-edit.sh", "agent-format.sh"]
+SCRIPTS = ["agent-guard.py", "agent-post-edit.sh", "agent-format.sh"]
 MODEL_CONFIGS = [".pi/models.json", ".pi/model-roles.json"]
 LEGACY_TERMS = ["legacy/", "docs/context", "REFACTOR_PLAN.md", "PRODUCT.md", "DESIGN.md"]
 GUARD_CASES = [
@@ -155,7 +155,7 @@ def check_hooks():
         if tool not in matcher:
             fail(f".claude/settings.json PreToolUse matcher lacks {tool}")
     for path, name in ADAPTERS.items():
-        for s in SCRIPTS + ["agent-guard.sh"]:
+        for s in SCRIPTS + ["agent-guard.py"]:
             if os.path.isfile(path) and s not in read(path):
                 fail(f"{name} adapter {path} does not call {s}")
     hook_json = jload(".agents/hooks.json") or {}
@@ -168,13 +168,13 @@ def check_hooks():
 def check_guard_smoke():
     for i, (payload, want) in enumerate(GUARD_CASES, 1):
         try:
-            r = subprocess.run(["bin/agent-guard.sh"], input=json.dumps(payload),
+            r = subprocess.run(["bin/agent-guard.py"], input=json.dumps(payload),
                                capture_output=True, text=True, timeout=10)
         except (OSError, subprocess.TimeoutExpired) as e:
-            fail(f"bin/agent-guard.sh smoke case {i} did not run: {e}")
+            fail(f"bin/agent-guard.py smoke case {i} did not run: {e}")
             continue
         if r.returncode != want:
-            fail(f"bin/agent-guard.sh smoke case {i} exit {r.returncode}, expected {want}")
+            fail(f"bin/agent-guard.py smoke case {i} exit {r.returncode}, expected {want}")
 
 
 def check_pi_paths():

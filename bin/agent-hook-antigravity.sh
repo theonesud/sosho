@@ -18,7 +18,7 @@ print(json.dumps(p))
 
 case "$mode" in
   pre)
-    err=$(printf '%s' "$mapped" | "$root/bin/agent-guard.sh" 2>&1 >/dev/null)
+    err=$(printf '%s' "$mapped" | "$root/bin/agent-guard.py" 2>&1 >/dev/null)
     if [ $? -eq 2 ]; then
       printf '%s' "$err" | python3 -c '
 import json, sys

@@ -86,7 +86,7 @@ CAUTION: Destructive and outward-facing actions are hard to undo.
 
 5.3 These actions run automatically in every agent through its adapter file. Section 7 lists the adapter files.
 
-- Before each read, edit, write, or shell command, `bin/agent-guard.sh` runs.
+- Before each read, search, edit, write, or shell command, `bin/agent-guard.py` runs. It blocks access to secret files.
 - After each edit, `bin/agent-post-edit.sh` runs. Then `bin/agent-format.sh` formats the edited file.
 - At pre-commit, the hook fixes and re-stages staged files. It also scans for secrets and warns on prose.
 - At commit-msg, the hook checks the Conventional Commits format.
@@ -114,6 +114,6 @@ NOTE: Later stages add rows for documentation, architecture, and structure.
 | pi | `AGENTS.md`, `.pi/APPEND_SYSTEM.md`, `.pi/settings.json`, `.pi/mcp.json`, `.pi/extensions/`, `bin/pi-launcher.sh`, `bin/pi-model-prep.sh`, `bin/pi-container-config.sh` |
 | OpenCode | `AGENTS.md`, `opencode.json`, `.opencode/plugins/` |
 | Antigravity | `AGENTS.md`, `.agents/rules/*.md`, `.agents/hooks.json`, `.agents/mcp_config.json` |
-| All agents | `AGENTS.md`, `.agents/skills`, `bin/agent-guard.sh`, `bin/agent-post-edit.sh`, `bin/agent-format.sh` |
+| All agents | `AGENTS.md`, `.agents/skills`, `bin/agent-guard.py`, `bin/agent-post-edit.sh`, `bin/agent-format.sh` |
 
 7.1 Put only tool-specific facts in adapter files.
