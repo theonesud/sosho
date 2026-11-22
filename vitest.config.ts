@@ -7,7 +7,6 @@ export default defineConfig({
       "**/dist/**",
       "legacy/**",
       "apps/**",
-      "workflows/**",
       "packages/llm/**",
       "packages/memory/**",
       "packages/workflow-engine/**",

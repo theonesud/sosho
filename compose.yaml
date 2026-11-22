@@ -140,7 +140,7 @@ services:
       - "127.0.0.1:4000:4000"
     networks: [sosho-net]
     volumes:
-      - ./litellm.config.yaml:/app/config.yaml:ro
+      - ./docker/litellm.yaml:/app/config.yaml:ro
     command: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-sosho-local}

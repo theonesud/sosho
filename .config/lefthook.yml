@@ -2,7 +2,6 @@
 x-legacy: &legacy
   - "legacy/**"
   - "apps/**"
-  - "workflows/**"
   - "packages/llm/**"
   - "packages/memory/**"
   - "packages/workflow-engine/**"
@@ -16,7 +15,6 @@ x-legacy: &legacy
 x-legacy-docs: &legacy-docs
   - "legacy/**"
   - "apps/**"
-  - "workflows/**"
   - "packages/llm/**"
   - "packages/memory/**"
   - "packages/workflow-engine/**"
@@ -24,7 +22,7 @@ x-legacy-docs: &legacy-docs
   - ".pi/**"
   - ".agents/skills/**"
   - "models/**"
-  - "usecases.md"
+  - "docs/usecases.md"
 
 pre-commit:
   parallel: true
@@ -68,7 +66,7 @@ pre-commit:
     vale:
       glob: "*.md"
       exclude: *legacy-docs
-      run: mise exec -- vale --no-exit {staged_files}
+      run: mise exec -- vale --config .config/vale/vale.ini --no-exit {staged_files}
       fail_text: "Vale reported warnings. The commit continues."
 
 commit-msg:
@@ -76,7 +74,7 @@ commit-msg:
     conventional:
       run: sh bin/check-commit-msg.sh {1}
     vale:
-      run: mise exec -- vale --no-exit --ext=.md {1} || true
+      run: mise exec -- vale --config .config/vale/vale.ini --no-exit --ext=.md {1} || true
 
 pre-push:
   commands:

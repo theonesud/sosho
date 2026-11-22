@@ -10,8 +10,8 @@ RUN := $(MISE) exec --
 
 COMPOSE := docker compose -p sosho
 
-LEGACY := legacy apps workflows packages/llm packages/memory packages/workflow-engine packages/yue2 docker/Dockerfile.yue2-gateway .pi .agents/skills models
-LEGACY_DOCS := usecases.md
+LEGACY := legacy apps packages/llm packages/memory packages/workflow-engine packages/yue2 docker/Dockerfile.yue2-gateway .pi .agents/skills models
+LEGACY_DOCS := docs/usecases.md
 EXCL := $(foreach p,$(LEGACY),':(exclude)$(p)')
 EXCL_MD := $(EXCL) $(foreach p,$(LEGACY_DOCS),':(exclude)$(p)')
 LS := git ls-files -co --exclude-standard
@@ -125,7 +125,7 @@ test:
 	$(RUN) uv pip list --outdated || true; \
 	echo "== vale (warnings only)"; \
 	if [ -z "$(MD_FILES)" ]; then echo "NOTE: no in-scope Markdown file. Skip Vale."; \
-	else $(RUN) vale --no-exit $(MD_FILES) || true; fi; \
+	else $(RUN) vale --config .config/vale/vale.ini --no-exit $(MD_FILES) || true; fi; \
 	exit $$rc
 
 fix:

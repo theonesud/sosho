@@ -1,4 +1,4 @@
-# Typed declarations for langgraph.graph.state. See typings/langgraph/graph/__init__.pyi.
+# Typed declarations for langgraph.graph.state. See __init__.pyi in this folder.
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from typing import Literal
 

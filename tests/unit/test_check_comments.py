@@ -59,7 +59,8 @@ def test_reports_each_comment_with_its_line(
 
 def _allow(tmp_path: Path, path: str, text: str, reason: str) -> None:
     entry = f'[[comment]]\npath = "{path}"\ntext = "{text}"\nreason = "{reason}"\n'
-    (tmp_path / "comments-allow.toml").write_text(entry)
+    (tmp_path / ".config").mkdir()
+    (tmp_path / ".config" / "comments-allow.toml").write_text(entry)
 
 
 def test_allow_entry_with_reason_passes(tmp_path: Path) -> None:

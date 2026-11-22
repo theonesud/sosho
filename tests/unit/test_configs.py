@@ -141,7 +141,7 @@ def read_llama_ini() -> configparser.ConfigParser:
 
 
 def read_litellm() -> LiteLLMConfig:
-    data: object = yaml.safe_load((ROOT / "litellm.config.yaml").read_text(encoding="utf-8"))
+    data: object = yaml.safe_load((ROOT / "docker" / "litellm.yaml").read_text(encoding="utf-8"))
     return LiteLLMConfig.model_validate(data)
 
 

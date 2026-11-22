@@ -8,7 +8,7 @@ from pathlib import Path
 import tree_sitter_language_pack as tslp
 from pydantic import BaseModel, Field, ValidationError
 
-ALLOW_FILE = Path("comments-allow.toml")
+ALLOW_FILE = Path(".config/comments-allow.toml")
 LANG_BY_SUFFIX = {
     ".py": "python",
     ".ts": "typescript",

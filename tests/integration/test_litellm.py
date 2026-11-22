@@ -50,7 +50,7 @@ class EmbeddingResponse(BaseModel):
 
 
 def _config_roles() -> list[str]:
-    text = (ROOT / "litellm.config.yaml").read_text(encoding="utf-8")
+    text = (ROOT / "docker" / "litellm.yaml").read_text(encoding="utf-8")
     config = LiteLLMConfig.model_validate(yaml.safe_load(text))
     return [entry.model_name for entry in config.model_list]
 
@@ -90,7 +90,7 @@ def test_liveliness_returns_200() -> None:
 def test_models_lists_exactly_the_config_roles(litellm_key: str) -> None:
     require_service("litellm", LITELLM_URL)
     expected = set(_config_roles())
-    assert len(expected) == 7, f"expected 7 roles in litellm.config.yaml, found {len(expected)}"
+    assert len(expected) == 7, f"expected 7 roles in docker/litellm.yaml, found {len(expected)}"
     with httpx.Client(timeout=HEALTH_TIMEOUT) as client:
         resp = client.get(f"{LITELLM_URL}/v1/models", headers=_auth(litellm_key))
     assert resp.status_code == 200, resp.text

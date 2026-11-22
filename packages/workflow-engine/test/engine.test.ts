@@ -111,7 +111,7 @@ try {
   engineGpu.close();
 
   // 3. Example research graph: pause at checkpoint, simulate server restart (new WorkflowEngine on same SQLite), approve, complete
-  const examplePath = join(import.meta.dirname, "../../../workflows/example-research.graph.json");
+  const examplePath = join(import.meta.dirname, "../../../apps/studio/workflows/example-research.graph.json");
   const exampleGraph = JSON.parse(readFileSync(examplePath, "utf8")) as GraphDefinition;
 
   const mockResearchExecutor = async ({ node }: { node: { id: string; type: string; outputKey?: string } }) => {

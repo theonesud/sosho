@@ -32,7 +32,6 @@ target-version = "py313"
 extend-exclude = [
   "legacy",
   "apps",
-  "workflows",
   "packages/llm",
   "packages/memory",
   "packages/workflow-engine",
@@ -80,6 +79,7 @@ ignore = ["PLR2004", "TRY003"]
 [tool.pyright]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
+stubPath = "packages/graph/typings"
 venvPath = "."
 venv = ".venv"
 exclude = [
@@ -87,7 +87,6 @@ exclude = [
   "**/.venv",
   "legacy",
   "apps",
-  "workflows",
   "packages/llm",
   "packages/memory",
   "packages/workflow-engine",
@@ -111,7 +110,6 @@ norecursedirs = [
   "node_modules",
   "legacy",
   "apps",
-  "workflows",
   "packages/llm",
   "packages/memory",
   "packages/workflow-engine",

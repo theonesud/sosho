@@ -14,17 +14,17 @@ text = "# The LiteLLM image has no curl. Python is present."
 reason = "A curl healthcheck fails in this image and marks a working LiteLLM as unhealthy."
 
 [[comment]]
-path = "mise.toml"
+path = ".config/mise.toml"
 text = "# Python 3.13 is the newest version that both LangGraph and Langflow list as supported."
 reason = "The newest-version rule invites a bump to Python 3.14, which these libraries do not support."
 
 [[comment]]
-path = "lefthook.yml"
+path = ".config/lefthook.yml"
 text = "# lefthook 2 reads `exclude` as a list of globs. A regex string has no effect."
 reason = "A lefthook defect makes a regex exclude silently do nothing, so a reader would think the files are excluded."
 
 [[comment]]
-path = "lefthook.yml"
+path = ".config/lefthook.yml"
 text = "# Secrets scanning covers every path, legacy paths included."
 reason = "A reader would copy the legacy exclude list to gitleaks and stop the secret scan of legacy files."
 

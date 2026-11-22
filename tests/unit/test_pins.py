@@ -86,7 +86,7 @@ def test_requirements_files_use_exact_versions(path: Path) -> None:
 
 
 def test_mise_tools_and_node_use_exact_versions() -> None:
-    tools = tomllib.loads((ROOT / "mise.toml").read_text())["tools"]
+    tools = tomllib.loads((ROOT / ".config" / "mise.toml").read_text())["tools"]
     bad = [
         f"{name}={version}" for name, version in tools.items() if not EXACT_SEMVER.match(version)
     ]
@@ -129,5 +129,5 @@ def test_inline_installs_in_compose_use_exact_versions() -> None:
 
 
 def test_mise_does_not_manage_node() -> None:
-    tools = tomllib.loads((ROOT / "mise.toml").read_text())["tools"]
+    tools = tomllib.loads((ROOT / ".config" / "mise.toml").read_text())["tools"]
     assert "node" not in tools

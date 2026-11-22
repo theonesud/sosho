@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { GraphValidationError, validateGraph } from "../src/schema.ts";
 
 // 1. Valid example graph passes
-const examplePath = join(import.meta.dirname, "../../../workflows/example-research.graph.json");
+const examplePath = join(import.meta.dirname, "../../../apps/studio/workflows/example-research.graph.json");
 const exampleRaw = JSON.parse(readFileSync(examplePath, "utf8"));
 const validated = validateGraph(exampleRaw);
 assert.equal(validated.id, "example-research-checkpoint");
