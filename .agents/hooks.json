@@ -1,0 +1,28 @@
+{
+  "sosho-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bin/agent-hook-antigravity.sh pre",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bin/agent-hook-antigravity.sh post",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

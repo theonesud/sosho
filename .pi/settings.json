@@ -28,6 +28,7 @@
     "+tool_search"
   ],
   "extensions": [
+    "./extensions/guard/src/index.ts",
     "-builtin:llama.cpp",
     "./extensions/langfuse/src/index.ts",
     "./extensions/scratchpad/src/index.ts",

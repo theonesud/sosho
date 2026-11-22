@@ -1,0 +1,44 @@
+# Graph service. Runs Studio graph JSON on the open source LangGraph library.
+# Build context is the repository root. docker/Dockerfile.graph.dockerignore limits it.
+
+FROM ghcr.io/astral-sh/uv:0.13.9 AS uv
+
+FROM python:3.13-slim-trixie AS build
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PROJECT_ENVIRONMENT=/app/.venv
+
+COPY --from=uv /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+COPY packages/graph/pyproject.toml packages/graph/pyproject.toml
+COPY packages/graph/src packages/graph/src
+
+RUN uv sync --locked --no-dev --package sosho-graph --no-editable
+
+FROM python:3.13-slim-trixie AS runtime
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    SOSHO_GRAPH_DB=/data/checkpoints.sqlite
+
+RUN groupadd --system --gid 10001 graph \
+    && useradd --system --uid 10001 --gid graph --home-dir /app --shell /usr/sbin/nologin graph \
+    && install -d -o graph -g graph /data
+
+COPY --from=build /app/.venv /app/.venv
+
+WORKDIR /app
+USER 10001:10001
+
+EXPOSE 8123
+VOLUME ["/data"]
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=10 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8123/health', timeout=2)"]
+
+CMD ["uvicorn", "sosho_graph.api:create_app", "--factory", "--host", "0.0.0.0", "--port", "8123"]

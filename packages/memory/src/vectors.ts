@@ -1,4 +1,4 @@
-export const DEFAULT_EMBED_URL = process.env.SOSHO_EMBED_URL || "http://127.0.0.1:8082/v1/embeddings";
+export const DEFAULT_EMBED_URL = process.env.SOSHO_EMBED_URL || "http://127.0.0.1:8080/v1/embeddings";
 
 export function encodeFloat32(vec: Float32Array): Buffer {
   return Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength);

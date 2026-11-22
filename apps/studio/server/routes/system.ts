@@ -77,9 +77,9 @@ export function createSystemRoutes(ctx: StudioContext): Hono {
 
     const llamaCppBase = stripApiSuffix(env.LLAMA_CPP_URL || providerBase("llama-cpp", "http://127.0.0.1:8080"));
     const llamaDecisionBase = stripApiSuffix(
-      env.LLAMA_DECISION_URL || providerBase("llama-decision", "http://127.0.0.1:8081"),
+      env.LLAMA_DECISION_URL || providerBase("llama-decision", "http://127.0.0.1:8080"),
     );
-    const llamaEmbedBase = stripApiSuffix(env.LLAMA_EMBED_URL || providerBase("llama-embed", "http://127.0.0.1:8082"));
+    const llamaEmbedBase = stripApiSuffix(env.LLAMA_EMBED_URL || providerBase("llama-embed", "http://127.0.0.1:8080"));
     const langfuseBase = (env.LANGFUSE_BASE_URL || "http://127.0.0.1:3001").replace(/\/+$/, "");
     const yue2Base = (env.YUE2_GATEWAY_URL || "http://127.0.0.1:8021").replace(/\/+$/, "");
 
@@ -227,7 +227,7 @@ export function createSystemRoutes(ctx: StudioContext): Hono {
   app.post("/doctor", async (c) => {
     const doctorPath = join(ctx.root, "bin", "doctor.sh");
     if (!existsSync(doctorPath)) {
-      throw new HttpError(404, "bin/doctor.sh not found");
+      throw new HttpError(404, "Doctor check not available: bin/doctor.sh not found");
     }
     try {
       const { stdout, stderr } = await execFileAsync("bash", [doctorPath], {

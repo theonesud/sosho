@@ -1,6 +1,6 @@
 {
   // Strict base for all new TypeScript projects. Each project extends this file.
-  // The legacy projects extend tsconfig.legacy.json until the rebuild stages replace them.
+  // Legacy projects live in legacy/ and extend legacy/tsconfig.legacy.json until the rebuild replaces them.
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023"],

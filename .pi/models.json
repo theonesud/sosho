@@ -10,7 +10,10 @@
           "name": "Sosho Main (LiteLLM)",
           "contextWindow": 1048576,
           "maxTokens": 1048576,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "reasoning": true
         },
         {
@@ -18,7 +21,9 @@
           "name": "Sosho Subagent (LiteLLM)",
           "contextWindow": 131072,
           "maxTokens": 16384,
-          "input": ["text"],
+          "input": [
+            "text"
+          ],
           "reasoning": true
         },
         {
@@ -26,7 +31,9 @@
           "name": "Sosho Subagent Code (LiteLLM)",
           "contextWindow": 131072,
           "maxTokens": 16384,
-          "input": ["text"],
+          "input": [
+            "text"
+          ],
           "reasoning": false
         },
         {
@@ -34,7 +41,9 @@
           "name": "Sosho Decision (LiteLLM)",
           "contextWindow": 16384,
           "maxTokens": 1024,
-          "input": ["text"],
+          "input": [
+            "text"
+          ],
           "reasoning": false
         },
         {
@@ -42,7 +51,10 @@
           "name": "Sosho Local Uncensored (LiteLLM)",
           "contextWindow": 65536,
           "maxTokens": 8192,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "reasoning": true
         },
         {
@@ -50,8 +62,20 @@
           "name": "Sosho Embed (LiteLLM)",
           "contextWindow": 2048,
           "maxTokens": 2048,
-          "input": ["text"],
+          "input": [
+            "text"
+          ],
           "reasoning": false
+        },
+        {
+          "id": "cloud-uncensored",
+          "name": "Sosho Cloud Uncensored (LiteLLM)",
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "input": [
+            "text"
+          ],
+          "reasoning": true
         }
       ]
     },
@@ -94,7 +118,7 @@
       ]
     },
     "llama-decision": {
-      "baseUrl": "http://127.0.0.1:8081/v1",
+      "baseUrl": "http://127.0.0.1:8080/v1",
       "api": "openai-completions",
       "apiKey": "local",
       "models": [
@@ -136,6 +160,23 @@
             "presencePenalty": 0,
             "top_k": 20
           }
+        }
+      ]
+    },
+    "llama-embed": {
+      "baseUrl": "http://127.0.0.1:8080/v1",
+      "api": "openai-completions",
+      "apiKey": "local",
+      "models": [
+        {
+          "id": "embeddinggemma",
+          "name": "EmbeddingGemma 300M (Local CPU Embeddings)",
+          "contextWindow": 2048,
+          "maxTokens": 2048,
+          "input": [
+            "text"
+          ],
+          "reasoning": false
         }
       ]
     },

@@ -65,13 +65,16 @@ CAUTION: Destructive and outward-facing actions are hard to undo.
 
 4.4 Verify. Run the checks from section 5 and from each standard that applies.
 
-4.5 Legacy paths are reference only. Do not extend legacy code. Build new code to the standards in section 6.
+4.5 Follow these behavior rules in every task:
 
-4.6 Record. Update `docs/context/NOW.md` when the state changes. Update `docs/context/DECISIONS.md` when the architecture changes.
+- Write output to the exact path that the user names. Follow the order that the user specifies.
+- Account for every item before you report a batch as complete. Compare the result with the source before you report a multi-item task as done.
+- Do not write more than 100 lines in one tool call. Write large tool output to a file. Read that file in parts.
 
 ## 5 Verification
 
 5.1 Run `make check` after any change. Run it also after any change to agent files.
+
 5.2 Use these commands. Make is the entry point.
 
 | Command | Purpose |
@@ -80,9 +83,10 @@ CAUTION: Destructive and outward-facing actions are hard to undo.
 | `make check` | Run all checks and tests. It does not change files. |
 | `make fix` | Format and fix files. |
 
-5.3 These actions run automatically:
+5.3 These actions run automatically in every agent through its adapter file. Section 7 lists the adapter files.
 
-- After an agent edit, `bin/agent-format.sh` formats the edited file.
+- Before each read, edit, write, or shell command, `bin/agent-guard.sh` runs.
+- After each edit, `bin/agent-post-edit.sh` runs. Then `bin/agent-format.sh` formats the edited file.
 - At pre-commit, the hook fixes and re-stages staged files. It also scans for secrets and warns on prose.
 - At commit-msg, the hook checks the Conventional Commits format.
 - At pre-push, the hook runs `make check`.
@@ -95,11 +99,6 @@ CAUTION: Destructive and outward-facing actions are hard to undo.
 
 | Read when | File |
 | :--- | :--- |
-| You plan any structural work | [REFACTOR_PLAN.md](REFACTOR_PLAN.md) |
-| You need the present state | [docs/context/NOW.md](docs/context/NOW.md) |
-| You change architecture, ports, schemas, or security | [docs/context/DECISIONS.md](docs/context/DECISIONS.md) |
-| You need product scope | [PRODUCT.md](PRODUCT.md) |
-| You do UI work | [DESIGN.md](DESIGN.md) |
 | You write or change any code | [docs/standards/code.md](docs/standards/code.md) |
 | You edit a `.ts` or `.tsx` file | [docs/standards/typescript.md](docs/standards/typescript.md) |
 | You edit a `.py` file | [docs/standards/python.md](docs/standards/python.md) |
@@ -110,11 +109,12 @@ NOTE: Later stages add rows for documentation, architecture, and structure.
 
 ## 7 Tool Adapters
 
-| Tool | Files it reads |
+| Tool | Files it reads in this repo |
 | :--- | :--- |
-| Claude Code | `.claude/CLAUDE.md`, `.claude/settings.json` |
-| pi | `AGENTS.md` natively |
-| OpenCode | `AGENTS.md` natively, `opencode.json` |
-| Antigravity | `AGENTS.md` natively |
+| Claude Code | `.claude/CLAUDE.md`, `.claude/settings.json`, `.claude/rules/*.md`, `.claude/skills`, `.mcp.json` |
+| pi | `AGENTS.md`, `.pi/APPEND_SYSTEM.md`, `.pi/settings.json`, `.pi/mcp.json`, `.pi/extensions/`, `bin/pi-launcher.sh`, `bin/pi-model-prep.sh`, `bin/pi-container-config.sh` |
+| OpenCode | `AGENTS.md`, `opencode.json`, `.opencode/plugins/` |
+| Antigravity | `AGENTS.md`, `.agents/rules/*.md`, `.agents/hooks.json`, `.agents/mcp_config.json` |
+| All agents | `AGENTS.md`, `.agents/skills`, `bin/agent-guard.sh`, `bin/agent-post-edit.sh`, `bin/agent-format.sh` |
 
 7.1 Put only tool-specific facts in adapter files.

@@ -1,6 +1,6 @@
-# Root uv project. Python packages join the workspace in stage 5.
-# Legacy paths (yue2, apps, packages, tests, and others) are excluded below.
-# The rebuild stages remove them from the exclude lists.
+# Root uv project. Shared Python tool configuration. The uv workspace holds packages/graph.
+# Legacy code is excluded below: legacy/, the apps and workflows folders, and the
+# packages that are pending review against docs/standards.
 
 [project]
 name = "sosho"
@@ -9,8 +9,20 @@ description = "Sosho root project. Holds the shared Python tool configuration."
 requires-python = ">=3.13,<3.14"
 dependencies = []
 
+[tool.uv.workspace]
+members = ["packages/graph"]
+
 [dependency-groups]
-dev = ["pyright==1.1.414", "pytest==9.2.0", "ruff==0.17.6"]
+dev = [
+  "httpx==0.28.1",
+  "pyright==1.1.414",
+  "pytest==9.2.0",
+  "ruff==0.17.6",
+  "sosho-graph",
+]
+
+[tool.uv.sources]
+sosho-graph = { workspace = true }
 
 [tool.uv]
 package = false
@@ -19,15 +31,15 @@ package = false
 line-length = 100
 target-version = "py313"
 extend-exclude = [
+  "legacy",
   "apps",
-  "packages",
-  "yue2",
   "workflows",
-  "tests",
-  "docker",
+  "packages/llm",
+  "packages/memory",
+  "packages/workflow-engine",
+  "packages/yue2",
   ".pi",
   ".agents/skills",
-  ".impeccable",
   "models",
 ]
 
@@ -77,15 +89,15 @@ venv = ".venv"
 exclude = [
   "**/node_modules",
   "**/.venv",
+  "legacy",
   "apps",
-  "packages",
-  "yue2",
   "workflows",
-  "tests",
-  "docker",
+  "packages/llm",
+  "packages/memory",
+  "packages/workflow-engine",
+  "packages/yue2",
   ".pi",
   ".agents/skills",
-  ".impeccable",
   "models",
 ]
 
@@ -95,14 +107,14 @@ norecursedirs = [
   ".git",
   ".venv",
   "node_modules",
+  "legacy",
   "apps",
-  "packages",
-  "yue2",
   "workflows",
-  "tests",
-  "docker",
+  "packages/llm",
+  "packages/memory",
+  "packages/workflow-engine",
+  "packages/yue2",
   ".pi",
   ".agents",
-  ".impeccable",
   "models",
 ]

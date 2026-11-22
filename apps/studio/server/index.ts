@@ -77,7 +77,7 @@ export function createStudioServer(options: StudioServerOptions = {}): {
 } {
   const ROOT = resolve(options.root || process.env.SOSHO_ROOT || join(import.meta.dirname, "../../.."));
   const WORKFLOWS_DIR = join(ROOT, "workflows");
-  const SKILLS_DIR = join(ROOT, ".pi", "skills");
+  const SKILLS_DIR = join(ROOT, ".agents", "skills");
   const PORT = options.port ?? Number(process.env.STUDIO_API_PORT || "4101");
   const STUDIO_TOKEN = options.token ?? loadStudioToken(ROOT);
   const HEARTBEAT_MS = options.heartbeatMs ?? 15_000;

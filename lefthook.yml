@@ -1,43 +1,68 @@
 # Local git hooks are the quality gate. There is no CI.
-# Legacy paths are excluded per command. The rebuild stages remove them from the lists.
-# Legacy: apps, packages, yue2, workflows, tests, docker, compose.yaml, .pi, .agents/skills,
-# .impeccable, models, bin/autotune.sh, bin/doctor.sh, bin/pi-launcher.sh, bin/chunk-read.sh,
-# and the root legacy docs.
+# lefthook 2 reads `exclude` as a list of globs. A regex string has no effect.
+# The legacy list holds code that is not yet at docs/standards. The rebuild stages remove items from it.
+
+x-legacy: &legacy
+  - "legacy/**"
+  - "apps/**"
+  - "workflows/**"
+  - "packages/llm/**"
+  - "packages/memory/**"
+  - "packages/workflow-engine/**"
+  - "packages/yue2/**"
+  - "docker/Dockerfile.yue2-gateway"
+  - ".pi/**"
+  - ".agents/skills/**"
+  - "models/**"
+  - "skills-lock.json"
+
+x-legacy-docs: &legacy-docs
+  - "legacy/**"
+  - "apps/**"
+  - "workflows/**"
+  - "packages/llm/**"
+  - "packages/memory/**"
+  - "packages/workflow-engine/**"
+  - "packages/yue2/**"
+  - ".pi/**"
+  - ".agents/skills/**"
+  - "models/**"
+  - "usecases.md"
 
 pre-commit:
   parallel: true
   commands:
     biome:
       glob: "*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc}"
-      exclude: '^(apps|packages|yue2|workflows|tests|docker|\.pi|\.agents/skills|\.impeccable|models|docs/context)/|^(compose\.yaml|skills-lock\.json|tsconfig\.legacy\.json)$'
+      exclude: *legacy
       run: mise exec -- pnpm exec biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
       stage_fixed: true
     ruff-format:
       glob: "*.py"
-      exclude: '^(apps|packages|yue2|workflows|tests|docker|\.pi|\.agents/skills|\.impeccable|models)/'
+      exclude: *legacy
       run: mise exec -- uv run ruff format {staged_files}
       stage_fixed: true
     ruff-lint:
       glob: "*.py"
-      exclude: '^(apps|packages|yue2|workflows|tests|docker|\.pi|\.agents/skills|\.impeccable|models)/'
+      exclude: *legacy
       run: mise exec -- uv run ruff check --fix {staged_files}
       stage_fixed: true
     shfmt:
       glob: "*.sh"
-      exclude: '^(apps|packages|yue2|workflows|tests|docker|\.pi|\.agents/skills|\.impeccable|models)/|^bin/(autotune|doctor|pi-launcher|chunk-read)\.sh$'
+      exclude: *legacy
       run: mise exec -- shfmt -w -i 2 -ci {staged_files}
       stage_fixed: true
     shellcheck:
       glob: "*.sh"
-      exclude: '^(apps|packages|yue2|workflows|tests|docker|\.pi|\.agents/skills|\.impeccable|models)/|^bin/(autotune|doctor|pi-launcher|chunk-read)\.sh$'
+      exclude: *legacy
       run: mise exec -- shellcheck {staged_files}
     hadolint:
       glob: "{Dockerfile,Dockerfile.*,*.Dockerfile,*/Dockerfile,*/Dockerfile.*}"
-      exclude: '^(apps|packages|yue2|workflows|tests|docker|\.pi|\.agents/skills|\.impeccable|models)/'
+      exclude: *legacy
       run: mise exec -- hadolint {staged_files}
     taplo:
       glob: "*.toml"
-      exclude: '^(apps|packages|yue2|workflows|tests|docker|\.pi|\.agents/skills|\.impeccable|models)/'
+      exclude: *legacy
       run: mise exec -- taplo fmt {staged_files}
       stage_fixed: true
     gitleaks:
@@ -46,7 +71,7 @@ pre-commit:
     vale:
       # Warn only. The hook never fails because of Vale.
       glob: "*.md"
-      exclude: '^(apps|packages|yue2|workflows|tests|docker|\.pi|\.agents/skills|\.impeccable|models|docs/context)/|^(readme|PRODUCT|DESIGN|REFACTOR_PLAN|model_params|usecases)\.md$'
+      exclude: *legacy-docs
       run: mise exec -- vale --no-exit {staged_files}
       fail_text: "Vale reported warnings. The commit continues."
 

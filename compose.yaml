@@ -1,15 +1,21 @@
-# Usage:
-#   docker compose --profile llm up -d   # starts llama-cpp + langfuse stack
-#   docker compose run --rm pi           # interactive pi agent in this workspace
-#   docker compose logs -f llama-cpp
+# Sosho Docker services.
 #
-# Host-specific values (UID/GID/HOME/threads) live in .env
+# Always-on services: llama-cpp (GPU chat plus CPU decision and embed models), litellm,
+# graph, langflow, and the Langfuse stack (included below).
+# Optional services: yue2-* under the `music` profile.
+#
+# Usage:
+#   docker compose -p sosho up -d                   # always-on services
+#   docker compose -p sosho --profile music up -d   # add YuE2 music services
+#   docker compose -p sosho logs -f llama-cpp
+#
+# Host-specific values and secrets live in .env (see .env.example).
+# Every host port binds to 127.0.0.1.
 
 name: sosho
 
 include:
   - path: docker/compose.langfuse.yaml
-
 
 x-model: &model
   HF_REPO: HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive
@@ -18,10 +24,11 @@ x-model: &model
   MMPROJ_FILE: mmproj-Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-f16.gguf
 
 services:
-  # One-shot init job: fetches the GGUFs if missing, then exits.
+  # One-shot download job for the main model. Skips when both files exist.
+  # Files: ./models/Qwen3.6-35B-A3B/<MODEL_FILE> and ./models/Qwen3.6-35B-A3B/<MMPROJ_FILE>
   model-download:
-    profiles: [llm]
     image: python:3.12-slim
+    networks: [sosho-net]
     environment:
       <<: *model
       HF_XET_HIGH_PERFORMANCE: "1"
@@ -43,16 +50,19 @@ services:
     restart: "no"
 
   llama-cpp:
-    profiles: [llm]
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     container_name: llama-cpp
     restart: always
     depends_on:
       model-download:
         condition: service_completed_successfully
+      decision-model-download:
+        condition: service_completed_successfully
+      embed-model-download:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:8080:8080"
-    networks: [webui-net]
+    networks: [sosho-net]
     ipc: host
     cpu_shares: 256
     ulimits:
@@ -64,7 +74,8 @@ services:
       retries: 20
       start_period: 10s
     volumes:
-      - ./models/Qwen3.6-35B-A3B:/models/Qwen3.6-35B-A3B:ro
+      - ./models:/models:ro
+      - ./docker/llama-models.ini:/etc/llama/models.ini:ro
     deploy:
       resources:
         reservations:
@@ -73,51 +84,20 @@ services:
               count: all
               capabilities: [gpu]
     command:
-      - --models-dir
-      - /models
+      - --models-preset
+      - /etc/llama/models.ini
       - --models-max
-      - "1"
+      - "3"
       - --host
       - 0.0.0.0
-      - -cmoe
-      - --moe-cache-mib
-      - "${LLM_MOE_CACHE_MIB:-1536}"
-      - -lm
-      - "${LLM_LOAD_MODE:-mlock}"
-      - --image-min-tokens
-      - "1024"
-      - -c
-      - "${LLM_CTX_SIZE:-65536}"
-      - -n
-      - "-1"
-      - -np
-      - "1"
-      - -t
-      - ${LLM_THREADS:-8}
-      - -ctk
-      - "${LLM_KV_CACHE_TYPE:-q4_0}"
-      - -ctv
-      - "${LLM_KV_CACHE_TYPE:-q4_0}"
-      - -b
-      - "${LLM_BATCH:-2048}"
-      - -ub
-      - "${LLM_UBATCH:-512}"
-      - -tb
-      - ${LLM_THREADS_BATCH:-12}
-      - --cache-prompt
-      - --reasoning
-      - "on"
-      - --reasoning-preserve
-      - --sleep-idle-seconds
-      - "900"
-      - -fa
-      - "on"
+      - --port
+      - "8080"
 
-  # Lightweight CPU-only decision/router model (0 GPU VRAM, ~1.5 GB RAM).
-  # Start with: docker compose --profile decision up -d
+  # CPU decision model download. Served by llama-cpp router preset [Qwen3-1.7B].
+  # File: ./models/Qwen3-1.7B/Qwen3-1.7B-Q4_K_M.gguf
   decision-model-download:
-    profiles: [decision]
     image: python:3.12-slim
+    networks: [sosho-net]
     environment:
       HF_REPO: unsloth/Qwen3-1.7B-GGUF
       MODEL_SUBDIR: Qwen3-1.7B
@@ -140,46 +120,11 @@ services:
         hf download "$$HF_REPO" "$$MODEL_FILE" --local-dir "$$dir"
     restart: "no"
 
-  llama-decision:
-    profiles: [decision]
-    image: ghcr.io/ggml-org/llama.cpp:server
-    container_name: llama-decision
-    restart: unless-stopped
-    depends_on:
-      decision-model-download:
-        condition: service_completed_successfully
-    ports:
-      - "127.0.0.1:8081:8081"
-    networks: [webui-net]
-    volumes:
-      - ./models/Qwen3-1.7B:/models/Qwen3-1.7B:ro
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8081/health || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-      start_period: 5s
-    command:
-      - -m
-      - /models/Qwen3-1.7B/Qwen3-1.7B-Q4_K_M.gguf
-      - --alias
-      - Qwen3-1.7B
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8081"
-      - -c
-      - "16384"
-      - -np
-      - "4"
-      - -t
-      - "${DECISION_LLM_THREADS:-8}"
-      - --cache-prompt
-
-  # Lightweight CPU-only embedding model for memory vector recall (0 GPU VRAM, ~400 MB RAM).
+  # CPU embedding model download. Served by llama-cpp router preset [embeddinggemma].
+  # File: ./models/embeddinggemma-300M/embeddinggemma-300M-Q8_0.gguf
   embed-model-download:
-    profiles: [embed]
     image: python:3.12-slim
+    networks: [sosho-net]
     environment:
       HF_REPO: ggml-org/embeddinggemma-300M-GGUF
       MODEL_SUBDIR: embeddinggemma-300M
@@ -202,53 +147,17 @@ services:
         hf download "$$HF_REPO" "$$MODEL_FILE" --local-dir "$$dir"
     restart: "no"
 
-  llama-embed:
-    profiles: [embed]
-    image: ghcr.io/ggml-org/llama.cpp:server
-    container_name: llama-embed
-    restart: unless-stopped
-    mem_limit: 1g
-    depends_on:
-      embed-model-download:
-        condition: service_completed_successfully
-    ports:
-      - "127.0.0.1:8082:8082"
-    networks: [webui-net]
-    volumes:
-      - ./models/embeddinggemma-300M:/models/embeddinggemma-300M:ro
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8082/health || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-      start_period: 5s
-    command:
-      - -m
-      - /models/embeddinggemma-300M/embeddinggemma-300M-Q8_0.gguf
-      - --alias
-      - embeddinggemma
-      - --embeddings
-      - --pooling
-      - mean
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8082"
-      - -c
-      - "2048"
-      - -np
-      - "4"
-      - -t
-      - "${EMBED_LLM_THREADS:-4}"
-
+  # LiteLLM gateway. llama-cpp uses service_started, because yue2 can unload it.
   litellm:
-    profiles: [llm, litellm]
-    image: ghcr.io/berriai/litellm:main-stable
+    image: ghcr.io/berriai/litellm:v1.110.2
     container_name: litellm
     restart: unless-stopped
+    depends_on:
+      llama-cpp:
+        condition: service_started
     ports:
-      - "127.0.0.1:${LITELLM_PORT:-4000}:4000"
-    networks: [webui-net]
+      - "127.0.0.1:4000:4000"
+    networks: [sosho-net]
     volumes:
       - ./litellm.config.yaml:/app/config.yaml:ro
     command: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
@@ -258,7 +167,7 @@ services:
       REFUSELESS_API_KEY: ${REFUSELESS_API_KEY:-}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}
-      LANGFUSE_HOST: ${LANGFUSE_INTERNAL_URL:-http://langfuse-web:3000}
+      LANGFUSE_HOST: http://langfuse-web:3000
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://127.0.0.1:4000/health/liveliness || exit 1"]
       interval: 5s
@@ -266,19 +175,20 @@ services:
       retries: 20
       start_period: 10s
 
-
-
-  # YuE2 model fetch: GGUF weights + sidecars from Hugging Face, once.
-  # Skips entirely when the files are already present.
+  # YuE2 model download: GGUF weights and sidecars, once. Skips when all files exist.
+  # Files: ./models/yue2-3b/yue2-3b-q4_0.gguf, ./models/yue2-3b/yue2-vae-f16.gguf,
+  #        ./models/yue2-3b/sidecars/{yue2-model-config.json,yue2-generation-config.json,
+  #        yue2-vae-config.json,yue2-qwen.tiktoken}
   yue2-model-download:
     profiles: [music]
     image: python:3.12-slim
+    networks: [sosho-net]
     environment:
       HF_REPO: audio-cpp/Yue2-3B-GGUF
       HF_XET_HIGH_PERFORMANCE: "1"
       HF_TOKEN: ${HF_TOKEN:-}
     volumes:
-      - ${YUE2_MODELS_DIR:-./models/yue2-3b}:/models
+      - ./models/yue2-3b:/models
       - hf-cache:/root/.cache/huggingface
     command:
       - sh
@@ -298,8 +208,7 @@ services:
     restart: "no"
 
   # YuE2 engine: one resident model, offline generation only.
-  # Not started by `up` (profile `music`) because it needs ~6 GB free VRAM.
-  #   docker compose --profile music up -d
+  # Start with: docker compose -p sosho --profile music up -d
   yue2-engine:
     profiles: [music]
     image: ghcr.io/0xshug0/audio.cpp:full-cuda12
@@ -308,14 +217,14 @@ services:
     depends_on:
       yue2-model-download:
         condition: service_completed_successfully
-    networks: [webui-net]
+    networks: [sosho-net]
     ipc: host
     cpu_shares: 512
     ulimits:
       memlock: { soft: -1, hard: -1 }
     volumes:
-      - ${YUE2_MODELS_DIR:-./models/yue2-3b}:/models:ro
-      - ./yue2/server.json:/app/server.json:ro
+      - ./models/yue2-3b:/models:ro
+      - ./packages/yue2/server.json:/app/server.json:ro
     deploy:
       resources:
         reservations:
@@ -348,8 +257,8 @@ services:
     depends_on:
       - yue2-engine
     ports:
-      - "127.0.0.1:${YUE2_GATEWAY_PORT:-8021}:8000"
-    networks: [webui-net]
+      - "127.0.0.1:8021:8000"
+    networks: [sosho-net]
     environment:
       YUE2_ENGINE_URL: http://yue2-engine:8020
       YUE2_MODEL_ID: yue2
@@ -359,79 +268,47 @@ services:
       YUE2_UNLOAD_AFTER_JOB: ${YUE2_UNLOAD_AFTER_JOB:-true}
       YUE2_RETENTION_SECONDS: ${YUE2_RETENTION_SECONDS:-86400}
       YUE2_MAX_GIB: ${YUE2_MAX_GIB:-5}
-      # VRAM handshake: unload active models via llama-cpp HTTP API (no Docker socket needed).
+      # VRAM handshake: unload active models via the llama-cpp HTTP API (no Docker socket).
       YUE2_STOP_LLAMA: ${YUE2_STOP_LLAMA:-true}
-      YUE2_LLAMA_URL: ${YUE2_LLAMA_URL:-http://llama-cpp:8080}
-      YUE2_BIND_HOST: ${YUE2_BIND_HOST:-127.0.0.1}
+      YUE2_LLAMA_URL: http://llama-cpp:8080
+      YUE2_BIND_HOST: 127.0.0.1
     volumes:
       - ./yue2-data:/data
 
-  # Interactive agent; not started by `up` (profile), use `docker compose run --rm pi`.
-  pi:
-    profiles: [agent]
+  # Graph service. Compiles Studio graph JSON into LangGraph runs. Open source library, no license key.
+  # Build: docker/Dockerfile.graph. Checkpoints live in the graph-data volume.
+  graph:
     build:
       context: .
-      dockerfile: docker/Dockerfile.pi
-    image: pi-sandbox:latest
-    container_name: pi-agent
-    networks: [webui-net]
-    user: "${UID:-1000}:${GID:-1000}"
-    stdin_open: true
-    tty: true
-    working_dir: ${PWD}
-    environment:
-      HOME: ${HOME}
-      LITELLM_BASE_URL: ${LITELLM_BASE_URL:-http://litellm:4000/v1}
-      PI_CODING_AGENT_DIR: ${PWD}/.pi
-      XDG_CACHE_HOME: ${PWD}/.pi/.cache
-      XDG_CONFIG_HOME: ${PWD}/.pi/.config
-      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://langfuse-web:3000}
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}
-      LANGGRAPH_URL: ${LANGGRAPH_URL:-http://langgraph:8123}
-      LANGFLOW_URL: ${LANGFLOW_URL:-http://langflow:7860}
-    tmpfs:
-      - ${HOME}:uid=${UID:-1000},gid=${GID:-1000},mode=0755
-    volumes:
-      - ${PWD}:${PWD}
-      - ${PWD}/../worktrees:${PWD}/../worktrees
-      - ${HOME}/.dokobot:${HOME}/.dokobot
-      - ${HOME}/.sosho/memory:${HOME}/.sosho/memory
-      - ${HOME}/skills:${HOME}/skills:ro
-      - ${HOME}/.gitconfig:${HOME}/.gitconfig:ro
-    command: ["--approve"]
-
-  langgraph:
-    profiles: [orchestration]
-    image: langchain/langgraph-api:latest
-    container_name: langgraph
+      dockerfile: docker/Dockerfile.graph
+    image: sosho-graph:latest
+    pull_policy: build
+    container_name: sosho-graph
     restart: unless-stopped
+    depends_on:
+      litellm:
+        condition: service_started
     ports:
-      - "127.0.0.1:${LANGGRAPH_PORT:-8123}:8123"
-    networks: [webui-net]
+      - "127.0.0.1:8123:8123"
+    networks: [sosho-net]
     environment:
-      PORT: "8123"
-      OPENAI_API_BASE: http://litellm:4000/v1
-      OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-sosho-local}
-      LANGFUSE_HOST: ${LANGFUSE_INTERNAL_URL:-http://langfuse-web:3000}
+      LITELLM_BASE_URL: http://litellm:4000/v1
+      LITELLM_API_KEY: ${LITELLM_MASTER_KEY:-sk-sosho-local}
+      LANGFUSE_HOST: http://langfuse-web:3000
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}
-      SOSHO_STUDIO_API_URL: http://host.docker.internal:4101
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8123/ok || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-      start_period: 10s
+    volumes:
+      - graph-data:/data
 
   langflow:
-    profiles: [orchestration]
     image: langflowai/langflow:latest
     container_name: langflow
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${LANGFLOW_PORT:-7860}:7860"
-    networks: [webui-net]
+      - "127.0.0.1:7860:7860"
+    networks: [sosho-net]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       LANGFLOW_HOST: 0.0.0.0
       LANGFLOW_PORT: "7860"
@@ -448,9 +325,10 @@ services:
       start_period: 15s
 
 networks:
-  webui-net:
-    name: webui-net
+  sosho-net:
+    name: sosho-net
 
 volumes:
   hf-cache:
   langflow-data:
+  graph-data:

@@ -4,7 +4,7 @@
 # Python 3.13 is the newest version that both LangGraph and Langflow list as supported.
 
 [tools]
-node = "26.13.1"      # Node Active LTS (v26 line)
+# Node comes from nvm and .nvmrc. Do not add node here.
 pnpm = "12.21.0"
 python = "3.13.18"
 uv = "0.13.9"

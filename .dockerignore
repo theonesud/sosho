@@ -1,0 +1,10 @@
+# Keep large local trees out of every Docker build context at the repository root.
+# The graph image copies only the files it needs, so the list stays a deny-list.
+.git
+.pi
+.venv
+models
+node_modules
+**/node_modules
+legacy
+yue2-data

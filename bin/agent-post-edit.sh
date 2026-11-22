@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# PostToolUse hook: run the agent-file check after an edit to a watched path.
+# Post-edit hook: run the agent-file check after an edit to a watched path.
+# Input: one tool JSON payload on stdin. Any supported agent payload works.
 set -euo pipefail
 
 ROOT="${CLAUDE_PROJECT_DIR:-$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -9,15 +10,31 @@ INPUT="$(cat || true)"
 FILE="$(printf '%s' "$INPUT" | python3 -c '
 import json, sys
 try:
-    ti = json.load(sys.stdin).get("tool_input") or {}
+    p = json.load(sys.stdin)
 except Exception:
-    ti = {}
-print(ti.get("file_path") or ti.get("path") or "")
+    p = {}
+if not isinstance(p, dict):
+    p = {}
+
+def first_str(d, keys):
+    for k in keys:
+        v = d.get(k)
+        if isinstance(v, str) and v:
+            return v
+    return ""
+
+ti = p
+for k in ("tool_input", "toolInput", "input", "args", "arguments"):
+    if isinstance(p.get(k), dict):
+        ti = p[k]
+        break
+print(first_str(ti, ("file_path", "filePath", "path", "TargetFile", "target_file", "AbsolutePath")))
 ')"
 REL="${FILE#"$ROOT"/}"
+REL="${REL#./}"
 
 case "$REL" in
-  AGENTS.md | .claude/* | opencode.json | bin/agent-guard.sh | bin/check-agent-docs.sh | docs/context/*)
+  AGENTS.md | .claude/* | .agents/rules/* | .agents/hooks.json | .agents/mcp_config.json | .mcp.json | .opencode/* | opencode.json | .pi/*.md | .pi/settings.json | .pi/mcp.json | bin/agent-* | bin/check-agent-docs.sh)
     "$ROOT/bin/check-agent-docs.sh"
     ;;
 esac

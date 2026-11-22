@@ -6,10 +6,10 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY yue2/gateway/requirements.txt ./
+COPY packages/yue2/gateway/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY yue2/gateway/app.py ./
+COPY packages/yue2/gateway/app.py ./
 
 ENV YUE2_DATA_DIR=/data
 EXPOSE 8000

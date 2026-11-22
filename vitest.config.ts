@@ -1,20 +1,21 @@
 import { defineConfig } from "vitest/config";
 
-// The legacy paths below hold old tsx test scripts. The rebuild stages remove them from this list.
+// packages/llm, packages/memory, packages/workflow-engine, and packages/yue2 are pending review.
+// The legacy folder holds old tsx test scripts. The rebuild stages remove it from this list.
 export default defineConfig({
   test: {
     exclude: [
       "**/node_modules/**",
       "**/dist/**",
+      "legacy/**",
       "apps/**",
-      "packages/**",
-      "yue2/**",
       "workflows/**",
-      "tests/**",
-      "docker/**",
+      "packages/llm/**",
+      "packages/memory/**",
+      "packages/workflow-engine/**",
+      "packages/yue2/**",
       ".pi/**",
       ".agents/skills/**",
-      ".impeccable/**",
       "models/**",
     ],
   },

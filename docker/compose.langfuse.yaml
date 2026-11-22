@@ -1,22 +1,21 @@
 # Minimal Langfuse Stack (v3 / v4 architecture) for Sosho
 #
 # Services:
-#   1. langfuse-web (UI & Ingestion API receiver on port 3000)
+#   1. langfuse-web (UI & Ingestion API receiver on port 3000, host port 3001)
 #   2. langfuse-worker (Background processor for async trace ingestion)
 #   3. postgres (Application state, users, orgs, projects)
 #   4. clickhouse (High-speed OLAP trace & observation storage)
 #   5. redis (Message queue between web and worker)
 #   6. minio (Local S3 object store for large payloads / media)
 #
+# This file is included by the root compose.yaml. Run Docker commands from the root.
+# All services join the shared sosho-net network.
+#
 # Zero-configuration auto-initialization:
 #   Login: admin@local.dev / password123
 #   Project: Pi-Agent (id: pi-agent)
 #   Keys: pk-lf-local-pi / sk-lf-local-pi
 #
-# Usage:
-#   docker compose -f compose.langfuse.yaml up -d
-#   docker compose -f compose.langfuse.yaml logs -f
-#   docker compose -f compose.langfuse.yaml down
 
 name: sosho-langfuse
 
@@ -32,6 +31,7 @@ services:
       clickhouse: { condition: service_healthy }
     ports:
       - "127.0.0.1:3001:3000"
+    networks: [sosho-net]
     environment: &langfuse-env
       NODE_OPTIONS: --max-old-space-size=1024
       DATABASE_URL: postgresql://${LANGFUSE_PG_USER:-postgres}:${LANGFUSE_PG_PASSWORD:-postgres}@postgres:5432/${LANGFUSE_PG_DB:-postgres}
@@ -84,6 +84,7 @@ services:
       minio: { condition: service_healthy }
       redis: { condition: service_healthy }
       clickhouse: { condition: service_healthy }
+    networks: [sosho-net]
     environment:
       <<: *langfuse-env
 
@@ -91,6 +92,7 @@ services:
     image: clickhouse/clickhouse-server:25.12
     restart: unless-stopped
     mem_limit: 1g
+    networks: [sosho-net]
     environment:
       CLICKHOUSE_DB: default
       CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-clickhouse}
@@ -112,6 +114,7 @@ services:
     entrypoint: sh
     # Automatically ensures the 'langfuse' bucket exists before starting
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    networks: [sosho-net]
     environment:
       MINIO_ROOT_USER: ${LANGFUSE_MINIO_USER:-minio}
       MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
@@ -130,6 +133,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     mem_limit: 256m
+    networks: [sosho-net]
     command: --requirepass ${LANGFUSE_REDIS_AUTH:-localredis} --maxmemory 200mb --maxmemory-policy noeviction
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a \"${LANGFUSE_REDIS_AUTH:-localredis}\" ping"]
@@ -141,6 +145,7 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     mem_limit: 512m
+    networks: [sosho-net]
     environment:
       POSTGRES_USER: ${LANGFUSE_PG_USER:-postgres}
       POSTGRES_PASSWORD: ${LANGFUSE_PG_PASSWORD:-postgres}
@@ -152,6 +157,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+networks:
+  sosho-net:
+    name: sosho-net
 
 volumes:
   langfuse_postgres:

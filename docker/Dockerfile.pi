@@ -1,10 +1,32 @@
-FROM node:24-bookworm-slim
+FROM node:26.13.1-bookworm-slim
+
+# Browser install path. The non-root user reads it at run time.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates git ripgrep curl python3 python3-pip python3-venv \
+  && apt-get install -y --no-install-recommends \
+    bash=5.2.15-2+b13 \
+    ca-certificates=20250419~deb12u2 \
+    git=1:2.39.5-0+deb12u3 \
+    ripgrep=13.0.0-4+b2 \
+    curl=7.88.1-10+deb12u15 \
+    python3=3.11.2-1+b1 \
+    python3-pip=23.0.1+dfsg-1 \
+    python3-venv=3.11.2-1+b1 \
   && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g @earendil-works/pi-coding-agent @dokobot/cli@latest @langfuse/otel @langfuse/tracing @opentelemetry/api @opentelemetry/sdk-trace-node
+# Playwright version that @playwright/mcp@0.0.86 depends on. Keep both in step.
+RUN npm install -g \
+    @earendil-works/pi-coding-agent@1.6.0 \
+    @dokobot/cli@2.11.0 \
+    @langfuse/otel@6.1.1 \
+    @langfuse/tracing@6.1.1 \
+    @opentelemetry/api@1.10.0 \
+    @opentelemetry/sdk-trace-node@2.12.0 \
+    @playwright/mcp@0.0.86 \
+  && npx -y playwright@1.66.0-alpha-2026-11-18 install --with-deps chromium \
+  && chmod -R a+rX "$PLAYWRIGHT_BROWSERS_PATH" \
+  && rm -rf /var/lib/apt/lists/* /root/.npm
 
 ENV NODE_PATH=/usr/local/lib/node_modules
 

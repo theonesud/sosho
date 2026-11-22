@@ -25,15 +25,39 @@
     }
   },
   "permission": {
+    "read": {
+      "*": "allow",
+      ".env": "deny",
+      ".env.*": "deny",
+      ".env.example": "allow",
+      "*.pem": "deny",
+      "*.key": "deny"
+    },
     "edit": {
       "*": "allow",
       ".env": "deny",
+      ".env.*": "deny",
+      ".env.example": "allow",
+      "*.pem": "deny",
+      "*.key": "deny",
       ".pi/models.json": "deny",
       ".pi/model-roles.json": "deny"
     },
     "bash": {
       "*": "allow",
       "git push*": "ask"
+    }
+  },
+  "mcp": {
+    "memory": {
+      "type": "local",
+      "command": ["npx", "tsx", "packages/memory/src/mcp.ts"],
+      "environment": {}
+    },
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp@0.0.86", "--headless"],
+      "environment": {}
     }
   }
 }

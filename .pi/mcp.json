@@ -2,19 +2,13 @@
   "mcpServers": {
     "memory": {
       "command": "npx",
-      "args": ["tsx", "/opt/sosho/packages/memory/src/mcp.ts"]
-    },
-    "langgraph": {
-      "url": "http://langgraph:8123/mcp",
-      "transport": "streamable-http"
-    },
-    "langflow": {
-      "url": "http://langflow:7860/api/v1/mcp/sse",
-      "transport": "sse"
+      "args": ["tsx", "packages/memory/src/mcp.ts"],
+      "env": {}
     },
     "playwright": {
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest", "--headless"]
+      "args": ["-y", "@playwright/mcp@0.0.86", "--headless"],
+      "env": {}
     }
   }
 }

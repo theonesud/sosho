@@ -1,3 +1,6 @@
-# Stage 5 of the rebuild sets the workspace members.
-# Until then the list stays empty and the root package is the only project.
-packages: []
+packages:
+  - "apps/*"
+  - "packages/*"
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true

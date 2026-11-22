@@ -21,13 +21,9 @@
     "decision": {
       "provider": "llama-decision",
       "model": "Qwen3-1.7B",
-      "healthUrl": "http://127.0.0.1:8081/health",
-      "fallback": {
-        "provider": "deepinfra",
-        "model": "Qwen/Qwen3-Coder-30B-A3B-Instruct"
-      },
+      "healthUrl": "http://127.0.0.1:8080/health",
       "concurrency": 4,
-      "description": "Ultra-fast local CPU router/classifier (0 GPU VRAM, 0 API cost) with cloud fallback"
+      "description": "Ultra-fast local CPU router and classifier. 0 GPU VRAM, 0 API cost. No cloud fallback."
     },
     "local-uncensored": {
       "provider": "llama.cpp",
@@ -35,6 +31,19 @@
       "healthUrl": "http://127.0.0.1:8080/health",
       "concurrency": 1,
       "description": "Local GPU uncensored MoE model for private/security/offline tasks (serialized -np 1)"
+    },
+    "embed": {
+      "provider": "llama-embed",
+      "model": "embeddinggemma",
+      "healthUrl": "http://127.0.0.1:8080/health",
+      "concurrency": 4,
+      "description": "Local CPU embedding model for memory vectors (0 GPU VRAM, 0 API cost)"
+    },
+    "cloud-uncensored": {
+      "provider": "refuseless",
+      "model": "deepseek-v4.1-flash-abliterated",
+      "concurrency": 2,
+      "description": "Cloud abliterated model for tasks that the main model refuses. Prompts leave the machine."
     }
   }
 }

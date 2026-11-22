@@ -13,7 +13,13 @@ import {
   TierSemaphoreRegistry,
 } from "../../../../packages/llm/src/subagent-runtime.ts";
 
-export type ModelRole = "main" | "subagent" | "subagent-code" | "decision" | "local-uncensored";
+export type ModelRole =
+  | "main"
+  | "subagent"
+  | "subagent-code"
+  | "decision"
+  | "local-uncensored"
+  | "cloud-uncensored";
 
 interface RoleConfig {
   provider: string;
@@ -57,6 +63,10 @@ const MAX_DEPTH = MAX_SUBAGENT_DEPTH;
 const MAX_SUMMARY_CHARS = 3500;
 const tierSemaphores = new TierSemaphoreRegistry();
 
+// Local llama.cpp server. The launcher sets LLAMA_BASE_URL per mode.
+const LLAMA_BASE_URL = (process.env.LLAMA_BASE_URL?.trim() || "http://127.0.0.1:8080").replace(/\/+$/, "");
+const LLAMA_HEALTH_URL = `${LLAMA_BASE_URL}/health`;
+
 const DEFAULT_ROLES: Record<string, RoleConfig> = {
   main: { provider: "deepinfra", model: "deepseek-ai/DeepSeek-V4.1-Flash-1017", concurrency: 2 },
   subagent: { provider: "deepinfra", model: "Qwen/Qwen3-32B", concurrency: 3 },
@@ -64,15 +74,19 @@ const DEFAULT_ROLES: Record<string, RoleConfig> = {
   decision: {
     provider: "llama-decision",
     model: "Qwen3-1.7B",
-    healthUrl: "http://127.0.0.1:8081/health",
-    fallback: { provider: "deepinfra", model: "Qwen/Qwen3-Coder-30B-A3B-Instruct" },
+    healthUrl: LLAMA_HEALTH_URL,
     concurrency: 4,
   },
   "local-uncensored": {
     provider: "llama.cpp",
     model: "Qwen3.6-35B-A3B",
-    healthUrl: "http://127.0.0.1:8080/health",
+    healthUrl: LLAMA_HEALTH_URL,
     concurrency: 1,
+  },
+  "cloud-uncensored": {
+    provider: "refuseless",
+    model: "deepseek-v4.1-flash-abliterated",
+    concurrency: 2,
   },
 };
 
@@ -109,27 +123,22 @@ async function isHealthy(url: string): Promise<boolean> {
   }
 }
 
-async function resolveModel(
-  tier: string,
-  cwd: string,
-): Promise<{ provider: string; model: string; concurrency: number }> {
+type ModelResolution =
+  | { kind: "ready"; provider: string; model: string; concurrency: number }
+  | { kind: "unhealthy"; healthUrl: string };
+
+async function resolveModel(tier: string, cwd: string): Promise<ModelResolution> {
   const roles = loadRoles(cwd);
   const cfg = roles[tier] || roles.subagent || DEFAULT_ROLES.subagent;
-  if (cfg.healthUrl) {
-    const healthy = await isHealthy(cfg.healthUrl);
-    if (!healthy && cfg.fallback) {
-      return {
-        provider: cfg.fallback.provider,
-        model: cfg.fallback.model,
-        concurrency: cfg.concurrency ?? 3,
-      };
+  const concurrency = cfg.concurrency ?? 3;
+  if (cfg.healthUrl && !(await isHealthy(cfg.healthUrl))) {
+    if (cfg.fallback) {
+      return { kind: "ready", provider: cfg.fallback.provider, model: cfg.fallback.model, concurrency };
     }
+    // No fallback is configured. Fail here, so no prompt goes to another provider.
+    return { kind: "unhealthy", healthUrl: cfg.healthUrl };
   }
-  return {
-    provider: cfg.provider,
-    model: cfg.model,
-    concurrency: cfg.concurrency ?? 3,
-  };
+  return { kind: "ready", provider: cfg.provider, model: cfg.model, concurrency };
 }
 
 function truncateSummary(text: string): string {
@@ -161,7 +170,22 @@ async function executeSingleSubagent(
 
   const cwd = ctx.cwd || process.cwd();
   const tier = params.tier || "subagent";
-  const { provider, model, concurrency } = await resolveModel(tier, cwd);
+  const resolution = await resolveModel(tier, cwd);
+  if (resolution.kind === "unhealthy") {
+    return {
+      id: "model-unavailable",
+      role: params.role,
+      tier,
+      provider: "none",
+      model: "none",
+      ok: false,
+      exitCode: 1,
+      durationMs: 0,
+      outputPath: "",
+      summary: `Blocked: the local ${tier} model is not running. Health check failed: ${resolution.healthUrl}. No fallback is used.`,
+    };
+  }
+  const { provider, model, concurrency } = resolution;
   const semaphore = tierSemaphores.get(tier, concurrency);
 
   return semaphore.run(async () => {
@@ -302,7 +326,7 @@ export default function subagentsExtension(pi: ExtensionAPI): void {
     name: "subagent_run",
     label: "Run Subagent",
     description:
-      "Delegate an isolated subtask to a specialized subagent using a cost/speed-appropriate model tier ('subagent' for general research/synthesis, 'subagent-code' for coding/repo exploration, 'decision' for fast classification/routing, 'local-uncensored' for private/security tasks, 'main' for deep reasoning).",
+      "Delegate an isolated subtask to a specialized subagent using a cost/speed-appropriate model tier ('subagent' for general research/synthesis, 'subagent-code' for coding/repo exploration, 'decision' for fast classification/routing, 'local-uncensored' for private/security tasks, 'cloud-uncensored' for tasks the main model refuses (prompts leave the machine), 'main' for deep reasoning).",
     promptSnippet: "subagent_run: Delegate a focused subtask to a model-tiered subagent",
     parameters: {
       type: "object",
@@ -311,7 +335,7 @@ export default function subagentsExtension(pi: ExtensionAPI): void {
         task: { type: "string", description: "Clear, self-contained task description and expected output" },
         tier: {
           type: "string",
-          enum: ["subagent", "subagent-code", "decision", "local-uncensored", "main"],
+          enum: ["subagent", "subagent-code", "decision", "local-uncensored", "cloud-uncensored", "main"],
           description: "Model tier to use (defaults to 'subagent')",
         },
         skills: {
@@ -369,7 +393,7 @@ export default function subagentsExtension(pi: ExtensionAPI): void {
               task: { type: "string" },
               tier: {
                 type: "string",
-                enum: ["subagent", "subagent-code", "decision", "local-uncensored", "main"],
+                enum: ["subagent", "subagent-code", "decision", "local-uncensored", "cloud-uncensored", "main"],
               },
               skills: { type: "array", items: { type: "string" } },
               timeout_seconds: { type: "number" },

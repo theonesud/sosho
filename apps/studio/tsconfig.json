@@ -1,6 +1,9 @@
 {
-  "extends": "../../tsconfig.legacy.json",
   "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "strict": true,
+    "skipLibCheck": true,
     "lib": [
       "ES2022",
       "DOM",

@@ -96,7 +96,7 @@ export function loadConfig(): LangfuseConfig | undefined {
     process.env.LANGFUSE_BASE_URL?.trim() ||
     process.env.LANGFUSE_HOST?.trim() ||
     asTrimmedString(file.baseUrl) ||
-    "https://cloud.langfuse.com";
+    "http://127.0.0.1:3001";
   return {
     publicKey,
     secretKey,
