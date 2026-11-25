@@ -11,7 +11,7 @@ import {
   MAX_STREAM_BUFFER_BYTES,
   MAX_SUBAGENT_DEPTH,
   TierSemaphoreRegistry,
-} from "../../../../packages/llm/src/subagent-runtime.ts";
+} from "./runtime.ts";
 
 export type ModelRole =
   | "main"
@@ -22,12 +22,7 @@ export type ModelRole =
   | "cloud-uncensored";
 
 interface RoleConfig {
-  provider: string;
-  model: string;
-  healthUrl?: string;
-  fallback?: { provider: string; model: string };
   concurrency?: number;
-  description?: string;
 }
 
 interface ModelRolesFile {
@@ -63,82 +58,35 @@ const MAX_DEPTH = MAX_SUBAGENT_DEPTH;
 const MAX_SUMMARY_CHARS = 3500;
 const tierSemaphores = new TierSemaphoreRegistry();
 
-// Local llama.cpp server. The launcher sets LLAMA_BASE_URL per mode.
-const LLAMA_BASE_URL = (process.env.LLAMA_BASE_URL?.trim() || "http://127.0.0.1:8080").replace(/\/+$/, "");
-const LLAMA_HEALTH_URL = `${LLAMA_BASE_URL}/health`;
-
-const DEFAULT_ROLES: Record<string, RoleConfig> = {
-  main: { provider: "deepinfra", model: "deepseek-ai/DeepSeek-V4.1-Flash-1017", concurrency: 2 },
-  subagent: { provider: "deepinfra", model: "Qwen/Qwen3-32B", concurrency: 3 },
-  "subagent-code": { provider: "deepinfra", model: "Qwen/Qwen3-Coder-30B-A3B-Instruct", concurrency: 3 },
-  decision: {
-    provider: "llama-decision",
-    model: "Qwen3-1.7B",
-    healthUrl: LLAMA_HEALTH_URL,
-    concurrency: 4,
-  },
-  "local-uncensored": {
-    provider: "llama.cpp",
-    model: "Qwen3.6-35B-A3B",
-    healthUrl: LLAMA_HEALTH_URL,
-    concurrency: 1,
-  },
-  "cloud-uncensored": {
-    provider: "refuseless",
-    model: "deepseek-v4.1-flash-abliterated",
-    concurrency: 2,
-  },
+// Every role is a LiteLLM alias. LiteLLM holds the real model and the fallback rules.
+const PROVIDER = "litellm";
+const DEFAULT_CONCURRENCY: Record<string, number> = {
+  main: 2,
+  subagent: 3,
+  "subagent-code": 3,
+  decision: 4,
+  "local-uncensored": 1,
+  "cloud-uncensored": 2,
 };
 
-function loadRoles(cwd: string): Record<string, RoleConfig> {
-  const candidates = [
-    join(cwd, ".pi", "model-roles.json"),
-    join(getAgentDir(), "model-roles.json"),
-  ];
+function loadConcurrency(cwd: string, tier: string): number {
+  const candidates = [join(cwd, ".pi", "model-roles.json"), join(getAgentDir(), "model-roles.json")];
   for (const p of candidates) {
-    if (existsSync(p)) {
-      try {
-        const parsed = JSON.parse(readFileSync(p, "utf8")) as ModelRolesFile;
-        if (parsed?.roles && typeof parsed.roles === "object") {
-          return { ...DEFAULT_ROLES, ...parsed.roles };
-        }
-      } catch {
-        // Fall through to defaults
-      }
+    if (!existsSync(p)) continue;
+    try {
+      const parsed = JSON.parse(readFileSync(p, "utf8")) as ModelRolesFile;
+      const value = parsed?.roles?.[tier]?.concurrency;
+      if (typeof value === "number" && value > 0) return value;
+    } catch {
+      // Fall through to defaults
     }
   }
-  return DEFAULT_ROLES;
+  return DEFAULT_CONCURRENCY[tier] ?? 3;
 }
 
-async function isHealthy(url: string): Promise<boolean> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 600);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    return res.ok;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-type ModelResolution =
-  | { kind: "ready"; provider: string; model: string; concurrency: number }
-  | { kind: "unhealthy"; healthUrl: string };
-
-async function resolveModel(tier: string, cwd: string): Promise<ModelResolution> {
-  const roles = loadRoles(cwd);
-  const cfg = roles[tier] || roles.subagent || DEFAULT_ROLES.subagent;
-  const concurrency = cfg.concurrency ?? 3;
-  if (cfg.healthUrl && !(await isHealthy(cfg.healthUrl))) {
-    if (cfg.fallback) {
-      return { kind: "ready", provider: cfg.fallback.provider, model: cfg.fallback.model, concurrency };
-    }
-    // No fallback is configured. Fail here, so no prompt goes to another provider.
-    return { kind: "unhealthy", healthUrl: cfg.healthUrl };
-  }
-  return { kind: "ready", provider: cfg.provider, model: cfg.model, concurrency };
+function resolveModel(tier: string, cwd: string): { alias: string; concurrency: number } {
+  const alias = tier in DEFAULT_CONCURRENCY ? tier : "subagent";
+  return { alias, concurrency: loadConcurrency(cwd, alias) };
 }
 
 function truncateSummary(text: string): string {
@@ -170,22 +118,8 @@ async function executeSingleSubagent(
 
   const cwd = ctx.cwd || process.cwd();
   const tier = params.tier || "subagent";
-  const resolution = await resolveModel(tier, cwd);
-  if (resolution.kind === "unhealthy") {
-    return {
-      id: "model-unavailable",
-      role: params.role,
-      tier,
-      provider: "none",
-      model: "none",
-      ok: false,
-      exitCode: 1,
-      durationMs: 0,
-      outputPath: "",
-      summary: `Blocked: the local ${tier} model is not running. Health check failed: ${resolution.healthUrl}. No fallback is used.`,
-    };
-  }
-  const { provider, model, concurrency } = resolution;
+  const { alias: model, concurrency } = resolveModel(tier, cwd);
+  const provider = PROVIDER;
   const semaphore = tierSemaphores.get(tier, concurrency);
 
   return semaphore.run(async () => {

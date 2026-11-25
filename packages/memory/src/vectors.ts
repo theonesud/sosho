@@ -1,4 +1,4 @@
-export const DEFAULT_EMBED_URL = process.env.SOSHO_EMBED_URL || "http://127.0.0.1:8080/v1/embeddings";
+export const DEFAULT_EMBED_URL = process.env.SOSHO_EMBED_URL || "http://127.0.0.1:4000/v1/embeddings";
 
 export function encodeFloat32(vec: Float32Array): Buffer {
   return Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength);
@@ -30,8 +30,11 @@ export async function fetchEmbeddings(
   try {
     const res = await fetch(embedUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "embeddinggemma", input: texts }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.LITELLM_MASTER_KEY ?? ""}`,
+      },
+      body: JSON.stringify({ model: "embed", input: texts }),
       signal: AbortSignal.timeout(4000),
     });
     if (!res.ok) return null;

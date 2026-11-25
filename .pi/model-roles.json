@@ -1,47 +1,44 @@
 {
   "roles": {
     "main": {
-      "provider": "deepinfra",
-      "model": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+      "provider": "litellm",
+      "model": "main",
       "concurrency": 2,
       "description": "Primary orchestrator, complex reasoning, 1M context, multimodal"
     },
     "subagent": {
-      "provider": "deepinfra",
-      "model": "Qwen/Qwen3-32B",
+      "provider": "litellm",
+      "model": "subagent",
       "concurrency": 3,
       "description": "Bang-for-the-buck cloud worker for parallel research, synthesis, and memory extraction"
     },
     "subagent-code": {
-      "provider": "deepinfra",
-      "model": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+      "provider": "litellm",
+      "model": "subagent-code",
       "concurrency": 3,
       "description": "Fast MoE coding subagent for repo exploration, refactoring, and test writing"
     },
     "decision": {
-      "provider": "llama-decision",
-      "model": "Qwen3-1.7B",
-      "healthUrl": "http://127.0.0.1:8080/health",
+      "provider": "litellm",
+      "model": "decision",
       "concurrency": 4,
       "description": "Ultra-fast local CPU router and classifier. 0 GPU VRAM, 0 API cost. No cloud fallback."
     },
     "local-uncensored": {
-      "provider": "llama.cpp",
-      "model": "Qwen3.6-35B-A3B",
-      "healthUrl": "http://127.0.0.1:8080/health",
+      "provider": "litellm",
+      "model": "local-uncensored",
       "concurrency": 1,
       "description": "Local GPU uncensored MoE model for private/security/offline tasks (serialized -np 1)"
     },
     "embed": {
-      "provider": "llama-embed",
-      "model": "embeddinggemma",
-      "healthUrl": "http://127.0.0.1:8080/health",
+      "provider": "litellm",
+      "model": "embed",
       "concurrency": 4,
       "description": "Local CPU embedding model for memory vectors (0 GPU VRAM, 0 API cost)"
     },
     "cloud-uncensored": {
-      "provider": "refuseless",
-      "model": "deepseek-v4.1-flash-abliterated",
+      "provider": "litellm",
+      "model": "cloud-uncensored",
       "concurrency": 2,
       "description": "Cloud abliterated model for tasks that the main model refuses. Prompts leave the machine."
     }

@@ -8,7 +8,7 @@ Read root [AGENTS.md](../../AGENTS.md) and [docs/context/DECISIONS.md](../../doc
 - **Atomic Persistence:** Write every Markdown record and profile through a temporary file, `fsync`, and atomic rename. Never write partial files in place.
 - **Race-Free Inbox Drain:** Rename `inbox/events.jsonl` to a unique batch file before drain, deduplicate events by SHA-256 hash, and refresh `core/profile.md`.
 - **Secret Redaction:** Redact API keys, tokens, JSON Web Tokens, private keys, bearer headers, and credential URLs in both `global` and `project` scopes. Never bypass redaction for project scope.
-- **Rebuildable Index:** Treat `<memory-root>/index.sqlite` as disposable. Combine FTS5 BM25, local CPU `embeddinggemma` dense vectors (`127.0.0.1:8082`) with automatic FTS5 fallback, single-hop entity graph recall, time decay, and access rank tracking.
+- **Rebuildable Index:** Treat `<memory-root>/index.sqlite` as disposable. Combine FTS5 BM25, dense vectors from the LiteLLM `embed` alias with automatic FTS5 fallback, single-hop entity graph recall, time decay, and access rank tracking.
 
 ## Mandatory Verification
 

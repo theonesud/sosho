@@ -6,7 +6,6 @@ export default defineConfig({
       "**/node_modules/**",
       "**/dist/**",
       "legacy/**",
-      "packages/llm/**",
       "packages/memory/**",
       "packages/yue2/**",
       ".pi/**",

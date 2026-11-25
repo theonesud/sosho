@@ -15,7 +15,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g \
-    @earendil-works/pi-coding-agent@latest \
+    @earendil-works/pi-coding-agent@1.6.0 \
     @dokobot/cli@2.11.0 \
     @langfuse/otel@6.1.1 \
     @langfuse/tracing@6.1.1 \

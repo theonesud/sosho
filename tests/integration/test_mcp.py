@@ -10,7 +10,7 @@ from typing import IO
 import pytest
 from pydantic import BaseModel
 
-from tests.conftest import ROOT
+from tests.conftest import LITELLM_URL, ROOT, require_service
 
 pytestmark = pytest.mark.integration
 
@@ -122,8 +122,13 @@ def _text_of(result: ToolResult) -> str:
     return " ".join(str(part.get("text", "")) for part in result.content)
 
 
-def test_memory_server_adds_then_finds_a_global_record(tmp_path: Path) -> None:
-    env = {**os.environ, "SOSHO_GLOBAL_MEMORY_DIR": str(tmp_path)}
+def test_memory_server_adds_then_finds_a_global_record(tmp_path: Path, litellm_key: str) -> None:
+    require_service("litellm", LITELLM_URL)
+    env = {
+        **os.environ,
+        "SOSHO_GLOBAL_MEMORY_DIR": str(tmp_path),
+        "LITELLM_MASTER_KEY": litellm_key,
+    }
     client = McpClient(_spec("memory"), env)
     try:
         client.initialize()

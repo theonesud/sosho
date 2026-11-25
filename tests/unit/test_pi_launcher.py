@@ -87,12 +87,18 @@ def _docker_run_args(box: Sandbox) -> list[str]:
     return runs[0]
 
 
-def test_help_lists_both_modes_and_starts_nothing(sandbox: Sandbox) -> None:
-    result = _run(sandbox, ["--help"])
+def test_launcher_help_lists_both_modes_and_starts_nothing(sandbox: Sandbox) -> None:
+    result = _run(sandbox, ["--launcher-help"])
     assert result.returncode == 0
     assert "container (default)" in result.stdout
     assert "raw" in result.stdout
     assert not sandbox.docker_log.exists()
+
+
+def test_help_option_goes_to_pi(sandbox: Sandbox) -> None:
+    result = _run(sandbox, ["--raw", "--help"])
+    assert result.returncode == 0, result.stderr
+    assert _calls(sandbox.pi_log)[0] == ["--approve", "--help"]
 
 
 def test_unknown_mode_fails(sandbox: Sandbox) -> None:
@@ -118,7 +124,8 @@ def test_container_uses_compose_urls_and_puts_approve_first(sandbox: Sandbox) ->
     _run(sandbox, ["hello"])
     args = _docker_run_args(sandbox)
     assert "LITELLM_BASE_URL=http://litellm:4000/v1" in args
-    assert "LLAMA_BASE_URL=http://llama-cpp:8080" in args
+    assert not any(arg.startswith("LLAMA_BASE_URL") for arg in args)
+    assert "SOSHO_EMBED_URL=http://litellm:4000/v1/embeddings" in args
     assert args[-3:] == ["pi-sandbox:latest", "--approve", "hello"]
 
 

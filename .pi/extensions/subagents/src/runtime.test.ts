@@ -10,7 +10,7 @@ import {
   isSubagentDepthAllowed,
   MAX_STREAM_BUFFER_BYTES,
   TierSemaphoreRegistry,
-} from "../src/subagent-runtime.ts";
+} from "./runtime.ts";
 
 const tmp = mkdtempSync(join(tmpdir(), "sosho-subagent-test-"));
 
@@ -23,7 +23,7 @@ try {
   assert.equal(isSubagentDepthAllowed({ SOSHO_SUBAGENT_DEPTH: "3" }), false);
 
   // 2. CLI args include --no-session
-  const args = buildSubagentCliArgs("deepinfra", "Qwen/Qwen3-32B", "hello");
+  const args = buildSubagentCliArgs("litellm", "subagent", "hello");
   assert.ok(args.includes("--no-session"));
   assert.ok(args.includes("--print"));
 

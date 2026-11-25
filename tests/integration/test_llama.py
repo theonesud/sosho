@@ -1,10 +1,14 @@
 import configparser
+import json
+import os
+import shutil
+import subprocess
+from collections.abc import Mapping
 
-import httpx
 import pytest
 from pydantic import BaseModel
 
-from tests.conftest import LLAMA_URL, ROOT, require_service
+from tests.conftest import ROOT
 
 pytestmark = pytest.mark.integration
 
@@ -43,6 +47,33 @@ class EmbeddingResponse(BaseModel):
     data: list[EmbeddingItem]
 
 
+class LlamaReply(BaseModel):
+    status: int
+    text: str
+
+
+def _llama(
+    path: str, body: Mapping[str, object] | None = None, timeout: float = HEALTH_TIMEOUT
+) -> LlamaReply:
+    docker = shutil.which("docker")
+    if docker is None:
+        pytest.skip("docker not found on PATH")
+    seconds = str(int(timeout))
+    command = [docker, "exec", "llama-cpp", "curl", "-s", "-m", seconds]
+    command += ["-w", "\n%{http_code}"]
+    if body is not None:
+        command += ["-H", "Content-Type: application/json", "-d", json.dumps(body)]
+    command.append(f"http://127.0.0.1:8080{path}")
+    result = subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603
+    text, _, code = result.stdout.rpartition("\n")
+    if not code.isdigit() or int(code) == 0:
+        msg = f"llama-cpp not reachable through docker exec: {result.stderr.strip()}"
+        if os.environ.get("LIVE_STRICT") == "1":
+            pytest.fail(msg)
+        pytest.skip(msg)
+    return LlamaReply(status=int(code), text=text)
+
+
 def _load_presets() -> configparser.ConfigParser:
     text = (ROOT / "docker" / "llama-models.ini").read_text(encoding="utf-8")
     parser = configparser.ConfigParser()
@@ -60,10 +91,9 @@ def _chat_body(model: str) -> dict[str, object]:
 
 
 def _post_chat(model: str) -> ChatResponse:
-    with httpx.Client(timeout=MODEL_TIMEOUT) as client:
-        resp = client.post(f"{LLAMA_URL}/v1/chat/completions", json=_chat_body(model))
-    assert resp.status_code == 200, resp.text
-    return ChatResponse.model_validate(resp.json())
+    resp = _llama("/v1/chat/completions", _chat_body(model), MODEL_TIMEOUT)
+    assert resp.status == 200, resp.text
+    return ChatResponse.model_validate_json(resp.text)
 
 
 def _assert_answered(model: str) -> None:
@@ -75,41 +105,33 @@ def _assert_answered(model: str) -> None:
 
 
 def test_health_returns_200() -> None:
-    require_service("llama-cpp", LLAMA_URL)
-    with httpx.Client(timeout=HEALTH_TIMEOUT) as client:
-        resp = client.get(f"{LLAMA_URL}/health")
-    assert resp.status_code == 200, resp.text
+    resp = _llama("/health")
+    assert resp.status == 200, resp.text
 
 
 def test_models_lists_every_preset_section() -> None:
-    require_service("llama-cpp", LLAMA_URL)
     expected = set(_load_presets().sections())
-    with httpx.Client(timeout=HEALTH_TIMEOUT) as client:
-        resp = client.get(f"{LLAMA_URL}/v1/models")
-    assert resp.status_code == 200, resp.text
-    listed = {entry.id for entry in ModelList.model_validate(resp.json()).data}
+    resp = _llama("/v1/models")
+    assert resp.status == 200, resp.text
+    listed = {entry.id for entry in ModelList.model_validate_json(resp.text).data}
     assert expected <= listed, f"missing from /v1/models: {sorted(expected - listed)}"
 
 
 def test_chat_qwen3_1_7b_answers() -> None:
-    require_service("llama-cpp", LLAMA_URL)
     _assert_answered(CHAT_MODEL)
 
 
 def test_embedding_model_returns_vector() -> None:
-    require_service("llama-cpp", LLAMA_URL)
     parser = _load_presets()
     embed_ids = [s for s in parser.sections() if parser.getboolean(s, "embedding", fallback=False)]
     assert embed_ids, "no preset in docker/llama-models.ini sets embedding = true"
     body = {"model": embed_ids[0], "input": "Sosho integration test."}
-    with httpx.Client(timeout=MODEL_TIMEOUT) as client:
-        resp = client.post(f"{LLAMA_URL}/v1/embeddings", json=body)
-    assert resp.status_code == 200, resp.text
-    vector = EmbeddingResponse.model_validate(resp.json()).data[0].embedding
+    resp = _llama("/v1/embeddings", body, MODEL_TIMEOUT)
+    assert resp.status == 200, resp.text
+    vector = EmbeddingResponse.model_validate_json(resp.text).data[0].embedding
     assert vector, "embedding vector is empty"
 
 
 @pytest.mark.heavy
 def test_chat_35b_model_answers() -> None:
-    require_service("llama-cpp", LLAMA_URL)
     _assert_answered(HEAVY_CHAT_MODEL)

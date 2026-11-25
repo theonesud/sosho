@@ -12,7 +12,6 @@
       "!**/.venv",
       "!**/pnpm-lock.yaml",
       "!legacy",
-      "!packages/llm",
       "!packages/memory",
       "!packages/yue2",
       "!.pi",

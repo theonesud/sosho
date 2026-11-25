@@ -1,7 +1,6 @@
 # lefthook 2 reads `exclude` as a list of globs. A regex string has no effect.
 x-legacy: &legacy
   - "legacy/**"
-  - "packages/llm/**"
   - "packages/memory/**"
   - "packages/yue2/**"
   - "docker/Dockerfile.yue2-gateway"
@@ -12,7 +11,6 @@ x-legacy: &legacy
 
 x-legacy-docs: &legacy-docs
   - "legacy/**"
-  - "packages/llm/**"
   - "packages/memory/**"
   - "packages/yue2/**"
   - ".pi/**"

@@ -13,10 +13,10 @@ path, ctx = sys.argv[1], int(sys.argv[2])
 with open(path, "r") as f:
     data = json.load(f)
 changed = False
-llama = data.get("providers", {}).get("llama.cpp")
+llama = data.get("providers", {}).get("litellm")
 if llama:
     for m in llama.get("models", []):
-        if m.get("contextWindow") != ctx:
+        if m.get("id") == "local-uncensored" and m.get("contextWindow") != ctx:
             m["contextWindow"] = ctx
             m["maxTokens"] = min(m.get("maxTokens", 8192), max(2048, ctx // 4))
             changed = True
@@ -72,30 +72,24 @@ PY
 }
 
 warm_local_model() {
-  local target_pi="$1" sosho_pi="$2" skip="$3" BASE_URL MODEL_ID HEALTH_URL WARM_PAYLOAD
+  local target_pi="$1" sosho_pi="$2" skip="$3" api_key="${4:-}" BASE_URL MODEL_ID WARM_PAYLOAD
   if [ "$skip" = "1" ] || [ ! -f "$target_pi/models.json" ]; then return 0; fi
   if ! command -v curl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then return 0; fi
-  read -r BASE_URL MODEL_ID < <(
+  BASE_URL="$(
     python3 - "$target_pi/models.json" <<'PY' 2>/dev/null
 import json, sys
 try:
     cfg = json.load(open(sys.argv[1]))
-    llama = cfg.get("providers", {}).get("llama.cpp", {})
-    if llama:
-        print(llama.get("baseUrl", "").rstrip("/"), (llama.get("models") or [{}])[0].get("id", ""))
-    else:
-        p = next(iter(cfg.get("providers", {}).values()), {})
-        print(p.get("baseUrl", "").rstrip("/"), (p.get("models") or [{}])[0].get("id", ""))
+    print(cfg["providers"]["litellm"]["baseUrl"].rstrip("/"))
 except Exception:
     print("")
 PY
-  )
+  )"
+  MODEL_ID="local-uncensored"
   case "$BASE_URL" in
     http://127.0.0.1:* | http://localhost:* | http://0.0.0.0:*)
-      if [ -z "$MODEL_ID" ]; then return 0; fi
-      HEALTH_URL="${BASE_URL%/v1}/health"
-      if ! curl -fsS -m 2 "$HEALTH_URL" >/dev/null 2>&1; then return 0; fi
-      echo "Pre-warming local model $MODEL_ID (press Ctrl+C to skip, or use --no-warmup)..."
+      if ! curl -fsS -m 2 "${BASE_URL%/v1}/health/liveliness" >/dev/null 2>&1; then return 0; fi
+      echo "Pre-warming local model $MODEL_ID through LiteLLM (press Ctrl+C to skip, or use --no-warmup)..."
       WARM_PAYLOAD="$(
         python3 - "$MODEL_ID" "$sosho_pi/SYSTEM.md" "$sosho_pi/APPEND_SYSTEM.md" <<'PY'
 import json, sys, os
@@ -120,6 +114,7 @@ print(json.dumps({
 PY
       )"
       if curl -s -m 180 -o /dev/null -H 'Content-Type: application/json' \
+        -H "Authorization: Bearer ${api_key:-sk-sosho-local}" \
         -X POST "$BASE_URL/chat/completions" --data-binary "$WARM_PAYLOAD"; then
         echo "Model ready."
       else

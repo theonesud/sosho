@@ -21,6 +21,34 @@ const ROOT_OBSERVATION_NAME = "Conversational Turn";
 const SUBAGENT_ROOT_OBSERVATION_NAME = "Subagent Turn";
 const TRACE_NAME = "Pi Turn";
 const GENERATION_PREFIX = "LLM Call";
+const LITELLM_PROVIDER = "litellm";
+
+interface LiteLLMLink {
+  traceId: string;
+  parentObservationId: string;
+  sessionId: string;
+  name: string;
+}
+
+/**
+ * Add the LiteLLM Langfuse callback keys to the request body. LiteLLM then writes
+ * its generation under the pi trace and under the pi span, with the usage and cost.
+ */
+function linkLiteLLMRequest(event: unknown, link: LiteLLMLink): unknown {
+  const payload = (event as { payload?: unknown }).payload;
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return undefined;
+  const body = payload as { metadata?: Record<string, unknown> };
+  return {
+    ...body,
+    metadata: {
+      ...(body.metadata ?? {}),
+      existing_trace_id: link.traceId,
+      parent_observation_id: link.parentObservationId,
+      ...(link.sessionId ? { session_id: link.sessionId } : {}),
+      generation_name: link.name,
+    },
+  };
+}
 const TOOL_PREFIX = "Tool:";
 const COMPACTION_OBSERVATION_NAME = "Compaction";
 const BRANCH_SUMMARY_OBSERVATION_NAME = "Branch Summary";
@@ -411,7 +439,9 @@ function createRuntime(
 // ---------------------------------------------------------------------------
 
 interface OpenGeneration {
-  obs: LangfuseGeneration;
+  obs: LangfuseGeneration | LangfuseSpan;
+  /** True when LiteLLM records the generation under this span. Pi records no usage then. */
+  linked: boolean;
   index: number;
   sawFirstToken: boolean;
   finished: boolean;
@@ -676,19 +706,32 @@ export default function (pi: ExtensionAPI) {
           ? { role: "tool", tool_results: state.pendingToolResults }
           : undefined;
 
+    const viaLiteLLM = ctx.model?.provider === LITELLM_PROVIDER;
+    const callMetadata = {
+      assistant_index: index - 1,
+      ...(ctx.model ? { provider: ctx.model.provider } : {}),
+    };
+    if (viaLiteLLM) {
+      const span = state.root.startObservation(
+        GENERATION_PREFIX,
+        { input: generationInput, metadata: { ...callMetadata, model_alias: ctx.model?.id } },
+        { asType: "span" },
+      );
+      state.openGeneration = { obs: span, linked: true, index, sawFirstToken: false, finished: false };
+      return linkLiteLLMRequest(event, {
+        traceId: state.root.traceId,
+        parentObservationId: span.id,
+        sessionId: String(traceAttributes[LangfuseOtelSpanAttributes.TRACE_SESSION_ID] ?? ""),
+        name: `${GENERATION_PREFIX} ${index}`,
+      });
+    }
     const obs = state.root.startObservation(
       GENERATION_PREFIX,
-      {
-        input: generationInput,
-        model: ctx.model?.id,
-        metadata: {
-          assistant_index: index - 1,
-          ...(ctx.model ? { provider: ctx.model.provider } : {}),
-        },
-      },
+      { input: generationInput, model: ctx.model?.id, metadata: callMetadata },
       { asType: "generation" },
     );
-    state.openGeneration = { obs, index, sawFirstToken: false, finished: false };
+    state.openGeneration = { obs, linked: false, index, sawFirstToken: false, finished: false };
+    return undefined;
   });
 
   pi.on("message_update", (event) => {
@@ -724,15 +767,21 @@ export default function (pi: ExtensionAPI) {
     const isError = message.stopReason === "error" || message.stopReason === "aborted";
     if (message.stopReason === "error") state.sawError = true;
 
-    gen.obs.update({
-      output: {
-        role: "assistant",
-        ...(outText ? { content: outText } : {}),
-        ...(tools.length ? { tool_calls: tools } : {}),
-      },
-      model: message.responseModel || message.model,
-      usageDetails: message.usage ? buildUsageDetails(message.usage) : undefined,
-      costDetails: message.usage ? buildCostDetails(message.usage) : undefined,
+    const output = {
+      role: "assistant",
+      ...(outText ? { content: outText } : {}),
+      ...(tools.length ? { tool_calls: tools } : {}),
+    };
+    const usageFields = gen.linked
+      ? {}
+      : {
+          model: message.responseModel || message.model,
+          usageDetails: message.usage ? buildUsageDetails(message.usage) : undefined,
+          costDetails: message.usage ? buildCostDetails(message.usage) : undefined,
+        };
+    (gen.obs as LangfuseGeneration).update({
+      output,
+      ...usageFields,
       ...(isError
         ? {
             level: "ERROR" as const,

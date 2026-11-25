@@ -26,7 +26,7 @@ Modes:
 Launcher options:
   --raw                Select raw mode. The option is not passed to pi.
   --no-warmup          Skip the local model warm-up.
-  -h, --help           Show this help and exit.
+  --launcher-help      Show this help and exit. Option --help goes to pi.
 
 Environment:
   PI_MODE              container or raw. Default: container.
@@ -39,7 +39,7 @@ EOF
 }
 
 load_env_file() {
-  local file="$1" line key
+  local file="$1" line key attrs
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       '' | '#'*) continue ;;
@@ -47,6 +47,12 @@ load_env_file() {
     key="${line%%=*}"
     [ "$key" != "$line" ] || continue
     [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    attrs="$(declare -p "$key" 2>/dev/null || true)"
+    attrs="${attrs#declare }"
+    attrs="${attrs%% *}"
+    case "$attrs" in
+      -*r*) continue ;;
+    esac
     export "${line?}"
   done <"$file"
 }
@@ -66,9 +72,14 @@ SKIP_WARMUP="${PI_SKIP_WARMUP:-0}"
 MODE="${PI_MODE:-container}"
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -h | --help)
+    --launcher-help)
       print_help
       exit 0
+      ;;
+    -h | --help)
+      SKIP_WARMUP=1
+      FORWARD_ARGS+=("$1")
+      shift
       ;;
     --raw)
       MODE=raw
@@ -162,8 +173,6 @@ fi
 sync_llama_context "$TARGET_PI" "$WORKSPACE_ENV"
 sync_compaction "$TARGET_PI"
 
-warm_local_model "$TARGET_PI" "$SOSHO_PI" "$SKIP_WARMUP"
-
 LANGFUSE_URL="${LANGFUSE_BASE_URL:-http://127.0.0.1:3001}"
 env_value() {
   if [ -f "$WORKSPACE_ENV" ]; then
@@ -172,6 +181,9 @@ env_value() {
 }
 LANGFUSE_PK="${LANGFUSE_PUBLIC_KEY:-$(env_value LANGFUSE_PUBLIC_KEY)}"
 LANGFUSE_SK="${LANGFUSE_SECRET_KEY:-$(env_value LANGFUSE_SECRET_KEY)}"
+LITELLM_KEY="${LITELLM_MASTER_KEY:-$(env_value LITELLM_MASTER_KEY)}"
+
+warm_local_model "$TARGET_PI" "$SOSHO_PI" "$SKIP_WARMUP" "$LITELLM_KEY"
 
 if [ "$MODE" = "raw" ]; then
   if [ -f "$WORKSPACE_ENV" ]; then
@@ -179,9 +191,8 @@ if [ "$MODE" = "raw" ]; then
   fi
   export SOSHO_ROOT
   export HOME
-  export LLAMA_BASE_URL="http://127.0.0.1:8080"
   export LITELLM_BASE_URL="http://127.0.0.1:4000/v1"
-  export SOSHO_EMBED_URL="http://127.0.0.1:8080/v1/embeddings"
+  export SOSHO_EMBED_URL="http://127.0.0.1:4000/v1/embeddings"
   export PI_CODING_AGENT_DIR="$TARGET_PI"
   export XDG_CACHE_HOME="$TARGET_PI/.cache"
   export XDG_CONFIG_HOME="$TARGET_PI/.config"
@@ -252,9 +263,8 @@ exec docker run "${DOCKER_INTERACTIVE_FLAGS[@]}" --rm \
   --add-host host.docker.internal:host-gateway \
   --user "$(id -u):$(id -g)" \
   -e "HOME=$HOME" \
-  -e "LLAMA_BASE_URL=http://llama-cpp:8080" \
   -e "LITELLM_BASE_URL=http://litellm:4000/v1" \
-  -e "SOSHO_EMBED_URL=http://llama-cpp:8080/v1/embeddings" \
+  -e "SOSHO_EMBED_URL=http://litellm:4000/v1/embeddings" \
   -e "PI_CODING_AGENT_DIR=$TARGET_PI" \
   -e "XDG_CACHE_HOME=$TARGET_PI/.cache" \
   -e "XDG_CONFIG_HOME=$TARGET_PI/.config" \
