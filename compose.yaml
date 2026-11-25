@@ -103,6 +103,44 @@ services:
       retries: 20
       start_period: 10s
 
+  engine:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.engine
+    image: sosho-engine:latest
+    pull_policy: build
+    container_name: engine
+    restart: unless-stopped
+    mem_limit: 1g
+    pids_limit: 256
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${SOSHO_ENGINE_PORT:-8123}:8123"
+    networks: [sosho-net]
+    environment:
+      SOSHO_ENGINE_DB_URL: postgresql://${LANGFUSE_PG_USER:-postgres}:${LANGFUSE_PG_PASSWORD:?Run make setup to create it}@postgres:5432/sosho_engine
+      SOSHO_ENGINE_API_TOKEN: ${SOSHO_ENGINE_API_TOKEN:?Run make setup to create it}
+      SOSHO_ENGINE_HOST: 0.0.0.0
+      SOSHO_ENGINE_LITELLM_BASE_URL: http://litellm:4000/v1
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?Run make setup to create it}
+      LANGFUSE_HOST: http://langfuse-web:3000
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?Run make setup to create it}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?Run make setup to create it}
+    healthcheck:
+      test: ["CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8123/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+
   yue2-model-download:
     profiles: [music]
     image: python:3.13.18-slim-trixie
@@ -203,67 +241,10 @@ services:
     volumes:
       - yue2-data:/data
 
-  graph:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.graph
-    image: sosho-graph:latest
-    pull_policy: build
-    container_name: sosho-graph
-    restart: unless-stopped
-    mem_limit: 512m
-    security_opt: [no-new-privileges:true]
-    cap_drop: [ALL]
-    depends_on:
-      litellm:
-        condition: service_healthy
-    ports:
-      - "127.0.0.1:8123:8123"
-    networks: [sosho-net]
-    environment:
-      LITELLM_BASE_URL: http://litellm:4000/v1
-      LITELLM_API_KEY: ${LITELLM_MASTER_KEY:?Run make setup to create it}
-      LANGFUSE_HOST: http://langfuse-web:3000
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?Run make setup to create it}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?Run make setup to create it}
-    volumes:
-      - graph-data:/data
-
-  langflow:
-    image: langflowai/langflow:1.13.3
-    container_name: langflow
-    restart: unless-stopped
-    mem_limit: 2560m
-    security_opt: [no-new-privileges:true]
-    ports:
-      - "127.0.0.1:7860:7860"
-    networks: [sosho-net]
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    environment:
-      LANGFLOW_HOST: 0.0.0.0
-      LANGFLOW_PORT: "7860"
-      LANGFLOW_AUTO_LOGIN: "false"
-      LANGFLOW_SUPERUSER: ${LANGFLOW_SUPERUSER:-admin}
-      LANGFLOW_SUPERUSER_PASSWORD: ${LANGFLOW_SUPERUSER_PASSWORD:?Run make setup to create it}
-      OPENAI_API_BASE: http://litellm:4000/v1
-      OPENAI_API_KEY: ${LITELLM_MASTER_KEY:?Run make setup to create it}
-      SOSHO_STUDIO_API_URL: http://host.docker.internal:4101
-    volumes:
-      - langflow-data:/app/langflow
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:7860/health || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-      start_period: 15s
-
 networks:
   sosho-net:
     name: sosho-net
 
 volumes:
   hf-cache:
-  langflow-data:
-  graph-data:
   yue2-data:

@@ -6,7 +6,7 @@ requires-python = ">=3.13,<3.14"
 dependencies = []
 
 [tool.uv.workspace]
-members = ["packages/graph"]
+members = ["packages/engine"]
 
 [dependency-groups]
 dev = [
@@ -15,12 +15,12 @@ dev = [
   "pytest==9.2.0",
   "pyyaml==6.0.4",
   "ruff==0.17.6",
-  "sosho-graph",
+  "sosho-engine==0.1.0",
   "tree-sitter-language-pack==1.9.1",
 ]
 
 [tool.uv.sources]
-sosho-graph = { workspace = true }
+sosho-engine = { workspace = true }
 
 [tool.uv]
 package = false
@@ -31,10 +31,8 @@ line-length = 100
 target-version = "py313"
 extend-exclude = [
   "legacy",
-  "apps",
   "packages/llm",
   "packages/memory",
-  "packages/workflow-engine",
   "packages/yue2",
   ".pi",
   ".agents/skills",
@@ -79,17 +77,14 @@ ignore = ["PLR2004", "TRY003"]
 [tool.pyright]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
-stubPath = "packages/graph/typings"
 venvPath = "."
 venv = ".venv"
 exclude = [
   "**/node_modules",
   "**/.venv",
   "legacy",
-  "apps",
   "packages/llm",
   "packages/memory",
-  "packages/workflow-engine",
   "packages/yue2",
   ".pi",
   ".agents/skills",
@@ -109,10 +104,8 @@ norecursedirs = [
   ".venv",
   "node_modules",
   "legacy",
-  "apps",
   "packages/llm",
   "packages/memory",
-  "packages/workflow-engine",
   "packages/yue2",
   ".pi",
   ".agents",

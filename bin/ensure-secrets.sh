@@ -35,7 +35,7 @@ ensure_key() {
   fi
 }
 
-for key in LANGFUSE_NEXTAUTH_SECRET LANGFUSE_SALT LANGFUSE_ENCRYPTION_KEY LITELLM_MASTER_KEY LANGFUSE_REDIS_AUTH; do
+for key in LANGFUSE_NEXTAUTH_SECRET LANGFUSE_SALT LANGFUSE_ENCRYPTION_KEY LITELLM_MASTER_KEY LANGFUSE_REDIS_AUTH SOSHO_ENGINE_API_TOKEN; do
   ensure_key "$key" "" ""
 done
 
@@ -43,7 +43,6 @@ ensure_key LANGFUSE_PG_PASSWORD sosho_langfuse_postgres postgres
 ensure_key LANGFUSE_CLICKHOUSE_PASSWORD sosho_langfuse_clickhouse clickhouse
 ensure_key LANGFUSE_MINIO_PASSWORD sosho_langfuse_minio miniosecret
 ensure_key LANGFUSE_INIT_USER_PASSWORD sosho_langfuse_postgres password123
-ensure_key LANGFLOW_SUPERUSER_PASSWORD sosho_langflow-data sosho-local
 
 if ! grep -Eq "^LANGFUSE_PUBLIC_KEY=[^[:space:]#]" "$file"; then
   if has_volume sosho_langfuse_postgres; then

@@ -1,0 +1,24 @@
+FROM python:3.13.18-slim-trixie
+
+COPY --from=ghcr.io/astral-sh/uv:0.13.9 /uv /usr/local/bin/uv
+
+RUN useradd --system --uid 10001 --home-dir /tmp engine
+
+WORKDIR /app
+ENV UV_PYTHON_DOWNLOADS=never \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PROJECT_ENVIRONMENT=/app/.venv \
+    PYTHONUNBUFFERED=1 \
+    PYDANTIC_AI_NO_BANNER=1 \
+    HOME=/tmp
+
+COPY pyproject.toml uv.lock ./
+COPY packages/engine/pyproject.toml packages/engine/pyproject.toml
+COPY packages/engine/src packages/engine/src
+RUN uv sync --frozen --no-dev --no-editable --package sosho-engine
+
+EXPOSE 8123
+USER 10001:10001
+HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=10 \
+    CMD ["/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8123/health', timeout=2)"]
+CMD ["/app/.venv/bin/python", "-m", "sosho_engine"]

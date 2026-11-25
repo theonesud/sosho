@@ -10,10 +10,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 LLAMA_URL = os.environ.get("SOSHO_LLAMA_URL", "http://127.0.0.1:8080")
 LITELLM_URL = os.environ.get("SOSHO_LITELLM_URL", "http://127.0.0.1:4000")
-GRAPH_URL = os.environ.get("SOSHO_GRAPH_URL", "http://127.0.0.1:8123")
 LANGFUSE_URL = os.environ.get("SOSHO_LANGFUSE_URL", "http://127.0.0.1:3001")
-LANGFLOW_URL = os.environ.get("SOSHO_LANGFLOW_URL", "http://127.0.0.1:7860")
-STUDIO_API_URL = os.environ.get("SOSHO_STUDIO_API_URL", "http://127.0.0.1:4101")
+ENGINE_URL = os.environ.get("SOSHO_ENGINE_URL", "http://127.0.0.1:8123")
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -56,3 +54,23 @@ def litellm_key() -> str:
     if not key:
         pytest.skip("The LiteLLM key is not set. Run make setup, then make up.")
     return key
+
+
+@pytest.fixture(scope="session")
+def engine_token() -> str:
+    token = os.environ.get("SOSHO_ENGINE_API_TOKEN", "")
+    if token:
+        return token
+    docker = shutil.which("docker")
+    if docker is None:
+        pytest.skip("docker not found. Cannot read the engine token.")
+    result = subprocess.run(  # noqa: S603
+        [docker, "exec", "engine", "printenv", "SOSHO_ENGINE_API_TOKEN"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    token = result.stdout.strip()
+    if not token:
+        pytest.skip("The engine token is not set. Run make setup, then make up.")
+    return token
