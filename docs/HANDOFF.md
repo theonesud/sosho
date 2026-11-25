@@ -23,6 +23,8 @@ Date of this state: 2026-11-25. Branch `refactor`. Commits up to `61506af`. Noth
 - The engine listens on `127.0.0.1:8123`. Every route needs the bearer token `SOSHO_ENGINE_API_TOKEN`, except `GET /health` and the webhook route.
 - The DBOS system database `sosho_engine` lives on the `postgres` service. The host worker reaches it on `127.0.0.1:${SOSHO_POSTGRES_PORT:-5432}`.
 - The host worker runs as the systemd user service `sosho-worker`.
+- The DBOS executor id of the engine is `engine`. The id of the worker is `host-worker`. Source: `packages/engine/src/sosho_engine/settings.py:9`.
+- Each process needs its own executor id. With a shared id, one process can take over the pending runs of the other.
 - In Langfuse, the pi spans and the LiteLLM generations share one trace. LiteLLM records no cost for these calls. The session id appears only on the pi spans.
 
 ## 3 Engine summary
@@ -135,3 +137,6 @@ When the list changes, edit every file that names these paths. See `Makefile`, `
 - Langfuse v4 runs in events-only mode. `/api/public/traces` returns 404. Read spans from `/api/public/v2/observations`. This is not verified in the repository code.
 - A new Langfuse `SALT` breaks the stored project API key. Delete its `api_keys` row and restart `langfuse-web`. The startup setup creates the key again.
 - Router presets in `docker/llama-models.ini` cannot read environment variables.
+- Claude Code reads its hook settings when a session starts. After a change to the hooks or a hook script path, restart Claude Code.
+- OpenCode rejects the schema keys `providers` and `permissions`. Use `provider`, `permission`, and a flat `mcp` map. See `opencode.json`.
+- The YuE2 gateway unloads all llama.cpp models before a music job. The models load again on the next request. The reload is not verified in this session.
