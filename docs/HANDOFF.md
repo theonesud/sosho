@@ -4,109 +4,134 @@ Read this file first. Then read `AGENTS.md` and the standards it lists. This fil
 
 ## 1 Goal
 
-The owner rebuilds Sosho as a local-first AI workbench on one GPU workstation.
+Sosho is an AI workbench that runs on one GPU workstation. One human owner and agents use it. `docs/usecases.md` lists the use cases.
 
-1. `legacy/` holds old code for reference. The owner deletes it soon.
-2. Bring code out of the legacy list only after it passes the standards in `docs/standards/`.
-3. Claude Code, pi, OpenCode, and Antigravity must work the same way. `AGENTS.md` is the only rule file.
-4. Use few services. Use Haiku subagents for mechanical work.
+The workflow backend is `packages/engine`, module `sosho_engine`. It is a JSON graph interpreter on DBOS Transact 3.7.0, written in Python. Workflows are versioned JSON. Agents write them now. The owner writes them on a canvas later. Build the backend first. Build the UI after the backend.
+
+Every model call goes through the LiteLLM proxy. Do not add direct provider or llama.cpp access. Claude Code is the exception. It calls Anthropic directly. The llama.cpp port has no host port.
+
+`agent` and `skill` nodes run pi sessions on a host worker. `llm` nodes are plain model calls in the engine.
+
+Claude Code acts as coordinator only. Sonnet subagents write code. Haiku subagents do other work. See `.claude/CLAUDE.md` item 6.
 
 ## 2 State
 
-`make test` passes on `refactor` with the stack up. `make up` starts all services. Ports and services are in `compose.yaml`, `docker/compose.langfuse.yaml`, and the Makefile usage text.
+Date of this state: 2026-11-25. Branch `refactor`. Commits up to `61506af`. Nothing is pushed.
 
-| Area | Fact |
-| :--- | :--- |
-| Models | One `llama-server` in router mode serves the three local models. It has no host port. Only `sosho-net` reaches it. LiteLLM on port 4000 maps the 7 roles. |
-| Routing | Every model call goes through LiteLLM. The exceptions are Claude Code on Anthropic and the YuE2 unload call. `tests/unit/test_direct_hosts.py` enforces this. |
-| Tracing | The pi Langfuse extension sends `existing_trace_id`, `parent_observation_id`, `session_id`, and `generation_name` in the request `metadata`. LiteLLM writes its generation under the pi span. Pi records no generation of its own for the `litellm` provider. |
-| Privacy | No local role falls back to a cloud model. The only fallback is `main` to `subagent`. |
-| Orchestration | The owner retired graph, workflow-engine, Studio, and Langflow. Their code is in `legacy/`. The `graph` and `langflow` services are not in `compose.yaml`. |
-| Engine | `packages/engine` is the DBOS workflow engine. The `engine` service in `compose.yaml` serves the API on port 8123. Read `packages/engine/README.md`. |
-| Host worker | `agent` and `skill` nodes run as pi sessions on the host. The user service `sosho-worker` runs `python -m sosho_engine worker`. It listens only to the DBOS queue `host`. Postgres is published on `127.0.0.1:5432`. `make worker-install` installs the service. `make up` restarts it. |
-| Next | A new UI follows the engine. |
-| pi | `pi` runs in the `pi-sandbox:latest` container on `sosho-net`. `pi --raw` runs on the host. |
-| Node | Node comes from nvm and `.nvmrc`. The owner's shell can still resolve an older Node. Run `nvm use` first. |
-| Config | Tool configs that can leave the root are in `.config/`: mise, lefthook, Vale, and the comment allow list. LiteLLM reads `docker/litellm.yaml`. |
-| Guard | All four agents call `bin/agent-guard.py` before each tool call. It runs with the system `python3`, which must be 3.12 or later. It uses only the standard library. |
-| Secrets | The guard blocks secret files: env files, SSH keys, `.pem`, `.key`, `.netrc`, and cloud credentials. `.env.example` stays readable. A text guard cannot see a file name that a command builds at run time. |
+- `make test` exits 0 with the stack up. The result is 429 passed and 7 skipped.
+- `compose.yaml` services: `model-download`, `llama-cpp`, `litellm`, and `engine`. The `music` profile adds the `yue2-*` services. The Langfuse stack in `docker/compose.langfuse.yaml` adds `postgres`.
+- The engine listens on `127.0.0.1:8123`. Every route needs the bearer token `SOSHO_ENGINE_API_TOKEN`, except `GET /health` and the webhook route.
+- The DBOS system database `sosho_engine` lives on the `postgres` service. The host worker reaches it on `127.0.0.1:${SOSHO_POSTGRES_PORT:-5432}`.
+- The host worker runs as the systemd user service `sosho-worker`.
+- In Langfuse, the pi spans and the LiteLLM generations share one trace. LiteLLM records no cost for these calls. The session id appears only on the pi spans.
 
-## 3 Open Work
+## 3 Engine summary
+
+Read `packages/engine/README.md` for the API and the run rules. This section lists the facts that the next session needs first.
+
+- A saved version never changes. Each run pins one version.
+- Node kinds:
+  - `trigger`, with modes `manual`, `cron`, `webhook`, and `workflow_finished`.
+  - `llm`, `agent`, `skill`, and `tool`.
+  - `router`, `map`, `join`, `human`, `subworkflow`, and `wait`.
+- Tools: only `echo` and `text_join`. Source: `packages/engine/src/sosho_engine/tools.py`.
+- Queues and slots:
+  - `local-gpu`: 1.
+  - `cloud-io`: 8.
+  - `host-browser`: 2.
+  - `host`: 4. Only the host worker listens to `host`.
+- An `agent` or `skill` node runs `bin/pi-launcher.sh --raw -p --no-session --mode json --provider litellm --model <role>` on the host worker. The worker loads the extensions `guard` and `langfuse` with `-e`.
+- A version has a policy. The fields are `allowed_kinds`, `allowed_tools`, `allowed_skills`, `max_steps`, `max_run_seconds`, `max_llm_calls`, and `max_depth`.
+- The worker lets one pi session at a time use each role in `SOSHO_ENGINE_GPU_ROLES`. The default is `local-uncensored`.
+
+## 4 Open Work
 
 Do these in order unless the owner says otherwise.
 
-1. Build a new UI on the engine API. Use `GET /nodes` for the palette.
-2. Add engine features that are not built: memory, watchers, a code sandbox, and self improvement.
-3. Rebuild `pi-sandbox:latest`. `docker/Dockerfile.pi` pins pi 1.6.0. Rebuild only to apply later changes.
-4. Bring legacy directories to the standards one at a time. Then remove each one from the legacy list. Use this order: packages, pi extensions.
-5. Move `.pi/models.next.json` to `.pi/models.json` and `.pi/model-roles.next.json` to `.pi/model-roles.json`. Until then, live pi can still use direct providers. The guard test skips both files while the `.next` files exist.
-6. Fix `lefthook validate`. It fails with `x-legacy: Value is array but should be object`. The hooks still run.
-7. Stop the old `sosho-graph` and `langflow` containers. Remove the `sosho_graph-data` and `sosho_langflow-data` volumes. The owner decides when. `sosho-graph` holds host port 8123 until then. Set `SOSHO_ENGINE_PORT=8124` and `SOSHO_ENGINE_URL=http://127.0.0.1:8124` to run the engine beside it.
+1. Build the test workflow "daily research digest" on role `local-uncensored`. First add the engine tools `web_search`, `fetch_url`, and `write_file`. Or use the `dokobot` skill through skill nodes. The workflow must use every node kind and every trigger mode:
+   - A cron trigger and a webhook trigger.
+   - A `map` over topics into a research subworkflow. Its `agent` or `skill` nodes search the web.
+   - A `router` quality check with a loop that revises weak sections.
+   - A `join`.
+   - A `human` approval.
+   - A `wait` before publication.
+   - A `workflow_finished` trigger that publishes.
+   Web search through dokobot needs host Chrome with the Dokobot extension running. On 2026-11-25, `~/.dokobot/bridges.json` is 2 bytes long. Its content is not verified.
+2. Verify these items. They are not verified yet:
+   - A cron schedule fires by itself.
+   - Crash recovery on Postgres.
+   - SIGKILL of the worker during a live pi session. Check for an orphan pi process.
+   - The `sosho-worker` service starts at boot. This needs `loginctl enable-linger`.
+   - OpenCode through LiteLLM.
+   - Container-mode pi.
+3. Share the GPU limit between `llm` nodes on queue `local-gpu` and pi sessions on `local-uncensored`.
+4. Add cost for local and cloud models in LiteLLM, so that Langfuse shows cost. Put the session id on the LiteLLM records.
+5. Rebuild `pi-sandbox:latest`. `docker/Dockerfile.pi` pins pi 1.6.0. The host has no pi binary, so `--raw` runs pi through `npx` at each start. Consider a pinned host install.
+6. Find the cause of two pi probe runs that hung with no output. The cause is not verified.
+7. Bring the remaining legacy paths to the standards, or delete them. See section 6.
+8. Fix `lefthook validate`. On 2026-11-25 it exits 1 with `x-legacy: Value is array but should be object`. The same error appears for `x-legacy-docs`.
 
-Decisions that wait for the owner:
+## 5 Decisions that wait for the owner
 
-- Turn on the Claude Code sandbox? It blocks secret reads at the OS level, also for scripts and built file names. It needs `bubblewrap` and `socat` on Linux. It also limits network and writes. Not tested on this machine.
+Do not start these without the owner:
+
+- The memory layer: run state, workflow memory, and global memory. Start it after the basics are verified.
+- Self-improvement. Reflection proposes a new version as a diff. The owner approves it.
+- The UI. The stack is Vite, React, React Flow 13, Tailwind, Radix with shadcn, TanStack Query, and ELK. The screens are Workflows, Editor, Run view, Inbox for human input, Triggers, and Versions. The UI talks only to the engine API.
+
+Open decisions:
+
+- Turn on the Claude Code sandbox? It needs `bubblewrap` and `socat` on Linux. It is not tested on this machine. `.claude/settings.json` has no sandbox setting now.
 - Allow a file limit above 300 lines for UI components?
+- Remove the orphan containers `sosho-embed-model-download-1` and `sosho-decision-model-download-1`. Both exited two days ago. The owner decides when to remove them.
 
-## 4 Legacy List
+## 6 Legacy List
 
-`make test` skips the legacy paths. These files hold the list. Change them together:
+`make test` skips the legacy paths. The `LEGACY` variable in `Makefile` lists them:
 
-- `Makefile`: the `LEGACY` variable
-- `.config/lefthook.yml`: the `x-legacy` and `x-legacy-docs` anchors
-- `pyproject.toml`, `biome.json`, `vitest.config.ts`, `.config/vale/vale.ini`, and `bin/agent-format.sh`
+- `legacy`, which holds the retired graph service, the workflow engine, and Studio. Commit `bf66cd6` moved them.
+- `packages/memory`
+- `packages/yue2`
+- `docker/Dockerfile.yue2-gateway`
+- `.pi`
+- `.agents/skills`
+- `models`
 
-The comment check and the legacy `tsx` tests take their file lists from the Makefile.
+When the list changes, edit every file that names these paths. See `Makefile`, `.config/lefthook.yml`, `biome.json`, `pyproject.toml`, `vitest.config.ts`, `.config/vale/vale.ini`, and `bin/agent-format.sh`.
 
-## 5 Tests
+## 7 Tests
 
-- Engine unit tests are in `packages/engine/tests`. They use SQLite and fake models.
-- Integration tests in `tests/integration/` need `make up`. They skip a service that does not answer. Set `LIVE_STRICT=1` to fail instead.
-- `CLOUD=1` adds the cloud role calls. `HEAVY=1` adds the 35B model calls. Both are off by default.
-- These items have no automatic test:
-  - An interactive `pi` session.
-  - The systemd unit start at login and at boot.
-  - The guard inside pi, OpenCode, and Antigravity. `tests/unit/test_guard.py` and `tests/unit/test_guard_bypass.py` test only the guard script.
+- `make test` runs all checks and tests. It changes no files. Vale prints warnings only. Exit code 0 is required.
+- Engine unit tests are in `packages/engine/tests`. They use SQLite and fake models. A test starts a second process, the host worker, with `packages/engine/tests/fake_pi.py`.
+- Integration tests are in `tests/integration/`. They need `make up`. A test skips a service that does not answer. Set `LIVE_STRICT=1` to fail instead.
+- `CLOUD=1` adds the cloud role calls. `HEAVY=1` adds the calls to the 35B model. Both are off by default.
+- `tests/integration/test_engine_worker.py` stops `sosho-worker` during its run. It starts the unit again at the end.
+- No automatic test covers these items:
+  - An interactive pi session.
+  - The systemd unit at login or at boot.
+  - The guard inside pi, OpenCode, or Antigravity. The guard tests cover only the script.
   - The YuE2 start on demand.
 
-## 6 Traps
+## 8 Traps
 
-- The engine has the executor id `engine`. The worker has `host-worker`. Runs that were pending under the old id `local` are not recovered.
-- The engine and the worker must have the same application version. The default is a hash of the engine source. `GET /health` shows `worker.alive` and `worker.version_mismatch`. After an engine code change, run `make up`. It rebuilds the image and restarts the worker. Pending runs of the old version are not recovered.
-- DBOS lets any process with the same version take a run from its internal queue. The worker has the full runtime for this reason.
-- The skill catalog comes from the worker. Start the worker once before you save a version with a skill.
-- The integration test `tests/integration/test_engine_worker.py` stops the unit `sosho-worker` while it runs, and starts it again.
-- pi sessions of the worker start without the project `.pi/settings.json`. The worker loads the extensions `guard` and `langfuse` with `-e`. The engine has no trace of its own. The worker gives pi a trace id from the run id, so all pi spans of one run share one trace.
-
-- The engine uses the default DBOS pickle serializer. The portable JSON serializer fails on pydantic-ai model responses. Keep workflow arguments and node outputs as JSON values.
-- Steps run again after a crash. Write each tool so that two runs give the same effect.
-- The engine API needs the bearer token on every route except `GET /health` and the webhook route.
-- A `map` or `subworkflow` run starts its child runs without a queue. Do not put them on a worker queue. A queued parent would wait for its own queued nodes and block the queue.
-- Child runs inherit budget, deadline, and policy from the parent. Child runs do not start `workflow_finished` triggers.
-- A `workflow_finished` chain stops at `max_depth`. Activation refuses a cycle.
-- Run status names are `pending`, `running`, `waiting`, `succeeded`, `failed`, and `cancelled` in every API response, event, and filter. The raw DBOS status is in `dbos_status`. A client that expects `SUCCESS` or `ERROR` must change.
-- A loop edge has `on_limit`. The default `exit` ends the loop at the cap and continues on the other edges. Set `fail` to fail the run at the cap.
-- `POST /workflows/{id}/runs` starts only `manual` triggers. Cron, webhook, and `workflow_finished` runs start from their own paths.
-- The save of a version checks the cron string, the time zone, condition paths, and `retry`. Old saved versions are not checked again.
-- The `GET /runs` filter `workflow_id` reads the table `engine_runs`. Runs from before this table do not appear in that filter.
-- A new `SOSHO_ENGINE_APP_VERSION` leaves pending runs of the old version unrecovered. Change it only when no run waits for recovery.
-- The guard blocks each shell command whose text names a secret file, also in quotes or a commit message. Read the reason. Do not split the text to get around it. Write a commit message to a file and run `git commit -F <file>`.
-- The guard blocks `grep -r`, `rg -u`, `rg --no-ignore`, and `docker compose config`. Use `rg` or `git grep`.
-- Claude Code reads its hook settings when a session starts. After a change to the hooks or to a hook script path, restart Claude Code.
-- One commit got an unstaged file during the pre-commit hook. The cause is not verified. Run `git show --stat HEAD` before each push.
-- The guard blocks edits to `.pi/models.json` and `.pi/model-roles.json`. Write a proposal to `.pi/models.next.json` or `.pi/model-roles.next.json`. The owner moves it into place.
-- The post-edit formatter removes unused imports. If you write a file in two parts, add the imports in the last part.
+- Each engine code change changes the app version. The version is a hash of the package source unless `SOSHO_ENGINE_APP_VERSION` is set. Pending runs of the old version do not recover. After a change, run `make up`. It restarts the worker.
+- The worker can take any workflow from the DBOS internal queue. This happens after a recovery, a resume, a fork, or a cron start. The worker is not only for host work.
+- Saved versions with the old `agent` fields `tools` and `max_requests` do not load. The node models reject extra fields.
+- In pi JSON mode, a model error exits 0 with `stopReason` `error`. The worker fails the node. See `packages/engine/src/sosho_engine/host_node.py:101`.
+- The `decision` role cannot run pi. Its model Qwen3-1.7B runs with `ctx-size` 16384 and `parallel` 4. Each slot has 4096 tokens. The pi system prompt is about 11400 tokens. This size is not verified in this session.
+- A `map` or `subworkflow` child run starts without a queue. Do not put it on a queue. A queued parent blocks its own queued children.
+- pi loads skills from `.agents/skills/` in its working directory. The `--skill` flag did not load them in a test. The worker links each skill into `<workdir>/.agents/skills/`.
+- The guard blocks each shell command whose text names a secret file. This includes quoted text and commit messages. Do not split the text to pass the guard. Write the commit message to a file and run `git commit -F <file>`.
+- The guard blocks some search and compose commands. The full list is in `bin/agent-guard.py`. Use `rg` or `git grep`.
+- The guard blocks edits to `.pi/models.json` and `.pi/model-roles.json`. Write a proposal as `.pi/models.next.json` or `.pi/model-roles.next.json`. Ask the owner to move it into place.
+- In a `!` shell line, a leading `!` negates the command in bash. Give the owner commands without a second `!`.
+- `make test` skips the engine integration tests if another service answers on port 8123. Set `SOSHO_ENGINE_URL`, or set `LIVE_STRICT=1` to fail instead.
 - lefthook 2 ignores a regex `exclude`. Use a list of globs.
-- gitleaks reads past a line end in `.env.example`. Mark an empty key line with `# gitleaks:allow`.
-- Router presets in `docker/llama-models.ini` cannot read env vars.
-- The `decision` model has a 4096 token context in `docker/llama-models.ini`. The pi system prompt has about 11000 tokens. A pi session on `decision` fails with `ContextWindowExceededError`.
-- The launcher skips readonly shell names such as `UID` in the secret environment file. No test covers it, because the guard blocks a test that names the file.
-- The launcher passes `--help` to pi. Use `--launcher-help` for the launcher text.
-- The YuE2 gateway unloads all models on port 8080 before a music job. The CPU models load again on the next request.
-- OpenCode 1.15.10 rejects the schema keys `providers` and `permissions`. Keep `provider`, `permission`, and a flat `mcp` map.
-- Langfuse v4 runs in events_only mode. `/api/public/traces` returns 404. Read spans from `/api/public/v2/observations`.
-- A new Langfuse `SALT` breaks the stored project API key. Delete its `api_keys` row and restart `langfuse-web`. The startup setup creates the key again.
-- pnpm 12 reads `saveExact` only from `pnpm-workspace.yaml`. npm reads `save-exact` from the `.npmrc` next to each `package.json`.
-- The OpenTelemetry exporter 0.3xx needs SDK 3. `@langfuse/otel` 6 still needs SDK 2, so the pi Langfuse extension stays on exporter 0.223.
+- gitleaks reads past the end of a line in `.env.example`. Mark an empty key line with `# gitleaks:allow`. See `docs/standards/code.md`.
 - Biome 2.6.8 does not read `.config/biome.json`. Keep `biome.json` at the root.
 - `mise exec -C <dir>` changes the working directory. Do not use it to run a command in a scratch folder.
+- pnpm 12 reads `saveExact` only from `pnpm-workspace.yaml`. npm reads `save-exact` from the `.npmrc` beside each `package.json`. Both files set it.
+- The pi Langfuse extension pins `@langfuse/otel` 6.1.1, `@opentelemetry/exporter-trace-otlp-http` 0.223.2, and `@opentelemetry/sdk-trace-node` 2.12.0. See `.pi/extensions/langfuse/package.json`. Do not change one version alone.
+- Langfuse v4 runs in events-only mode. `/api/public/traces` returns 404. Read spans from `/api/public/v2/observations`. This is not verified in the repository code.
+- A new Langfuse `SALT` breaks the stored project API key. Delete its `api_keys` row and restart `langfuse-web`. The startup setup creates the key again.
+- Router presets in `docker/llama-models.ini` cannot read environment variables.
