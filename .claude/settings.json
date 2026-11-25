@@ -42,5 +42,21 @@
         ]
       }
     ]
+  },
+  "model": "opus",
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL": "1h",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  },
+  "cleanupPeriodDays": 3650,
+  "theme": "dark",
+  "spinnerTipsEnabled": false,
+  "promptSuggestionEnabled": false,
+  "awaySummaryEnabled": false,
+  "idleCompaction": false,
+  "enabledMcpjsonServers": ["memory", "playwright"],
+  "statusLine": {
+    "type": "command",
+    "command": "\"${CLAUDE_PROJECT_DIR}/bin/statusline.sh\""
   }
 }
