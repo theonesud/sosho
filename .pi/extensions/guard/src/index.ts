@@ -19,10 +19,14 @@ export default function (pi: ExtensionAPI) {
   pi.on("tool_call", (event) => {
     const payload = JSON.stringify({ tool_name: event.toolName, tool_input: event.input });
     const result = runHook("agent-guard.py", payload);
+    if (result.status === 0) {
+      return undefined;
+    }
     if (result.status === 2) {
       return { block: true, reason: result.stderr.trim() };
     }
-    return undefined;
+    const detail = result.stderr?.trim() || result.error?.message || "no output";
+    return { block: true, reason: `Guard failed with status ${result.status}: ${detail}` };
   });
 
   pi.on("tool_result", (event) => {

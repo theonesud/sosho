@@ -1,23 +1,19 @@
-
 name: sosho
 
 include:
   - path: docker/compose.langfuse.yaml
 
-x-model: &model
-  HF_REPO: HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive
-  MODEL_SUBDIR: Qwen3.6-35B-A3B
-  MODEL_FILE: Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf
-  MMPROJ_FILE: mmproj-Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-f16.gguf
-
 services:
   model-download:
-    image: python:3.12.15-slim
+    image: python:3.13.18-slim-trixie
     networks: [sosho-net]
     environment:
-      <<: *model
       HF_XET_HIGH_PERFORMANCE: "1"
       HF_TOKEN: ${HF_TOKEN:-}
+      MODELS: |
+        HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive Qwen3.6-35B-A3B Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf mmproj-Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-f16.gguf
+        unsloth/Qwen3-1.7B-GGUF Qwen3-1.7B Qwen3-1.7B-Q4_K_M.gguf
+        ggml-org/embeddinggemma-300M-GGUF embeddinggemma-300M embeddinggemma-300M-Q8_0.gguf
     volumes:
       - ./models:/models
       - hf-cache:/root/.cache/huggingface
@@ -26,24 +22,22 @@ services:
       - -c
       - |
         set -e
-        dir=/models/$$MODEL_SUBDIR
-        if [ -e "$$dir/$$MODEL_FILE" ] && [ -e "$$dir/$$MMPROJ_FILE" ]; then
-          echo "Models present in $$dir"; exit 0
-        fi
-        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]==2.4.0"
-        hf download "$$HF_REPO" "$$MODEL_FILE" "$$MMPROJ_FILE" --local-dir "$$dir"
+        printf '%s\n' "$$MODELS" | while read -r repo subdir files; do
+          [ -n "$$repo" ] || continue
+          missing=0
+          for f in $$files; do [ -e "/models/$$subdir/$$f" ] || missing=1; done
+          if [ $$missing -eq 0 ]; then echo "Present: $$subdir"; continue; fi
+          command -v hf >/dev/null || pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]==2.4.0"
+          hf download "$$repo" $$files --local-dir "/models/$$subdir"
+        done
     restart: "no"
 
   llama-cpp:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda-b12407
     container_name: llama-cpp
-    restart: always
+    restart: unless-stopped
     depends_on:
       model-download:
-        condition: service_completed_successfully
-      decision-model-download:
-        condition: service_completed_successfully
-      embed-model-download:
         condition: service_completed_successfully
     ports:
       - "127.0.0.1:8080:8080"
@@ -78,60 +72,12 @@ services:
       - --port
       - "8080"
 
-  decision-model-download:
-    image: python:3.12.15-slim
-    networks: [sosho-net]
-    environment:
-      HF_REPO: unsloth/Qwen3-1.7B-GGUF
-      MODEL_SUBDIR: Qwen3-1.7B
-      MODEL_FILE: Qwen3-1.7B-Q4_K_M.gguf
-      HF_XET_HIGH_PERFORMANCE: "1"
-      HF_TOKEN: ${HF_TOKEN:-}
-    volumes:
-      - ./models:/models
-      - hf-cache:/root/.cache/huggingface
-    command:
-      - sh
-      - -c
-      - |
-        set -e
-        dir=/models/$$MODEL_SUBDIR
-        if [ -e "$$dir/$$MODEL_FILE" ]; then
-          echo "Decision model present in $$dir"; exit 0
-        fi
-        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]==2.4.0"
-        hf download "$$HF_REPO" "$$MODEL_FILE" --local-dir "$$dir"
-    restart: "no"
-
-  embed-model-download:
-    image: python:3.12.15-slim
-    networks: [sosho-net]
-    environment:
-      HF_REPO: ggml-org/embeddinggemma-300M-GGUF
-      MODEL_SUBDIR: embeddinggemma-300M
-      MODEL_FILE: embeddinggemma-300M-Q8_0.gguf
-      HF_XET_HIGH_PERFORMANCE: "1"
-      HF_TOKEN: ${HF_TOKEN:-}
-    volumes:
-      - ./models:/models
-      - hf-cache:/root/.cache/huggingface
-    command:
-      - sh
-      - -c
-      - |
-        set -e
-        dir=/models/$$MODEL_SUBDIR
-        if [ -e "$$dir/$$MODEL_FILE" ]; then
-          echo "Embedding model present in $$dir"; exit 0
-        fi
-        pip install -q --root-user-action=ignore --retries 10 --timeout 60 "huggingface_hub[cli,hf_xet]==2.4.0"
-        hf download "$$HF_REPO" "$$MODEL_FILE" --local-dir "$$dir"
-    restart: "no"
-
   litellm:
     image: ghcr.io/berriai/litellm:v1.110.2
     container_name: litellm
     restart: unless-stopped
+    mem_limit: 1g
+    security_opt: [no-new-privileges:true]
     depends_on:
       llama-cpp:
         # llama-cpp uses service_started, because yue2 can unload it.
@@ -143,11 +89,11 @@ services:
       - ./docker/litellm.yaml:/app/config.yaml:ro
     command: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
     environment:
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-sosho-local}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?Run make setup to create it}
       DEEPINFRA_API_KEY: ${DEEPINFRA_API_KEY:-}
       REFUSELESS_API_KEY: ${REFUSELESS_API_KEY:-}
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?Run make setup to create it}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?Run make setup to create it}
       LANGFUSE_HOST: http://langfuse-web:3000
     healthcheck:
       # The LiteLLM image has no curl. Python is present.
@@ -159,7 +105,7 @@ services:
 
   yue2-model-download:
     profiles: [music]
-    image: python:3.12.15-slim
+    image: python:3.13.18-slim-trixie
     networks: [sosho-net]
     environment:
       HF_REPO: audio-cpp/Yue2-3B-GGUF
@@ -219,6 +165,12 @@ services:
       - --backend
       - cuda
       - --log
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8020/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
 
   yue2-gateway:
     profiles: [music]
@@ -229,8 +181,10 @@ services:
     pull_policy: build
     container_name: yue2-gateway
     restart: unless-stopped
+    security_opt: [no-new-privileges:true]
     depends_on:
-      - yue2-engine
+      yue2-engine:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8021:8000"
     networks: [sosho-net]
@@ -247,7 +201,7 @@ services:
       YUE2_LLAMA_URL: http://llama-cpp:8080
       YUE2_BIND_HOST: 127.0.0.1
     volumes:
-      - ./yue2-data:/data
+      - yue2-data:/data
 
   graph:
     build:
@@ -257,18 +211,21 @@ services:
     pull_policy: build
     container_name: sosho-graph
     restart: unless-stopped
+    mem_limit: 512m
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     depends_on:
       litellm:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "127.0.0.1:8123:8123"
     networks: [sosho-net]
     environment:
       LITELLM_BASE_URL: http://litellm:4000/v1
-      LITELLM_API_KEY: ${LITELLM_MASTER_KEY:-sk-sosho-local}
+      LITELLM_API_KEY: ${LITELLM_MASTER_KEY:?Run make setup to create it}
       LANGFUSE_HOST: http://langfuse-web:3000
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?Run make setup to create it}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?Run make setup to create it}
     volumes:
       - graph-data:/data
 
@@ -276,6 +233,8 @@ services:
     image: langflowai/langflow:1.13.3
     container_name: langflow
     restart: unless-stopped
+    mem_limit: 2560m
+    security_opt: [no-new-privileges:true]
     ports:
       - "127.0.0.1:7860:7860"
     networks: [sosho-net]
@@ -284,10 +243,11 @@ services:
     environment:
       LANGFLOW_HOST: 0.0.0.0
       LANGFLOW_PORT: "7860"
+      LANGFLOW_AUTO_LOGIN: "false"
       LANGFLOW_SUPERUSER: ${LANGFLOW_SUPERUSER:-admin}
-      LANGFLOW_SUPERUSER_PASSWORD: ${LANGFLOW_SUPERUSER_PASSWORD:-sosho-local}
+      LANGFLOW_SUPERUSER_PASSWORD: ${LANGFLOW_SUPERUSER_PASSWORD:?Run make setup to create it}
       OPENAI_API_BASE: http://litellm:4000/v1
-      OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-sosho-local}
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY:?Run make setup to create it}
       SOSHO_STUDIO_API_URL: http://host.docker.internal:4101
     volumes:
       - langflow-data:/app/langflow
@@ -306,3 +266,4 @@ volumes:
   hf-cache:
   langflow-data:
   graph-data:
+  yue2-data:

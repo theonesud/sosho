@@ -53,4 +53,6 @@ def litellm_key() -> str:
         check=False,
     )
     key = result.stdout.strip()
-    return key or "sk-sosho-local"
+    if not key:
+        pytest.skip("The LiteLLM key is not set. Run make setup, then make up.")
+    return key

@@ -1,4 +1,4 @@
-FROM python:3.12.15-slim
+FROM python:3.13.18-slim-trixie
 
 # ffmpeg converts the engine's WAV payload to FLAC before storage.
 RUN apt-get update \
@@ -11,6 +11,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY packages/yue2/gateway/app.py ./
 
+RUN useradd --system --uid 10001 --create-home gateway \
+  && install -d -o gateway -g gateway /data
+
 ENV YUE2_DATA_DIR=/data
 EXPOSE 8000
+USER 10001:10001
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=10 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

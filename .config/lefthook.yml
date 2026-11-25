@@ -53,7 +53,7 @@ pre-commit:
     shellcheck:
       glob: "*.sh"
       exclude: *legacy
-      run: mise exec -- shellcheck {staged_files}
+      run: mise exec -- shellcheck -x {staged_files}
     hadolint:
       glob: "{Dockerfile,Dockerfile.*,*.Dockerfile,*/Dockerfile,*/Dockerfile.*}"
       exclude: *legacy

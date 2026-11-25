@@ -22,18 +22,22 @@ model_list:
       model: openai/Qwen3-1.7B
       api_base: http://llama-cpp:8080/v1
       api_key: local
+      timeout: 120
 
   - model_name: embed
     litellm_params:
       model: openai/embeddinggemma
       api_base: http://llama-cpp:8080/v1
       api_key: local
+      timeout: 120
 
   - model_name: local-uncensored
     litellm_params:
       model: openai/Qwen3.6-35B-A3B
       api_base: http://llama-cpp:8080/v1
       api_key: local
+      timeout: 600
+      stream_timeout: 600
 
   - model_name: cloud-uncensored
     litellm_params:
@@ -42,10 +46,9 @@ model_list:
       api_key: os.environ/REFUSELESS_API_KEY
 
 router_settings:
-  routing_strategy: simple-shuffle
   enable_pre_call_checks: true
   num_retries: 2
-  timeout: 60
+  timeout: 120
   allowed_fails: 2
   cooldown_time: 30
   retry_after: 5

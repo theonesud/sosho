@@ -165,8 +165,13 @@ sync_compaction "$TARGET_PI"
 warm_local_model "$TARGET_PI" "$SOSHO_PI" "$SKIP_WARMUP"
 
 LANGFUSE_URL="${LANGFUSE_BASE_URL:-http://127.0.0.1:3001}"
-LANGFUSE_PK="${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}"
-LANGFUSE_SK="${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}"
+env_value() {
+  if [ -f "$WORKSPACE_ENV" ]; then
+    sed -n "s/^$1=//p" "$WORKSPACE_ENV" | tail -n 1
+  fi
+}
+LANGFUSE_PK="${LANGFUSE_PUBLIC_KEY:-$(env_value LANGFUSE_PUBLIC_KEY)}"
+LANGFUSE_SK="${LANGFUSE_SECRET_KEY:-$(env_value LANGFUSE_SECRET_KEY)}"
 
 if [ "$MODE" = "raw" ]; then
   if [ -f "$WORKSPACE_ENV" ]; then

@@ -1,11 +1,10 @@
-
-name: sosho-langfuse
+name: sosho
 
 services:
   langfuse-web:
     image: docker.langfuse.com/langfuse/langfuse:4.69.0
     restart: unless-stopped
-    mem_limit: 1280m
+    mem_limit: 1536m
     depends_on:
       postgres: { condition: service_healthy }
       minio: { condition: service_healthy }
@@ -16,7 +15,7 @@ services:
     networks: [sosho-net]
     environment: &langfuse-env
       NODE_OPTIONS: --max-old-space-size=1024
-      DATABASE_URL: postgresql://${LANGFUSE_PG_USER:-postgres}:${LANGFUSE_PG_PASSWORD:-postgres}@postgres:5432/${LANGFUSE_PG_DB:-postgres}
+      DATABASE_URL: postgresql://${LANGFUSE_PG_USER:-postgres}:${LANGFUSE_PG_PASSWORD:?Run make setup to create it}@postgres:5432/${LANGFUSE_PG_DB:-postgres}
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?Run make setup to create it}
       SALT: ${LANGFUSE_SALT:?Run make setup to create it}
       ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?Run make setup to create it}
@@ -25,33 +24,33 @@ services:
       CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
       CLICKHOUSE_URL: http://clickhouse:8123
       CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-clickhouse}
-      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:?Run make setup to create it}
       CLICKHOUSE_CLUSTER_ENABLED: "false"
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_AUTH: ${LANGFUSE_REDIS_AUTH:-localredis}
+      REDIS_AUTH: ${LANGFUSE_REDIS_AUTH:?Run make setup to create it}
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
       LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
       LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
       LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_USER:-minio}
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:?Run make setup to create it}
       LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
       LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:9090
       LANGFUSE_S3_MEDIA_UPLOAD_INTERNAL_ENDPOINT: http://minio:9000
       LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_USER:-minio}
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:?Run make setup to create it}
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-local-org}
       LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-Local}
       LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-pi-agent}
       LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-Pi-Agent}
-      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-pi}
-      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-pi}
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?Run make setup to create it}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?Run make setup to create it}
       LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-admin@local.dev}
       LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-Admin}
-      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-password123}
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:?Run make setup to create it}
 
   langfuse-worker:
     image: docker.langfuse.com/langfuse/langfuse-worker:4.69.0
@@ -65,16 +64,17 @@ services:
     networks: [sosho-net]
     environment:
       <<: *langfuse-env
+      NODE_OPTIONS: --max-old-space-size=384
 
   clickhouse:
     image: clickhouse/clickhouse-server:25.12.11.4
     restart: unless-stopped
-    mem_limit: 1g
+    mem_limit: 1280m
     networks: [sosho-net]
     environment:
       CLICKHOUSE_DB: default
       CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-clickhouse}
-      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:?Run make setup to create it}
     volumes:
       - langfuse_clickhouse:/var/lib/clickhouse
       - ./clickhouse-memory.xml:/etc/clickhouse-server/config.d/memory.xml:ro
@@ -94,7 +94,7 @@ services:
     networks: [sosho-net]
     environment:
       MINIO_ROOT_USER: ${LANGFUSE_MINIO_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:?Run make setup to create it}
     ports:
       - "127.0.0.1:9090:9000"
     volumes:
@@ -111,9 +111,9 @@ services:
     restart: unless-stopped
     mem_limit: 256m
     networks: [sosho-net]
-    command: --requirepass ${LANGFUSE_REDIS_AUTH:-localredis} --maxmemory 200mb --maxmemory-policy noeviction
+    command: --requirepass ${LANGFUSE_REDIS_AUTH:?Run make setup to create it} --maxmemory 200mb --maxmemory-policy noeviction
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"${LANGFUSE_REDIS_AUTH:-localredis}\" ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"${LANGFUSE_REDIS_AUTH:?Run make setup to create it}\" ping"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -125,7 +125,7 @@ services:
     networks: [sosho-net]
     environment:
       POSTGRES_USER: ${LANGFUSE_PG_USER:-postgres}
-      POSTGRES_PASSWORD: ${LANGFUSE_PG_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${LANGFUSE_PG_PASSWORD:?Run make setup to create it}
       POSTGRES_DB: ${LANGFUSE_PG_DB:-postgres}
     volumes:
       - langfuse_postgres:/var/lib/postgresql/data
