@@ -2,9 +2,7 @@ import asyncio
 import hashlib
 import hmac
 import secrets
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from croniter import croniter
 from dbos import DBOS
 from pydantic import BaseModel, JsonValue, TypeAdapter
 
@@ -16,7 +14,8 @@ from sosho_engine.runflow import scheduled_run
 from sosho_engine.spec import Workflow
 from sosho_engine.spec_nodes import TriggerNode
 from sosho_engine.store_tables import TriggerRow
-from sosho_engine.validation import Issue, SpecInvalidError
+from sosho_engine.validation import SpecInvalidError
+from sosho_engine.validation_extra import check_cron
 
 SCHEDULE_PREFIX = "wf."
 _JSON: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
@@ -55,20 +54,6 @@ async def _drop_schedules(workflow_id: str, keep: set[str]) -> None:
         name = str(item["schedule_name"])
         if name not in keep:
             await DBOS.delete_schedule_async(name)
-
-
-def _check_cron(node: TriggerNode) -> list[Issue]:
-    issues: list[Issue] = []
-    if not croniter.is_valid(node.cron or "", second_at_beginning=True):
-        issues.append(Issue("bad_cron", f"cron string {node.cron} is not valid", node.id))
-    if node.cron_timezone:
-        try:
-            ZoneInfo(node.cron_timezone)
-        except (ZoneInfoNotFoundError, ModuleNotFoundError, ValueError):
-            issues.append(
-                Issue("bad_timezone", f"time zone {node.cron_timezone} is unknown", node.id)
-            )
-    return issues
 
 
 async def _refuse_cycle(workflow_id: str, nodes: list[TriggerNode]) -> None:
@@ -124,7 +109,7 @@ async def activate(workflow_id: str, version: int | None) -> Activation:
     store = runtime.current().store
     spec = await asyncio.to_thread(store.get_version, workflow_id, version)
     nodes = [n for n in spec.nodes if isinstance(n, TriggerNode) and n.mode != "manual"]
-    issues = [issue for node in nodes if node.mode == "cron" for issue in _check_cron(node)]
+    issues = [issue for node in nodes if node.mode == "cron" for issue in check_cron(node)]
     if issues:
         raise SpecInvalidError(issues)
     await _refuse_cycle(workflow_id, nodes)

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from engine_support import CALLS, Api, dig, publish, run_to_end
 from flows import Spec, draft, edge, llm, tool, trigger, unique
 from pydantic import JsonValue
@@ -16,7 +18,7 @@ def test_linear_flow_templates_outputs_between_nodes(api: Api) -> None:
     ]
     publish(api, draft(nodes, [edge("start", "a"), edge("a", "b")]), wid)
     detail = run_to_end(api, wid, {"msg": "hello"})
-    assert _status(detail) == "SUCCESS"
+    assert _status(detail) == "succeeded"
     assert dig(detail, "output", "output", "b", "text") == "echo:say hello"
     assert dig(detail, "summary", "version") == 1
 
@@ -99,7 +101,7 @@ def test_step_retries_until_the_tool_succeeds(api: Api) -> None:
     node = tool("a", "flaky", tag=tag, fail_times=2)
     node["retry"] = {"max_attempts": 4, "interval_seconds": 0.01, "backoff_rate": 1.0}
     publish(api, draft([trigger(), node], [edge("start", "a")]), wid)
-    assert _status(run_to_end(api, wid)) == "SUCCESS"
+    assert _status(run_to_end(api, wid)) == "succeeded"
     assert CALLS[f"tool:{tag}"] == 3
 
 
@@ -108,7 +110,7 @@ def test_node_fails_run_when_retries_are_used_up(api: Api) -> None:
     node = tool("a", "flaky", tag=unique("t"), fail_times=5)
     publish(api, draft([trigger(), node], [edge("start", "a")]), wid)
     detail = run_to_end(api, wid)
-    assert _status(detail) == "ERROR"
+    assert _status(detail) == "failed"
     assert "node a failed" in str(dig(detail, "error"))
 
 
@@ -119,23 +121,23 @@ def test_continue_on_error_lets_the_flow_go_on(api: Api) -> None:
     nodes: list[JsonValue] = [trigger(), bad, tool("after", "echo", value="{{nodes.bad.error}}")]
     publish(api, draft(nodes, [edge("start", "bad"), edge("bad", "after")]), wid)
     detail = run_to_end(api, wid)
-    assert _status(detail) == "SUCCESS"
+    assert _status(detail) == "succeeded"
     assert "tool failed" in str(dig(detail, "output", "output", "after", "value"))
 
 
-def test_agent_node_calls_registry_tool_and_answers(api: Api) -> None:
+def test_agent_node_runs_a_pi_session_and_reports_its_work(host_api: Api) -> None:
     wid = unique("agent")
-    agent: Spec = {
-        "id": "ag",
-        "kind": "agent",
-        "role": "agent",
-        "prompt": "do {{input.x}}",
-        "tools": ["count"],
-    }
-    publish(api, draft([trigger(), agent], [edge("start", "ag")]), wid)
-    detail = run_to_end(api, wid, {"x": "work"})
-    assert _status(detail) == "SUCCESS"
-    assert str(dig(detail, "output", "output", "ag", "text")).startswith("agent done:")
+    agent: Spec = {"id": "ag", "kind": "agent", "role": "main", "prompt": "tool:{{input.x}}"}
+    publish(host_api, draft([trigger(), agent], [edge("start", "ag")]), wid)
+    detail = run_to_end(host_api, wid, {"x": "work"})
+    assert _status(detail) == "succeeded"
+    node = dig(detail, "output", "output", "ag")
+    assert dig(node, "text") == "fake done:tool:work"
+    assert dig(node, "role") == "main"
+    assert dig(node, "skills") == []
+    assert dig(node, "usage", "turns") == 2
+    assert dig(node, "tool_calls") == [{"name": "write", "ok": True}, {"name": "bash", "ok": False}]
+    assert (Path(str(dig(node, "workdir"))) / "out.txt").read_text() == "written"
     assert dig(detail, "output", "llm_calls") == 2
 
 
@@ -146,7 +148,7 @@ def test_queued_llm_node_runs_as_child_workflow(api: Api) -> None:
     detail = run_to_end(api, wid)
     run_id = dig(detail, "summary", "run_id")
     steps = dig(detail, "steps")
-    assert _status(detail) == "SUCCESS"
+    assert _status(detail) == "succeeded"
     assert isinstance(steps, list)
     children = [dig(step, "child_run_id") for step in steps]
     assert any(str(child).startswith(f"{run_id}:a:") for child in children)

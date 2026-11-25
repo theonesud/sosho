@@ -44,7 +44,7 @@ async def start(workflow_id: str, body: StartRequest) -> RunRef:
         input=body.input,
         trigger_node=body.trigger_node,
     )
-    return RunRef(run_id=await runs.start_run(params))
+    return RunRef(run_id=await runs.start_run(params, "manual"))
 
 
 @router.get("/runs")
@@ -87,4 +87,4 @@ async def resume(run_id: str) -> RunRef:
 
 @router.post("/runs/{run_id}/fork", status_code=202)
 async def fork(run_id: str, body: ForkRequest) -> RunRef:
-    return RunRef(run_id=await runs.fork_run(run_id, body.node_id, body.occurrence))
+    return RunRef(run_id=await runs.fork_run(run_id, body.node_id, body.occurrence, body.item))

@@ -2,6 +2,8 @@ from dbos import DBOS, Queue
 
 from sosho_engine.errors import NotFoundError
 
+HOST_QUEUE = "host"
+
 
 async def get_queue(name: str) -> Queue:
     queue = await DBOS.retrieve_queue_async(name)

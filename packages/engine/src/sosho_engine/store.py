@@ -11,11 +11,14 @@ from sosho_engine.store_tables import (
     METADATA,
     REPLIES,
     RUNS,
+    SKILLS,
     TRIGGERS,
     VERSIONS,
+    WORKERS,
     WORKFLOWS,
     TriggerRow,
     VersionSummary,
+    WorkerBeat,
     WorkflowSummary,
 )
 
@@ -202,3 +205,32 @@ class Store:
         )
         with self._engine.connect() as conn:
             return [row.run_id for row in conn.execute(query)]
+
+    def replace_skills(self, names: list[str]) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(delete(SKILLS))
+            for name in names:
+                conn.execute(insert(SKILLS).values(name=name))
+
+    def list_skills(self) -> list[str]:
+        with self._engine.connect() as conn:
+            return [row.name for row in conn.execute(select(SKILLS).order_by(SKILLS.c.name))]
+
+    def beat(self, executor_id: str, app_version: str) -> None:
+        values = {
+            "executor_id": executor_id,
+            "app_version": app_version,
+            "seen_ms": time.time_ns() // 10**6,
+        }
+        with self._engine.begin() as conn:
+            conn.execute(delete(WORKERS).where(WORKERS.c.executor_id == executor_id))
+            conn.execute(insert(WORKERS).values(**values))
+
+    def workers(self) -> list[WorkerBeat]:
+        with self._engine.connect() as conn:
+            return [
+                WorkerBeat(
+                    executor_id=row.executor_id, app_version=row.app_version, seen_ms=row.seen_ms
+                )
+                for row in conn.execute(select(WORKERS))
+            ]

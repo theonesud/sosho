@@ -39,8 +39,6 @@ services:
     depends_on:
       model-download:
         condition: service_completed_successfully
-    ports:
-      - "127.0.0.1:8080:8080"
     networks: [sosho-net]
     ipc: host
     cpu_shares: 256

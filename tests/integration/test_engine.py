@@ -13,7 +13,7 @@ pytestmark = pytest.mark.integration
 
 REQUEST_TIMEOUT = 20.0
 POLL_ATTEMPTS = 600
-TERMINAL = {"SUCCESS", "ERROR", "CANCELLED", "MAX_RECOVERY_ATTEMPTS_EXCEEDED"}
+TERMINAL = {"succeeded", "failed", "cancelled"}
 
 
 class Health(BaseModel):
@@ -155,7 +155,7 @@ def test_engine_creates_a_workflow_and_lists_the_node_catalog(engine: EngineClie
 def test_engine_runs_an_llm_node_through_litellm(engine: EngineClient) -> None:
     workflow_id = engine.publish(_llm_spec())
     view = engine.wait(engine.start(workflow_id), TERMINAL)
-    assert view.summary.status == "SUCCESS", view.error
+    assert view.summary.status == "succeeded", view.error
     result = RunOutput.model_validate(view.output)
     assert result.output["ask"].text.strip()
 
@@ -168,7 +168,7 @@ def test_engine_human_round_trip_approve(engine: EngineClient) -> None:
     body = {"node_id": "ask", "reply": {"action": "approve"}}
     assert engine.client.post(f"/runs/{run_id}/input", json=body).status_code == 202
     view = engine.wait(run_id, TERMINAL)
-    assert view.summary.status == "SUCCESS", view.error
+    assert view.summary.status == "succeeded", view.error
 
 
 def test_engine_cancel_stops_a_waiting_run(engine: EngineClient) -> None:
@@ -176,4 +176,4 @@ def test_engine_cancel_stops_a_waiting_run(engine: EngineClient) -> None:
     run_id = engine.start(workflow_id)
     engine.wait_pending(run_id)
     assert engine.client.post(f"/runs/{run_id}/cancel").status_code == 202
-    assert engine.wait(run_id, TERMINAL).summary.status == "CANCELLED"
+    assert engine.wait(run_id, TERMINAL).summary.status == "cancelled"

@@ -13,16 +13,15 @@ from sosho_engine.fanout import Handle, Launcher, merge_fanout, plan_fanout, sta
 from sosho_engine.jobs import NodeJob, NodeResult, RunParams
 from sosho_engine.launch import limit_seconds, remaining_seconds
 from sosho_engine.nodeflow import node_workflow
-from sosho_engine.queues import get_queue
-from sosho_engine.scheduler import RunState, join_inputs, node_data
+from sosho_engine.queues import HOST_QUEUE, get_queue
+from sosho_engine.scheduler import RunState, blocked_branches, join_inputs, node_data
 from sosho_engine.spec import Workflow
-from sosho_engine.spec_nodes import MapNode, SubworkflowNode
+from sosho_engine.spec_nodes import HOST_KINDS, MapNode, SubworkflowNode
 from sosho_engine.steps import run_inline_step
 from sosho_engine.tools import JsonDict
 
-CHILD_KINDS = frozenset({"agent", "human", "wait"})
-FANOUT_KINDS = frozenset({"map", "subworkflow"})
-AGENT_QUEUE = "cloud-io"
+CHILD_KINDS = frozenset({"agent", "skill", "human", "wait"})
+TIMEOUT_GRACE_SECONDS = 30.0
 Announce = Callable[[dict[str, str]], Awaitable[None]]
 
 
@@ -79,8 +78,10 @@ def make_jobs(ctx: RunContext, state: RunState, ready: list[str], llm_used: int)
                 data=node_data(state, node_id),
                 llm_left=shares[node_id],
                 allowed_tools=ctx.spec.policy.allowed_tools,
+                allowed_skills=ctx.spec.policy.allowed_skills,
                 join_inputs=inputs,
                 join_dead=dead,
+                blocked=blocked_branches(state, node_id),
             )
         )
     return jobs
@@ -105,11 +106,17 @@ async def _start_child(
     job: NodeJob, cid: str, remaining: float | None
 ) -> WorkflowHandleAsync[JsonDict]:
     node = job.node
-    queue = node.queue or (AGENT_QUEUE if node.kind == "agent" else None)
+    on_host = node.kind in HOST_KINDS
+    queue = HOST_QUEUE if on_host else node.queue
     payload: dict[str, JsonValue] = job.model_dump(mode="json")
     with SetWorkflowID(cid):
-        if node.timeout_seconds is not None and node.kind == "agent":
-            with SetWorkflowTimeout(limit_seconds(node.timeout_seconds, remaining)):
+        if on_host:
+            own = (
+                None
+                if node.timeout_seconds is None
+                else node.timeout_seconds + TIMEOUT_GRACE_SECONDS
+            )
+            with SetWorkflowTimeout(limit_seconds(own, remaining)):
                 return await _enqueue(queue, payload)
         return await _enqueue(queue, payload)
 

@@ -17,7 +17,7 @@ def test_workflow_filter_pages_past_the_newest_five_hundred_runs(api: Api) -> No
     last = ""
     for _ in range(NOISE):
         last = start(api, noise)
-    assert wait_terminal(api, last, attempts=1200) == "SUCCESS"
+    assert wait_terminal(api, last, attempts=1200) == "succeeded"
     first_page = api.get("/runs", workflow_id=target, limit="2").body
     second_page = api.get("/runs", workflow_id=target, limit="2", offset="2").body
     assert isinstance(first_page, list)
@@ -32,9 +32,9 @@ def test_status_and_workflow_filters_work_together(api: Api) -> None:
     wid = unique("pagec")
     publish(api, _simple(), wid)
     run_id = start(api, wid)
-    assert wait_terminal(api, run_id) == "SUCCESS"
-    done = api.get("/runs", workflow_id=wid, status="SUCCESS").body
-    other = api.get("/runs", workflow_id=wid, status="ERROR").body
+    assert wait_terminal(api, run_id) == "succeeded"
+    done = api.get("/runs", workflow_id=wid, status="succeeded").body
+    other = api.get("/runs", workflow_id=wid, status="failed").body
     assert isinstance(done, list)
     assert [dig(item, "run_id") for item in done] == [run_id]
     assert other == []

@@ -1,3 +1,4 @@
+import asyncio
 import time
 from collections import Counter
 from dataclasses import dataclass
@@ -11,8 +12,6 @@ from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
     TextPart,
-    ToolCallPart,
-    ToolReturnPart,
     UserPromptPart,
 )
 from pydantic_ai.models import Model
@@ -24,7 +23,7 @@ from sosho_engine.tools import JsonDict, ToolRegistry, builtin_tools
 
 TOKEN = "test-token-0123456789abcdef"  # noqa: S105
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
-TERMINAL = {"SUCCESS", "ERROR", "CANCELLED", "MAX_RECOVERY_ATTEMPTS_EXCEEDED"}
+TERMINAL = {"succeeded", "failed", "cancelled"}
 CALLS: Counter[str] = Counter()
 
 
@@ -37,19 +36,15 @@ def last_prompt(messages: list[ModelMessage]) -> str:
     return ""
 
 
-def _tool_return(messages: list[ModelMessage]) -> str | None:
-    for message in messages:
-        if isinstance(message, ModelRequest):
-            for part in message.parts:
-                if isinstance(part, ToolReturnPart):
-                    return str(part.content)
-    return None
+SLOW_SECONDS = 3.0
 
 
-def _chat(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+async def _chat(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
     del info
     prompt = last_prompt(messages)
     CALLS[f"llm:{prompt}"] += 1
+    if prompt.startswith("slow:"):
+        await asyncio.sleep(SLOW_SECONDS)
     if prompt.startswith("flaky:") and CALLS[f"llm:{prompt}"] < 3:
         raise RuntimeError("model is flaky")
     if prompt.startswith("json:"):
@@ -57,17 +52,7 @@ def _chat(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
     return ModelResponse(parts=[TextPart(f"echo:{prompt}")])
 
 
-def _agent(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-    returned = _tool_return(messages)
-    if returned is None and info.function_tools:
-        name = info.function_tools[0].name
-        return ModelResponse(parts=[ToolCallPart(name, {"value": last_prompt(messages)})])
-    return ModelResponse(parts=[TextPart(f"agent done:{returned}")])
-
-
 def fake_models(role: str) -> Model:
-    if role == "agent":
-        return FunctionModel(_agent, model_name="fake-agent")
     return FunctionModel(_chat, model_name="fake-chat")
 
 
@@ -92,6 +77,11 @@ async def _flaky(params: FailParams) -> JsonDict:
     return {"attempts": CALLS[f"tool:{params.tag}"]}
 
 
+async def _slow(params: CountParams) -> JsonDict:
+    await asyncio.sleep(SLOW_SECONDS)
+    return {"value": params.value}
+
+
 async def _effect(params: CountParams) -> JsonDict:
     CALLS["tool:effect"] += 1
     return {"value": params.value}
@@ -101,15 +91,19 @@ def test_tools() -> ToolRegistry:
     registry = builtin_tools()
     registry.register("count", "Count calls.", CountParams, _count)
     registry.register("flaky", "Fail some times.", FailParams, _flaky)
+    registry.register("slow", "Sleep a while.", CountParams, _slow)
     registry.register("effect", "Side effect.", CountParams, _effect, side_effect=True)
     return registry
 
 
-def make_runtime(db_path: Path) -> Runtime:
-    settings = Settings.model_validate(
+def base_settings(db_path: Path) -> Settings:
+    return Settings.model_validate(
         {"db_url": f"sqlite:///{db_path}", "api_token": TOKEN, "app_version": "test"}
     )
-    return build_runtime(settings, fake_models, test_tools())
+
+
+def make_runtime(db_path: Path) -> Runtime:
+    return build_runtime(base_settings(db_path), fake_models, test_tools())
 
 
 def dig(value: JsonValue, *path: str | int) -> JsonValue:

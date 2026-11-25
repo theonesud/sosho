@@ -19,7 +19,7 @@ def _queued_tool_child(api: Api) -> str:
 
 def _agent_child(api: Api) -> str:
     wid = unique("agchild")
-    agent: Spec = {"id": "ag", "kind": "agent", "role": "agent", "prompt": "go", "tools": ["echo"]}
+    agent: Spec = {"id": "ag", "kind": "agent", "role": "main", "prompt": "go"}
     publish(api, draft([trigger(), agent], [edge("start", "ag")]), wid)
     return wid
 
@@ -37,17 +37,21 @@ def test_map_over_queued_nodes_does_not_deadlock_the_queue(api: Api) -> None:
     nodes: list[JsonValue] = [trigger(), _map_node(_queued_tool_child(api))]
     publish(api, draft(nodes, [edge("start", "fan")]), parent)
     detail = run_to_end(api, parent, {"items": list(range(ITEMS))})
-    assert _status(detail) == "SUCCESS"
+    assert _status(detail) == "succeeded"
     assert dig(detail, "output", "output", "fan", "count") == ITEMS
 
 
-def test_nested_subworkflow_with_agent_nodes_does_not_deadlock(api: Api) -> None:
+def test_nested_subworkflow_with_agent_nodes_does_not_deadlock(host_api: Api) -> None:
     middle = unique("mid")
-    publish(api, draft([trigger(), _sub_node(_agent_child(api))], [edge("start", "inner")]), middle)
+    publish(
+        host_api,
+        draft([trigger(), _sub_node(_agent_child(host_api))], [edge("start", "inner")]),
+        middle,
+    )
     parent = unique("top")
-    publish(api, draft([trigger(), _map_node(middle)], [edge("start", "fan")]), parent)
-    detail = run_to_end(api, parent, {"items": list(range(ITEMS))})
-    assert _status(detail) == "SUCCESS"
+    publish(host_api, draft([trigger(), _map_node(middle)], [edge("start", "fan")]), parent)
+    detail = run_to_end(host_api, parent, {"items": list(range(ITEMS))})
+    assert _status(detail) == "succeeded"
     assert dig(detail, "output", "output", "fan", "count") == ITEMS
 
 
@@ -73,7 +77,7 @@ def test_child_run_inherits_the_remaining_llm_budget(api: Api) -> None:
         parent,
     )
     detail = run_to_end(api, parent)
-    assert _status(detail) == "ERROR"
+    assert _status(detail) == "failed"
     assert _calls(prompts) == 2
 
 
@@ -82,7 +86,7 @@ def test_parent_counts_the_llm_calls_of_its_child_runs(api: Api) -> None:
     parent = unique("count")
     publish(api, draft([trigger(), _sub_node(child)], [edge("start", "inner")]), parent)
     detail = run_to_end(api, parent)
-    assert _status(detail) == "SUCCESS"
+    assert _status(detail) == "succeeded"
     assert dig(detail, "output", "llm_calls") == 3
 
 
@@ -106,7 +110,7 @@ def test_child_run_cannot_use_a_tool_the_parent_policy_denies(api: Api) -> None:
         parent,
     )
     detail = run_to_end(api, parent)
-    assert _status(detail) == "ERROR"
+    assert _status(detail) == "failed"
     assert "policy denies tool count" in str(dig(detail, "error"))
 
 
@@ -122,5 +126,5 @@ def test_child_run_cannot_use_a_node_kind_the_parent_policy_denies(api: Api) -> 
         parent,
     )
     detail = run_to_end(api, parent)
-    assert _status(detail) == "ERROR"
+    assert _status(detail) == "failed"
     assert "policy denies tool nodes" in str(dig(detail, "error"))

@@ -18,11 +18,11 @@ from sosho_engine.tools import JsonDict
 FENCE = re.compile(r"^```[a-zA-Z]*\s*(.*?)\s*```$", re.DOTALL)
 
 
-def route(node: RouterNode, data: dict[str, JsonValue]) -> JsonDict:
+def route(node: RouterNode, data: dict[str, JsonValue], blocked: list[str]) -> JsonDict:
     for branch in node.branches:
-        if evaluate(branch.when, data):
+        if branch.name not in blocked and evaluate(branch.when, data):
             return {"branch": branch.name}
-    if node.default is None:
+    if node.default is None or node.default in blocked:
         raise NodeFailedError(f"router {node.id} matched no branch")
     return {"branch": node.default}
 
@@ -66,13 +66,13 @@ def _llm_settings(node: LlmNode) -> ModelSettings:
     return settings
 
 
-def _attempt() -> int:
+def attempt_number() -> int:
     status = DBOS.step_status
     return (status.current_attempt or 0) + 1 if status is not None else 1
 
 
 async def run_llm(node: LlmNode, job: NodeJob) -> NodeResult:
-    attempt = _attempt()
+    attempt = attempt_number()
     if attempt > job.llm_left:
         raise RunLimitError("the LLM call budget is used")
     messages: list[ModelMessage] = [
@@ -93,7 +93,7 @@ async def run_llm(node: LlmNode, job: NodeJob) -> NodeResult:
 async def execute_inline(job: NodeJob) -> NodeResult:
     node = job.node
     if isinstance(node, RouterNode):
-        return NodeResult(output=route(node, job.data))
+        return NodeResult(output=route(node, job.data, job.blocked))
     if isinstance(node, JoinNode):
         return NodeResult(output=join(node, job))
     if isinstance(node, ToolNode):

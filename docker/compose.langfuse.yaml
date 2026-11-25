@@ -122,6 +122,8 @@ services:
     image: postgres@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
     restart: unless-stopped
     mem_limit: 512m
+    ports:
+      - "127.0.0.1:${SOSHO_POSTGRES_PORT:-5432}:5432"
     networks: [sosho-net]
     environment:
       POSTGRES_USER: ${LANGFUSE_PG_USER:-postgres}

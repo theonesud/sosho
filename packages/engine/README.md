@@ -14,17 +14,18 @@ The engine runs workflows as durable DBOS Transact workflows. A workflow is a ve
 
 ## 2 Node Kinds
 
-Call `GET /nodes` for the JSON schema of each kind. Each node has `id`, `kind`, `retry`, and `continue_on_error`.
+Call `GET /nodes` for the JSON schema of each kind. Each node has `id`, `kind`, `name`, `queue`, `retry`, `timeout_seconds`, and `continue_on_error`.
 
 | Kind | Purpose | Notes |
 | :--- | :--- | :--- |
 | `trigger` | Start a run. | Modes: `manual`, `cron`, `webhook`, `workflow_finished`. |
 | `llm` | Send one prompt to a model role. | Set `json_output` to parse the answer. |
-| `agent` | Run a pydantic-ai agent with registry tools. | Model requests are DBOS steps. A side-effect tool is a step. |
+| `agent` | Run a pi session on the host worker. | Fields: `role`, `prompt`, `instructions`, `skills`, `max_turns`. `timeout_seconds` kills the session. |
+| `skill` | Run a pi session that uses one skill. | Fields: `skill`, `task`, `role`, `max_turns`. It runs on the host worker. |
 | `tool` | Call a registered Python tool. | Always a step. |
-| `router` | Choose one branch. | Each branch has a condition on earlier outputs. |
+| `router` | Choose one branch. | Each branch has a condition on earlier outputs. The condition `value` is a template. |
 | `map` | Run a child workflow for each list item. | Set `max_items`. |
-| `join` | Wait for parallel branches. | Set `require_all` to fail when a branch has no output. |
+| `join` | Wait for parallel branches. | Set `require_all` to fail the join when it runs and an input edge was not taken. A join with no taken input is skipped and does not fail. |
 | `human` | Wait for `approve`, `reject`, `input`, or `edit`. | A timeout applies `default_action`. |
 | `subworkflow` | Run one child workflow version. | |
 | `wait` | Sleep for a fixed time. | The sleep survives a restart. |
@@ -35,9 +36,30 @@ Rules for a graph:
 - An edge with `when` leaves a `router` or a `human` node. The value is a branch name or an action.
 - Only a `join` node can have two or more input edges.
 - A cycle needs a `loop` edge with `max_iterations`. The cap is 50.
-- Only `llm`, `agent`, and `tool` nodes accept `queue` and `timeout_seconds`.
+- A loop edge has `on_limit`. See section 2.1.
+- A condition path must name a known node that is upstream of the router. The path must start with `input`, `nodes`, or `loop`.
+- A cron trigger needs a valid cron string and a known time zone. The save of the version checks them.
+- Only `llm`, `agent`, `skill`, and `tool` nodes accept `queue` and `timeout_seconds`.
+- An `agent` node and a `skill` node accept only the queue `host`. No other kind accepts it. The issue is `host_queue`.
+- Only `llm`, `agent`, `skill`, `tool`, `router`, and `join` nodes accept `retry`. The other kinds give the issue `retry_kind`.
+- The `role` of an `agent` node or a `skill` node must be `main`, `subagent`, `subagent-code`, `local-uncensored`, or `cloud-uncensored`. The `decision` role cannot run pi. Its context is 4096 tokens and the pi prompt has about 11400 tokens. The issue is `role_unsupported`.
+- Each skill name must be in the skill catalog. The issue is `unknown_skill`. See section 4.1.
 
-A template reads earlier outputs with `{{nodes.<id>.<field>}}`. It reads the run input with `{{input.<field>}}`. It reads the loop count with `{{loop.iteration}}`.
+A template reads earlier outputs with `{{nodes.<id>.<field>}}`. It reads the run input with `{{input.<field>}}`. It reads the execution count with `{{loop.iteration}}`.
+
+`{{loop.iteration}}` is the number of finished executions of the node that renders it. It is 0 at the first execution. It is not the pass count of one loop edge.
+
+A condition `value` is rendered like other fields. A value that is exactly one placeholder keeps its type. A value with other text becomes text. Placeholders must name a known upstream node.
+
+### 2.1 Loop edges
+
+- A loop edge fires each time its source finishes and `when` matches. Each firing is one pass.
+- `on_limit` is `exit` by default. The loop edge is not taken after `max_iterations` passes. The run continues on the other edges of the source.
+- A router skips the loop branch at the cap. It chooses another branch that matches, or the default. If none is left, the router fails with `matched no branch`.
+- A human node offers only its other actions at the cap. A reply with the blocked action is refused with status 409.
+- The save needs another branch or action for each `exit` loop edge with `when`. The issue is `loop_no_exit`.
+- With `on_limit` set to `fail`, the pass after the cap fails the run with `loop {source} to {target} passed {max_iterations}`. `continue_on_error` does not catch it.
+- On a loop pass, the nodes after the loop target run again. Their earlier outputs stay readable until they run again.
 
 ## 3 Policy
 
@@ -46,10 +68,11 @@ Each version carries a policy. The engine checks it when you save the version an
 | Field | Meaning |
 | :--- | :--- |
 | `allowed_kinds` | Node kinds that the graph can use. |
-| `allowed_tools` | Tools that `tool` and `agent` nodes can call. |
+| `allowed_tools` | Tools that `tool` nodes can call. |
+| `allowed_skills` | Skills that `agent` and `skill` nodes can use. The issue is `skill_denied`. |
 | `max_steps` | Maximum node executions in one run. |
 | `max_run_seconds` | DBOS workflow timeout for the run. Every start path applies it. |
-| `max_llm_calls` | Budget of model requests. An `agent` node uses it as a request limit. |
+| `max_llm_calls` | Budget of model requests. An `agent` or `skill` node counts one request for each pi turn. |
 | `max_depth` | Maximum depth of child runs and chained runs. |
 
 ## 4 Queues
@@ -59,10 +82,54 @@ Each version carries a policy. The engine checks it when you save the version an
 | `local-gpu` | 1 |
 | `cloud-io` | 8 |
 | `host-browser` | 2 |
+| `host` | 4 |
 
-A node with `queue` runs as a child workflow on that queue. An `agent` node uses `cloud-io` when it has no queue.
+A node with `queue` runs as a child workflow on that queue. An `agent` node or a `skill` node always runs on `host`.
+
+The engine does not listen to `host`. Only the host worker listens to it. See section 4.2.
 
 A `map` node and a `subworkflow` node start their child runs without a queue. A run that only starts and awaits other runs never holds a slot of a queue. This rule prevents a deadlock between parent runs and their queued nodes.
+
+### 4.1 Skill catalog
+
+The engine container cannot see the host files. The host worker scans `.agents/skills/` for directories that hold a `SKILL.md` file. It writes the names to the table `engine_skills` at start and again when the list changes. The scan runs at each heartbeat.
+
+- The engine reads the catalog when you save or validate a version. `GET /nodes` lists it in `skills`.
+- A skill name that is not in the catalog gives the issue `unknown_skill`.
+- The catalog is empty until the worker runs once. Until then every skill name is refused.
+
+### 4.2 Host worker
+
+The host worker is a process of the same package. Command: `python -m sosho_engine worker`. It runs on the host and connects to the Postgres database through `127.0.0.1`. It listens only to the queue `host`.
+
+- Each process has its own DBOS executor id. The engine uses `engine`. The worker uses `host-worker`. With the shared default `local`, the worker can take a pending run of the engine.
+- Both processes must have the same application version. If not, host work stays enqueued. The default version is a hash of the `.py` files of the package. Set `SOSHO_ENGINE_APP_VERSION` to override it for both.
+- The worker writes a heartbeat to the table `engine_workers`. `GET /health` shows `worker.alive`, `worker.version`, and `worker.version_mismatch`. `alive` is true when a worker with the same version sent a heartbeat in the last 30 seconds.
+- Enqueued host work waits while the worker is down. It runs when the worker starts. A restarted worker recovers its own pending work.
+- DBOS also lets any process with the same version take a run from the internal queue. This happens after a recovery, a resume, a fork, or a cron start. For this reason the worker carries the full runtime. It can run any workflow.
+- The worker runs each node as `bin/pi-launcher.sh --raw -p --no-session --mode json --provider litellm --model <role> <prompt>`. The environment has `PI_SKIP_WARMUP=1` and `SOSHO_ROOT=<repo>`. The extensions `guard` and `langfuse` of the repository load with `-e`. `instructions` go to `--append-system-prompt`.
+- The working directory is `<runs_dir>/<run_id>/<node_id>`. The default `runs_dir` is `~/.sosho/runs`. The worker deletes and creates the directory again at each step run. A second run of the step after a crash gives the same result.
+- The worker links each needed skill as `<workdir>/.agents/skills/<name>`. The pi flag `--skill` did not load skills in a test. The directory did.
+- The directory keeps `events.jsonl` with every JSON event line and `stderr.log`.
+- The node output is `text`, `role`, `skill` or `skills`, `usage`, `tool_calls`, `duration_ms`, and `workdir`. `text` has at most 20000 characters. `truncated` shows a cut. `tool_calls` has at most 200 entries.
+- The step fails when pi exits with a code other than 0. It also fails when the last assistant message has `stopReason` `error`. In JSON mode pi exits with 0 in that case. A line that is not JSON is skipped.
+- The worker kills the pi process group at `timeout_seconds`. The default is 900 seconds. It also kills it when the run is cancelled, when the output is above 20 MiB, and when the session needs more than `max_turns` turns.
+- `retry` runs pi again. A failed attempt counts as `max_turns` requests.
+- The environment has `LANGFUSE_PI_PARENT_TRACE_ID`, `LANGFUSE_PI_PARENT_SPAN_ID`, and `LANGFUSE_PI_PARENT_SESSION_ID`. The trace id is a hash of the run id. The engine writes no span for the run. Verified in Langfuse: the pi spans `Subagent Turn` carry that trace id. Their parent span id is a hash of the run id and node id. No observation exists for that parent span. The LiteLLM generations nest under the pi spans.
+
+GPU limit: the worker lets one pi session at a time use a role in `gpu_roles`. The default is `local-uncensored`. A session on another role runs in parallel. The queue `host` has 4 slots. A waiting local session holds one slot. An `llm` node on the queue `local-gpu` does not share this limit. The llama.cpp server has one slot and serializes the requests.
+
+Service commands:
+
+| Command | Purpose |
+| :--- | :--- |
+| `make worker` | Run the worker in the foreground. |
+| `make worker-install` | Write `~/.config/systemd/user/sosho-worker.service`. Enable and start it. |
+| `make worker-uninstall` | Stop, disable, and remove the unit. |
+| `make worker-logs` | Follow the journal of the unit. |
+| `make up` | Starts the containers, then restarts the unit when it is active. |
+
+The unit holds no secret. It has `EnvironmentFile=` that points to the repository secrets file. Systemd reads the file at each start. The unit restarts on failure, and it starts at login. Run `loginctl enable-linger` to start it at boot. The worker builds its database URL from `LANGFUSE_PG_USER`, `LANGFUSE_PG_PASSWORD`, and `SOSHO_POSTGRES_PORT`.
 
 ## 5 Run Lifecycle
 
@@ -72,12 +139,12 @@ A `map` node and a `subworkflow` node start their child runs without a queue. A 
 4. A node on a branch that was not taken is skipped. A skipped node skips its children.
 5. The run writes events to the `log` stream and the `progress` event after each wave.
 6. A `human` node runs as a child workflow. It waits for `POST /runs/{id}/input`.
-7. The run ends with `SUCCESS` or `ERROR`. It then starts the runs of `workflow_finished` triggers.
+7. The run ends with `succeeded` or `failed`. It then starts the runs of `workflow_finished` triggers.
 
 Rules for a wave:
 
 - The engine reserves model requests for each node before the wave starts. A wave cannot pass `max_llm_calls`.
-- An `llm` node reserves one request for each allowed attempt. An `agent` node reserves `max_requests`.
+- An `llm` node reserves one request for each allowed attempt. An `agent` node or a `skill` node reserves `max_turns` for each allowed attempt.
 - A `map` node or a `subworkflow` node gets an equal share of the rest. A `map` node splits its share between its items.
 - A failed node uses its reserved requests. A retry counts as one request.
 - If a node fails and has no `continue_on_error`, the run fails at once. The engine cancels the other child runs of the run.
@@ -103,8 +170,11 @@ Control a run:
 - Cancel stops the run and its child workflows.
 - Resume starts a cancelled run again. The steps that finished keep their results.
 - Fork starts a new run from an execution of a node. Set `occurrence` to choose the execution. The run replays the earlier steps from the record.
+- For a `map` node, set `item` to fork from the child run of that item index. Items before it keep their results. `occurrence` counts executions of the node.
 
 ## 6 API
+
+A run has one status name in every response, event, and filter: `pending`, `running`, `waiting`, `succeeded`, `failed`, or `cancelled`. `waiting` means a human node waits for an answer. The run summary also has `dbos_status` with the raw DBOS status. `GET /runs?status=` accepts only these names. Another value returns 400. A function in `run_status.py` maps the DBOS status to the name.
 
 Each route needs the header `Authorization: Bearer <SOSHO_ENGINE_API_TOKEN>`. Two routes are open: `GET /health` and the webhook route. The webhook route needs `X-Sosho-Token`.
 
@@ -117,7 +187,7 @@ Each route needs the header `Authorization: Bearer <SOSHO_ENGINE_API_TOKEN>`. Tw
 | `GET, POST /workflows/{id}/versions` | List versions or save a new immutable version. |
 | `GET /workflows/{id}/versions/{n}` | Read one version. |
 | `POST /validate` | Return the issues of a draft. |
-| `POST /workflows/{id}/runs` | Start a run. |
+| `POST /workflows/{id}/runs` | Start a run from a `manual` trigger. A trigger of another mode returns 409. |
 | `GET /runs` | List runs. Filters: `status`, `workflow_id`, `limit`, `offset`. The engine keeps an index of runs for the `workflow_id` filter. |
 | `GET /runs/{id}` | Read a run, its progress, pending human requests, and steps. |
 | `GET /runs/{id}/events` | Stream run events as server-sent events. |
@@ -125,21 +195,21 @@ Each route needs the header `Authorization: Bearer <SOSHO_ENGINE_API_TOKEN>`. Tw
 | `POST /runs/{id}/cancel` | Cancel a run. |
 | `POST /runs/{id}/resume` | Resume a cancelled run. |
 | `POST /runs/{id}/fork` | Fork a run from a node. |
-| `POST, DELETE /workflows/{id}/activate` | Bind or remove the triggers of a version. |
+| `POST, DELETE /workflows/{id}/activate` | Bind or remove the triggers of a version. `POST` needs a JSON object body. Use `{}` for the latest version. |
 | `GET /schedules` | List cron schedules. |
-| `POST /schedules/{name}/{pause, resume, trigger}` | Manage a schedule. |
+| `POST /schedules/{name}/{pause, resume, trigger, delete}` | Manage a schedule. Another action returns 404. |
 | `DELETE /schedules/{name}` | Delete a schedule. |
-| `POST /webhooks/{workflow_id}/{node_id}` | Start a run from a webhook trigger. |
+| `POST /webhooks/{workflow_id}/{node_id}` | Start a run from a `webhook` trigger. The header `X-Sosho-Token` is required. |
 
 Activation reads the trigger nodes of one version:
 
-- A `cron` trigger creates a DBOS schedule. The name is `wf.<workflow_id>.<node_id>`.
+- A `cron` trigger creates a DBOS schedule. The name is `wf.<workflow_id>.<node_id>`. A cron run starts only from its schedule.
 - A `webhook` trigger gets a new token. The response shows the token one time. The engine stores only its hash.
-- A `workflow_finished` trigger starts a run when the source workflow ends.
+- A `workflow_finished` trigger starts a run when the source workflow ends and its `on_status` matches. The run input is `source_run_id`, `status`, and `output`. These runs start only from the chain.
 - Activation checks the cron strings and the time zones first. A bad value changes nothing.
 - Activation replaces a schedule that has the same name. It removes the schedules of dropped trigger nodes after it saves the new bindings.
 
-A webhook request for an unknown trigger and a request with a wrong token both return 404. A body that is not valid JSON returns 400. Each trigger accepts `SOSHO_ENGINE_WEBHOOK_RATE_PER_MINUTE` requests in one minute. More requests return 429.
+A webhook run starts only from the webhook route. A webhook request without the header `X-Sosho-Token` returns 422. A webhook request for an unknown trigger and a request with a wrong token both return 404. A body that is not valid JSON returns 400. Each trigger accepts `SOSHO_ENGINE_WEBHOOK_RATE_PER_MINUTE` requests in one minute. More requests return 429.
 
 The API limits the body size. CORS allows only loopback origins.
 
@@ -147,9 +217,16 @@ The API limits the body size. CORS allows only loopback origins.
 
 | Variable | Meaning |
 | :--- | :--- |
-| `SOSHO_ENGINE_API_TOKEN` | Bearer token for all routes except health and webhook. Required. `make setup` creates it. |
+| `SOSHO_ENGINE_API_TOKEN` | Bearer token for all routes except health and webhook. Required. It needs at least 16 characters. `make setup` creates it. |
 | `SOSHO_ENGINE_DB_URL` | System database URL. SQLite and Postgres work. |
-| `SOSHO_ENGINE_APP_VERSION` | DBOS application version. A run recovers only on the same version. |
+| `SOSHO_ENGINE_APP_VERSION` | DBOS application version. A run recovers only on the same version. The default is a hash of the package source. |
+| `SOSHO_ENGINE_EXECUTOR_ID` | DBOS executor id. The default is `engine`. The worker uses `host-worker`. |
+| `SOSHO_POSTGRES_PORT` | Host port of Postgres, on `127.0.0.1` only. The default is 5432. |
+| `SOSHO_ENGINE_RUNS_DIR` | Worker root for session directories. The default is `~/.sosho/runs`. |
+| `SOSHO_ENGINE_SKILLS_DIR` | Worker skills directory. The default is `<repo>/.agents/skills`. |
+| `SOSHO_ENGINE_PI_COMMAND` | Worker pi command. The default is `<repo>/bin/pi-launcher.sh`. |
+| `SOSHO_ENGINE_PI_DEFAULT_TIMEOUT_SECONDS`, `SOSHO_ENGINE_PI_STDOUT_CAP_BYTES` | Default session time limit and output cap. |
+| `SOSHO_ENGINE_GPU_ROLES`, `SOSHO_ENGINE_PI_EXTENSIONS` | JSON lists. Roles with one session at a time, and the pi extensions to load. |
 | `SOSHO_ENGINE_LITELLM_BASE_URL` | Base URL of LiteLLM. |
 | `SOSHO_ENGINE_MAX_BODY_BYTES` | Maximum request body size. |
 | `SOSHO_ENGINE_WEBHOOK_RATE_PER_MINUTE` | Webhook requests for each trigger in one minute. The default is 60. |
@@ -160,8 +237,14 @@ The API limits the body size. CORS allows only loopback origins.
 ## 8 Limits
 
 - DBOS uses its default pickle serializer. The portable JSON serializer fails on pydantic-ai model responses. All workflow arguments and node outputs are JSON values.
-- The agent retry policy is the DBOS default for model requests. The node `retry` field does not apply to an agent.
+- The `llm` nodes use pydantic-ai only for a direct model call through LiteLLM.
+- The node `retry` field of an `agent` or a `skill` runs pi again as a DBOS step retry. A failed attempt counts as `max_turns` requests, because the worker cannot read its real usage.
+- A pi session can run any tool of the host that pi offers. The `guard` extension blocks secret files. An orphan pi process can stay after a SIGKILL of a foreground worker. The systemd unit kills the control group at stop.
+- A new application version leaves the pending runs of the old version unrecovered. The default version changes with each code change. Restart the worker and the engine together, with `make up`.
+- Saved versions with the old `agent` fields `tools` and `max_requests` are not valid any more.
+- The worker takes the pi version from the host `pi` binary. If none exists, it uses `npx`, which is slow at the first start.
 - Fork counts only the start of a child run. A node in a loop has one execution for each pass.
+- A run that was cancelled by a timeout has the status `cancelled`.
 - A `map` node with more items than its budget share gives some child runs a budget of zero.
 - A run that started before the run index existed does not appear when you filter by `workflow_id`.
 - DBOS stops a timed out run at its next step. A long sleep delays the stop.
@@ -171,4 +254,6 @@ The API limits the body size. CORS allows only loopback origins.
 
 - Run `make test` from the repository root.
 - Unit tests in `tests/` use a SQLite database and fake models. They need no network.
+- Unit tests start a second process, the host worker, with a fake pi in `tests/fake_pi.py`. The fake prints the pi JSON events.
 - `tests/integration/test_engine.py` needs the running service. Set `SOSHO_ENGINE_URL` when the service is not on port 8123.
+- `tests/integration/test_engine_worker.py` needs `make up` and the Postgres port. The light test stops the unit `sosho-worker` while it runs a worker with the fake pi. It starts the unit again at the end. The test marked `heavy` runs with `HEAVY=1`. It uses the unit when it is active.

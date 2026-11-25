@@ -5,10 +5,22 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 IDENTIFIER = r"^[A-Za-z][A-Za-z0-9_-]{0,63}$"
 ID_PATTERN = re.compile(IDENTIFIER)
-QueueName = Literal["local-gpu", "cloud-io", "host-browser"]
+SKILL_NAME = r"^[a-z0-9][a-z0-9-]{0,63}$"
+QueueName = Literal["local-gpu", "cloud-io", "host-browser", "host"]
+HOST_KINDS = frozenset({"agent", "skill"})
 HumanAction = Literal["approve", "reject", "input", "edit"]
 NodeKind = Literal[
-    "trigger", "llm", "agent", "tool", "router", "map", "join", "human", "subworkflow", "wait"
+    "trigger",
+    "llm",
+    "agent",
+    "skill",
+    "tool",
+    "router",
+    "map",
+    "join",
+    "human",
+    "subworkflow",
+    "wait",
 ]
 MAX_TIMEOUT_SECONDS = 3600.0
 MAX_WAIT_SECONDS = 7 * 24 * 3600.0
@@ -67,8 +79,16 @@ class AgentNode(NodeBase):
     role: str
     prompt: str
     instructions: str | None = None
-    tools: list[str] = []
-    max_requests: int = Field(default=10, ge=1, le=100)
+    skills: list[Annotated[str, Field(pattern=SKILL_NAME)]] = []
+    max_turns: int = Field(default=20, ge=1, le=200)
+
+
+class SkillNode(NodeBase):
+    kind: Literal["skill"] = "skill"
+    skill: str = Field(pattern=SKILL_NAME)
+    task: str
+    role: str
+    max_turns: int = Field(default=20, ge=1, le=200)
 
 
 class ToolNode(NodeBase):
@@ -141,6 +161,7 @@ Node = Annotated[
     TriggerNode
     | LlmNode
     | AgentNode
+    | SkillNode
     | ToolNode
     | RouterNode
     | MapNode
@@ -155,6 +176,7 @@ NODE_CLASSES: dict[str, type[NodeBase]] = {
     "trigger": TriggerNode,
     "llm": LlmNode,
     "agent": AgentNode,
+    "skill": SkillNode,
     "tool": ToolNode,
     "router": RouterNode,
     "map": MapNode,

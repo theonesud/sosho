@@ -73,7 +73,7 @@ def test_a_chain_stops_when_the_depth_passes_max_depth(api: Api) -> None:
     second = _wait_runs(api, middle)
     assert len(second) == 1
     assert dig(second, 0, "parent_run_id") is not None
-    assert wait_terminal(api, str(dig(second, 0, "run_id"))) == "SUCCESS"
+    assert wait_terminal(api, str(dig(second, 0, "run_id"))) == "succeeded"
     assert _runs(api, tail) == []
     api.delete(f"/workflows/{middle}/activate")
     api.delete(f"/workflows/{tail}/activate")
@@ -98,6 +98,6 @@ def test_child_runs_of_a_map_do_not_fire_finished_triggers(api: Api) -> None:
         "version": 1,
     }
     publish(api, draft([trigger(), fan], [edge("start", "fan")]), parent)
-    assert dig(run_to_end(api, parent, {"items": [1, 2]}), "summary", "status") == "SUCCESS"
+    assert dig(run_to_end(api, parent, {"items": [1, 2]}), "summary", "status") == "succeeded"
     assert len(_runs(api, watcher)) == 1
     api.delete(f"/workflows/{watcher}/activate")

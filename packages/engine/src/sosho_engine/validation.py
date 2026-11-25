@@ -1,29 +1,31 @@
 from collections.abc import Callable
-from dataclasses import dataclass
 
 from sosho_engine.graph import adjacency, has_cycle, incoming_edges, reachable
+from sosho_engine.issues import Issue
 from sosho_engine.spec import Workflow
 from sosho_engine.spec_nodes import (
+    HOST_KINDS,
     AgentNode,
     HumanNode,
     MapNode,
     Node,
     RouterNode,
+    SkillNode,
     SubworkflowNode,
     ToolNode,
     TriggerNode,
 )
 from sosho_engine.templating import referenced_nodes, template_paths
+from sosho_engine.validation_extra import (
+    check_conditions,
+    check_cron_triggers,
+    check_loop_exits,
+    check_retry,
+)
 
-QUEUE_KINDS = frozenset({"llm", "agent", "tool"})
+QUEUE_KINDS = frozenset({"llm", "agent", "skill", "tool"})
+PI_ROLES = frozenset({"main", "subagent", "subagent-code", "local-uncensored", "cloud-uncensored"})
 BRANCH_KINDS = frozenset({"router", "human"})
-
-
-@dataclass(frozen=True)
-class Issue:
-    code: str
-    message: str
-    node: str | None = None
 
 
 class SpecInvalidError(ValueError):
@@ -134,6 +136,12 @@ def _check_node_options(spec: Workflow) -> list[Issue]:
     for node in spec.nodes:
         if node.queue is not None and node.kind not in QUEUE_KINDS:
             issues.append(Issue("queue_kind", f"a {node.kind} node has no queue", node.id))
+        if node.kind in HOST_KINDS and node.queue not in (None, "host"):
+            issues.append(
+                Issue("host_queue", f"a {node.kind} node runs only on queue host", node.id)
+            )
+        if node.kind not in HOST_KINDS and node.queue == "host":
+            issues.append(Issue("host_queue", f"a {node.kind} node cannot use queue host", node.id))
         if node.timeout_seconds is not None and node.kind not in QUEUE_KINDS:
             issues.append(Issue("timeout_kind", f"a {node.kind} node has no timeout", node.id))
     return issues
@@ -142,9 +150,23 @@ def _check_node_options(spec: Workflow) -> list[Issue]:
 def _node_tools(node: Node) -> list[str]:
     if isinstance(node, ToolNode):
         return [node.tool]
-    if isinstance(node, AgentNode):
-        return list(node.tools)
     return []
+
+
+def _node_skills(node: Node) -> list[str]:
+    if isinstance(node, SkillNode):
+        return [node.skill]
+    if isinstance(node, AgentNode):
+        return list(node.skills)
+    return []
+
+
+def _check_roles(spec: Workflow) -> list[Issue]:
+    return [
+        Issue("role_unsupported", f"role {node.role} cannot run a pi session", node.id)
+        for node in spec.nodes
+        if isinstance(node, (AgentNode, SkillNode)) and node.role not in PI_ROLES
+    ]
 
 
 def check_policy(spec: Workflow) -> list[Issue]:
@@ -157,6 +179,11 @@ def check_policy(spec: Workflow) -> list[Issue]:
             Issue("tool_denied", f"policy denies tool {tool}", node.id)
             for tool in _node_tools(node)
             if policy.allowed_tools is not None and tool not in policy.allowed_tools
+        )
+        issues.extend(
+            Issue("skill_denied", f"policy denies skill {skill}", node.id)
+            for skill in _node_skills(node)
+            if policy.allowed_skills is not None and skill not in policy.allowed_skills
         )
     return issues
 
@@ -199,13 +226,19 @@ CHECKS: tuple[Check, ...] = (
     _check_branches,
     _check_node_options,
     check_policy,
+    _check_roles,
     _check_refs,
     _check_triggers,
+    check_cron_triggers,
+    check_retry,
+    check_loop_exits,
 )
-GRAPH_CHECKS: tuple[Check, ...] = (_check_cycles, _check_reachable, _check_joins)
+GRAPH_CHECKS: tuple[Check, ...] = (_check_cycles, _check_reachable, _check_joins, check_conditions)
 
 
-def validate_workflow(spec: Workflow, known_tools: set[str] | None = None) -> list[Issue]:
+def validate_workflow(
+    spec: Workflow, known_tools: set[str] | None = None, known_skills: set[str] | None = None
+) -> list[Issue]:
     issues = [issue for check in CHECKS for issue in check(spec)]
     if not any(issue.code in ("dangling_edge", "duplicate_node") for issue in issues):
         issues.extend(issue for check in GRAPH_CHECKS for issue in check(spec))
@@ -216,10 +249,19 @@ def validate_workflow(spec: Workflow, known_tools: set[str] | None = None) -> li
                 for tool in _node_tools(node)
                 if tool not in known_tools
             )
+    if known_skills is not None:
+        for node in spec.nodes:
+            issues.extend(
+                Issue("unknown_skill", f"skill {skill} is not in the skill catalog", node.id)
+                for skill in _node_skills(node)
+                if skill not in known_skills
+            )
     return issues
 
 
-def assert_valid(spec: Workflow, known_tools: set[str] | None = None) -> None:
-    issues = validate_workflow(spec, known_tools)
+def assert_valid(
+    spec: Workflow, known_tools: set[str] | None = None, known_skills: set[str] | None = None
+) -> None:
+    issues = validate_workflow(spec, known_tools, known_skills)
     if issues:
         raise SpecInvalidError(issues)

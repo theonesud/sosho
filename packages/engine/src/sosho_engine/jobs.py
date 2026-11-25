@@ -8,6 +8,7 @@ class Inherited(BaseModel):
     llm_budget: int
     allowed_kinds: list[NodeKind] | None
     allowed_tools: list[str] | None
+    allowed_skills: list[str] | None = None
     max_depth: int
 
 
@@ -27,8 +28,10 @@ class NodeJob(BaseModel):
     data: dict[str, JsonValue]
     llm_left: int
     allowed_tools: list[str] | None = None
+    allowed_skills: list[str] | None = None
     join_inputs: dict[str, JsonValue] = {}
     join_dead: list[str] = []
+    blocked: list[str] = []
 
 
 class NodeResult(BaseModel):

@@ -43,7 +43,7 @@ def test_human_node_waits_then_approve_continues(api: Api) -> None:
     assert dig(pending, 0, "prompt") == "Ship release?"
     assert dig(pending, 0, "actions") == ["approve", "reject", "edit"]
     assert _answer(api, run_id, "approve") == 202
-    assert wait_terminal(api, run_id) == "SUCCESS"
+    assert wait_terminal(api, run_id) == "succeeded"
     expected = {"start": "done", "ask": "done", "ship": "done", "stop": "skipped"}
     assert dig(_output(api, run_id), "nodes") == expected
 
@@ -54,7 +54,7 @@ def test_human_reject_takes_the_reject_branch(api: Api) -> None:
     run_id = start(api, wid, {"what": "x"})
     wait_pending(api, run_id)
     assert _answer(api, run_id, "reject") == 202
-    assert wait_terminal(api, run_id) == "SUCCESS"
+    assert wait_terminal(api, run_id) == "succeeded"
     assert dig(_output(api, run_id), "output") == {"stop": {"value": "stopped"}}
 
 
@@ -62,7 +62,7 @@ def test_human_timeout_uses_the_default_action(api: Api) -> None:
     wid = unique("timeout")
     publish(api, _approval_spec(wait_seconds=0.3), wid)
     detail = run_to_end(api, wid, {"what": "x"})
-    assert dig(detail, "summary", "status") == "SUCCESS"
+    assert dig(detail, "summary", "status") == "succeeded"
     assert dig(detail, "output", "output") == {"stop": {"value": "stopped"}}
 
 
@@ -73,7 +73,7 @@ def test_input_with_a_disallowed_action_is_refused(api: Api) -> None:
     wait_pending(api, run_id)
     assert _answer(api, run_id, "input") == 409
     assert _answer(api, run_id, "reject") == 202
-    assert wait_terminal(api, run_id) == "SUCCESS"
+    assert wait_terminal(api, run_id) == "succeeded"
 
 
 def test_input_to_a_finished_run_is_refused(api: Api) -> None:
@@ -89,9 +89,9 @@ def test_cancel_stops_a_waiting_run_and_its_child(api: Api) -> None:
     run_id = start(api, wid, {"what": "x"})
     pending = wait_pending(api, run_id)
     assert api.post(f"/runs/{run_id}/cancel").status == 202
-    assert wait_terminal(api, run_id) == "CANCELLED"
+    assert wait_terminal(api, run_id) == "cancelled"
     child = api.get(f"/runs/{dig(pending, 0, 'run_id')}")
-    assert dig(child.body, "summary", "status") == "CANCELLED"
+    assert dig(child.body, "summary", "status") == "cancelled"
 
 
 def test_resume_restarts_a_cancelled_run_and_it_finishes(api: Api) -> None:
@@ -100,11 +100,11 @@ def test_resume_restarts_a_cancelled_run_and_it_finishes(api: Api) -> None:
     run_id = start(api, wid, {"what": "x"})
     wait_pending(api, run_id)
     api.post(f"/runs/{run_id}/cancel")
-    assert wait_terminal(api, run_id) == "CANCELLED"
+    assert wait_terminal(api, run_id) == "cancelled"
     assert api.post(f"/runs/{run_id}/resume").status == 202
     wait_pending(api, run_id)
     assert _answer(api, run_id, "approve") == 202
-    assert wait_terminal(api, run_id) == "SUCCESS"
+    assert wait_terminal(api, run_id) == "succeeded"
 
 
 def test_fork_from_a_node_replays_earlier_nodes_only(api: Api) -> None:
@@ -123,7 +123,7 @@ def test_fork_from_a_node_replays_earlier_nodes_only(api: Api) -> None:
     forked = api.post(f"/runs/{run_id}/fork", {"node_id": "two"})
     assert forked.status == 202, forked.text
     fork_id = str(dig(forked.body, "run_id"))
-    assert wait_terminal(api, fork_id) == "SUCCESS"
+    assert wait_terminal(api, fork_id) == "succeeded"
     result = api.get(f"/runs/{fork_id}").body
     assert dig(result, "summary", "forked_from") == run_id
     assert dig(result, "output", "output", "three", "calls") == first + 2

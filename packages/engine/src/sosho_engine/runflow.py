@@ -12,6 +12,7 @@ from sosho_engine.events import Telemetry, preview
 from sosho_engine.fanout import Handle
 from sosho_engine.jobs import RunParams
 from sosho_engine.launch import cancel_children, run_options
+from sosho_engine.run_status import FAILED, RUNNING, SUCCEEDED, WAITING
 from sosho_engine.scheduler import RunState, complete, new_state, settle, terminal_outputs
 from sosho_engine.spec import Workflow
 from sosho_engine.spec_nodes import Node, TriggerNode
@@ -94,11 +95,11 @@ async def _wave(run: Run, ready: list[str]) -> None:
     jobs = make_jobs(run.ctx, run.state, ready, run.llm_calls)
     for node_id in ready:
         await run.tel.log("node_started", {"node": node_id})
-    await run.tel.progress(run.snapshot("running", ready))
+    await run.tel.progress(run.snapshot(RUNNING, ready))
 
     async def announce(waiting: dict[str, str]) -> None:
         extra: dict[str, JsonValue] = {"waiting": dict(waiting)}
-        await run.tel.progress({**run.snapshot("running", ready), **extra})
+        await run.tel.progress({**run.snapshot(WAITING, ready), **extra})
 
     try:
         outcomes = await run_wave(run.ctx, run.state, jobs, launch_run, announce)
@@ -108,7 +109,7 @@ async def _wave(run: Run, ready: list[str]) -> None:
     nodes = run.ctx.spec.node_map()
     for job in jobs:
         await _apply(run, nodes[job.node.id], outcomes[job.node.id])
-    await run.tel.progress(run.snapshot("running", []))
+    await run.tel.progress(run.snapshot(RUNNING, []))
 
 
 async def _drive(run: Run) -> None:
@@ -156,13 +157,13 @@ async def run_workflow(params: dict[str, JsonValue]) -> dict[str, JsonValue]:
         await _drive(run)
     except Exception as error:
         await cancel_children(ctx.run_id)
-        await _finish(run, "failed", {"error": str(error)})
+        await _finish(run, FAILED, {"error": str(error)})
         raise
     output = terminal_outputs(run.state)
-    await _finish(run, "succeeded", output)
+    await _finish(run, SUCCEEDED, output)
     statuses: dict[str, JsonValue] = dict(run.state.statuses)
     return {
-        "status": "succeeded",
+        "status": SUCCEEDED,
         "output": output,
         "nodes": statuses,
         "steps": run.steps,

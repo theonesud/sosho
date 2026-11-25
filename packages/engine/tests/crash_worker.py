@@ -80,11 +80,11 @@ async def main(mode: str, db: Path, marker: Path, run_id: str, shape: str) -> No
         {"db_url": f"sqlite:///{db}", "api_token": TOKEN, "app_version": "test"}
     )
     active = lifecycle.build_runtime(settings, fake_models, _tools(marker, mode))
-    await lifecycle.launch(active)
+    await lifecycle.launch(active, lifecycle.engine_queues())
     if mode == "start":
         await asyncio.to_thread(active.store.create_workflow, "crash", "crash", None)
         await asyncio.to_thread(active.store.add_version, "crash", _SHAPES[shape]())
-        started = await runs.start_run(RunParams(workflow_id="crash"))
+        started = await runs.start_run(RunParams(workflow_id="crash"), "manual")
         sys.stdout.write(f"{started}\n")
         sys.stdout.flush()
         await asyncio.sleep(120)

@@ -1,3 +1,5 @@
+import asyncio
+import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -8,6 +10,7 @@ from pydantic import BaseModel
 from sosho_engine import lifecycle, routes_runs, routes_triggers, routes_workflows
 from sosho_engine.api_support import AUTH, install_error_handlers
 from sosho_engine.body_limit import BodyLimitMiddleware
+from sosho_engine.health import WorkerHealth, worker_health
 from sosho_engine.runtime import Runtime
 
 LOOPBACK_ORIGINS = r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$"
@@ -16,13 +19,14 @@ LOOPBACK_ORIGINS = r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$"
 class Health(BaseModel):
     status: str
     app_version: str
+    worker: WorkerHealth
 
 
 def create_app(active: Runtime) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         del app
-        await lifecycle.launch(active)
+        await lifecycle.launch(active, lifecycle.engine_queues())
         try:
             yield
         finally:
@@ -40,7 +44,12 @@ def create_app(active: Runtime) -> FastAPI:
 
     @app.get("/health")
     async def health() -> Health:
-        return Health(status="ok", app_version=active.settings.app_version)
+        beats = await asyncio.to_thread(active.store.workers)
+        settings = active.settings
+        worker = worker_health(
+            beats, settings.app_version, time.time_ns() // 10**6, settings.worker_alive_seconds
+        )
+        return Health(status="ok", app_version=settings.app_version, worker=worker)
 
     for module in (routes_workflows, routes_runs, routes_triggers):
         app.include_router(module.router, dependencies=AUTH)

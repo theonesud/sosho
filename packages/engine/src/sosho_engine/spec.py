@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import Field, JsonValue
 
 from sosho_engine.spec_nodes import (
@@ -18,11 +20,13 @@ class Edge(Strict):
     when: str | None = None
     loop: bool = False
     max_iterations: int | None = Field(default=None, ge=1, le=MAX_LOOP_ITERATIONS)
+    on_limit: Literal["exit", "fail"] = "exit"
 
 
 class Policy(Strict):
     allowed_kinds: list[NodeKind] | None = None
     allowed_tools: list[str] | None = None
+    allowed_skills: list[str] | None = None
     max_steps: int = Field(default=200, ge=1, le=10000)
     max_run_seconds: int = Field(default=3600, ge=1, le=7 * 24 * 3600)
     max_llm_calls: int = Field(default=50, ge=0, le=10000)

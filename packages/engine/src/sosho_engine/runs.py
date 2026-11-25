@@ -6,12 +6,13 @@ from dbos import DBOS, WorkflowStatus
 from pydantic import JsonValue, TypeAdapter, ValidationError
 
 from sosho_engine import runtime
-from sosho_engine.errors import ConflictError, NotFoundError
+from sosho_engine.errors import BadRequestError, ConflictError, NotFoundError
 from sosho_engine.events import LOG_STREAM, PROGRESS_EVENT
 from sosho_engine.human import HUMAN_TOPIC, PENDING_EVENT, HumanReply, PendingEvent, ProgressView
 from sosho_engine.jobs import RunParams
 from sosho_engine.launch import run_options
 from sosho_engine.run_models import PendingHuman, RunDetail, RunSummary, StepSummary
+from sosho_engine.run_status import RUNNING, STATUS_NAMES, WAITING, dbos_statuses, engine_status
 from sosho_engine.runflow import run_workflow
 from sosho_engine.spec_nodes import TriggerNode
 from sosho_engine.step_lookup import locate_step
@@ -37,11 +38,12 @@ def _params(status: WorkflowStatus) -> RunParams | None:
     return RunParams.model_validate(first)
 
 
-def summarize(status: WorkflowStatus) -> RunSummary:
+def summarize(status: WorkflowStatus, waiting: bool = False) -> RunSummary:
     params = _params(status)
     return RunSummary(
         run_id=status.workflow_id,
-        status=status.status,
+        status=engine_status(status.status, waiting),
+        dbos_status=status.status,
         workflow_id=params.workflow_id if params else None,
         version=params.version if params else None,
         created_at=status.created_at,
@@ -52,12 +54,16 @@ def summarize(status: WorkflowStatus) -> RunSummary:
     )
 
 
-async def start_run(params: RunParams) -> str:
+async def start_run(params: RunParams, mode: str) -> str:
     store = runtime.current().store
     spec = await asyncio.to_thread(store.get_version, params.workflow_id, params.version)
     trigger = spec.node_map().get(params.trigger_node or spec.entry)
     if not isinstance(trigger, TriggerNode):
         raise NotFoundError(f"trigger node {params.trigger_node} not found")
+    if trigger.mode != mode:
+        raise ConflictError(
+            f"trigger node {trigger.id} has mode {trigger.mode} but this route needs {mode}"
+        )
     pinned = params.model_copy(update={"version": spec.version})
     run_id = uuid.uuid4().hex
     await asyncio.to_thread(store.register_run, run_id, params.workflow_id)
@@ -67,32 +73,59 @@ async def start_run(params: RunParams) -> str:
 
 
 async def _indexed_runs(
-    workflow_id: str, status: str | None, limit: int, offset: int
+    workflow_id: str, statuses: list[str] | None, need: int | None
 ) -> list[WorkflowStatus]:
     store = runtime.current().store
     matches: list[WorkflowStatus] = []
     cursor = 0
-    while len(matches) < offset + limit:
+    while need is None or len(matches) < need:
         ids = await asyncio.to_thread(store.run_ids, workflow_id, CHUNK, cursor)
         if not ids:
             break
         cursor += len(ids)
-        found = await DBOS.list_workflows_async(
-            workflow_ids=ids, name=RUN_WORKFLOW_NAME, status=status, sort_desc=True
+        matches.extend(
+            await DBOS.list_workflows_async(
+                workflow_ids=ids, name=RUN_WORKFLOW_NAME, status=statuses, sort_desc=True
+            )
         )
-        matches.extend(found)
-    return matches[offset : offset + limit]
+    return matches
+
+
+async def _is_waiting(status: WorkflowStatus) -> bool:
+    if engine_status(status.status) != RUNNING:
+        return False
+    progress = await DBOS.get_event_async(status.workflow_id, PROGRESS_EVENT, timeout_seconds=0)
+    return bool(await _pending_humans(_json_or_repr(progress)))
+
+
+async def _found_runs(
+    status: str | None, workflow_id: str | None, limit: int, offset: int
+) -> list[WorkflowStatus]:
+    statuses = dbos_statuses(status) if status is not None else None
+    needs_all = status in (RUNNING, WAITING)
+    if workflow_id is not None:
+        return await _indexed_runs(workflow_id, statuses, None if needs_all else offset + limit)
+    if needs_all:
+        return await DBOS.list_workflows_async(
+            name=RUN_WORKFLOW_NAME, status=statuses, sort_desc=True
+        )
+    return await DBOS.list_workflows_async(
+        name=RUN_WORKFLOW_NAME, status=statuses, sort_desc=True, limit=limit, offset=offset
+    )
 
 
 async def list_runs(
     status: str | None, workflow_id: str | None, limit: int, offset: int
 ) -> list[RunSummary]:
-    if workflow_id is not None:
-        return [summarize(item) for item in await _indexed_runs(workflow_id, status, limit, offset)]
-    found = await DBOS.list_workflows_async(
-        name=RUN_WORKFLOW_NAME, status=status, sort_desc=True, limit=limit, offset=offset
-    )
-    return [summarize(item) for item in found]
+    if status is not None and status not in STATUS_NAMES:
+        raise BadRequestError(f"status {status} is unknown, use one of {', '.join(STATUS_NAMES)}")
+    found = await _found_runs(status, workflow_id, limit, offset)
+    summaries = [summarize(item, await _is_waiting(item)) for item in found]
+    if status in (RUNNING, WAITING):
+        summaries = [item for item in summaries if item.status == status]
+    if workflow_id is not None or status in (RUNNING, WAITING):
+        return summaries[offset : offset + limit]
+    return summaries
 
 
 async def get_status(run_id: str) -> WorkflowStatus:
@@ -133,12 +166,13 @@ async def _pending_humans(progress: JsonValue) -> list[PendingHuman]:
 async def run_detail(run_id: str) -> RunDetail:
     status = await get_status(run_id)
     progress = await DBOS.get_event_async(run_id, PROGRESS_EVENT, timeout_seconds=0)
+    pending = await _pending_humans(_json_or_repr(progress))
     return RunDetail(
-        summary=summarize(status),
+        summary=summarize(status, bool(pending) and engine_status(status.status) == RUNNING),
         output=_json_or_repr(status.output),
         error=str(status.error) if status.error else None,
         progress=_json_or_repr(progress),
-        pending_human=await _pending_humans(_json_or_repr(progress)),
+        pending_human=pending,
         steps=await list_steps(run_id),
     )
 
@@ -190,9 +224,9 @@ async def resume_run(run_id: str) -> str:
     return handle.workflow_id
 
 
-async def fork_run(run_id: str, node_id: str, occurrence: int) -> str:
+async def fork_run(run_id: str, node_id: str, occurrence: int, item: int | None = None) -> str:
     steps = await list_steps(run_id)
-    start = locate_step(run_id, node_id, steps, occurrence)
+    start = locate_step(run_id, node_id, steps, occurrence, item)
     version = runtime.current().settings.app_version
     handle = await DBOS.fork_workflow_async(run_id, start, application_version=version)
     params = _params(await get_status(run_id))

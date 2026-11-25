@@ -50,7 +50,7 @@ def test_activation_creates_a_cron_schedule_and_runs_it_on_trigger(api: Api) -> 
     assert api.post(f"/schedules/{name}/trigger").status == 202
     runs = _runs_of(api, wid)
     assert dig(runs, 0, "workflow_id") == wid
-    assert wait_terminal(api, str(dig(runs, 0, "run_id"))) == "SUCCESS"
+    assert wait_terminal(api, str(dig(runs, 0, "run_id"))) == "succeeded"
 
 
 def test_schedule_can_pause_resume_and_delete(api: Api) -> None:
@@ -85,7 +85,7 @@ def test_webhook_with_the_right_token_starts_a_run(api: Api) -> None:
     response = api.post_as(f"/webhooks/{wid}/start", {"msg": "from hook"}, _hook(token))
     assert response.status == 202, response.text
     run_id = str(dig(response.body, "run_id"))
-    assert wait_terminal(api, run_id) == "SUCCESS"
+    assert wait_terminal(api, run_id) == "succeeded"
     output = dig(api.get(f"/runs/{run_id}").body, "output", "output")
     assert output == {"a": {"value": "from hook"}}
 
@@ -128,7 +128,7 @@ def test_workflow_finished_trigger_starts_a_follow_up_run(api: Api) -> None:
     source_run = dig(api.post(f"/workflows/{source}/runs", {}).body, "run_id")
     runs = _runs_of(api, follower)
     follow_id = str(dig(runs, 0, "run_id"))
-    assert wait_terminal(api, follow_id) == "SUCCESS"
+    assert wait_terminal(api, follow_id) == "succeeded"
     detail = api.get(f"/runs/{follow_id}").body
     assert dig(detail, "output", "output") == {"b": {"value": "succeeded"}}
     assert dig(detail, "summary", "parent_run_id") == source_run

@@ -26,7 +26,7 @@ def _first_run(api: Api, wid: str) -> str:
 
 
 def _stopped(api: Api, run_id: str) -> bool:
-    return wait_terminal(api, run_id, attempts=160) == "CANCELLED"
+    return wait_terminal(api, run_id, attempts=160) == "cancelled"
 
 
 def test_scheduled_run_stops_at_the_run_time_limit(api: Api) -> None:
@@ -64,8 +64,8 @@ def test_child_run_stops_at_its_own_limit_when_the_parent_has_more_time(api: Api
     child = unique("tmkid")
     publish(api, _slow(nap_seconds=SHORT_NAP), child)
     run_id = _parent_of(api, child, limit=3600)
-    assert wait_terminal(api, run_id, attempts=200) == "ERROR"
-    assert _status_of(api, child) == "CANCELLED"
+    assert wait_terminal(api, run_id, attempts=200) == "failed"
+    assert _status_of(api, child) == "cancelled"
 
 
 def test_child_run_stops_at_the_parent_deadline_when_its_own_limit_is_larger(api: Api) -> None:
@@ -73,4 +73,4 @@ def test_child_run_stops_at_the_parent_deadline_when_its_own_limit_is_larger(api
     publish(api, _slow(nap_seconds=SHORT_NAP, limit=3600), child)
     run_id = _parent_of(api, child, limit=LIMIT)
     wait_terminal(api, run_id, attempts=200)
-    assert _status_of(api, child) == "CANCELLED"
+    assert _status_of(api, child) == "cancelled"

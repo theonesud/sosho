@@ -1,4 +1,4 @@
-.PHONY: setup test fix up down logs
+.PHONY: setup test fix up down logs worker worker-install worker-uninstall worker-logs
 
 MISE := $(shell command -v mise 2>/dev/null || echo $(HOME)/.local/bin/mise)
 
@@ -10,7 +10,7 @@ RUN := $(MISE) exec --
 
 COMPOSE := docker compose -p sosho
 
-LEGACY := legacy packages/llm packages/memory packages/yue2 docker/Dockerfile.yue2-gateway .pi .agents/skills models
+LEGACY := legacy packages/memory packages/yue2 docker/Dockerfile.yue2-gateway .pi .agents/skills models
 LEGACY_DOCS := docs/usecases.md
 EXCL := $(foreach p,$(LEGACY),':(exclude)$(p)')
 EXCL_MD := $(EXCL) $(foreach p,$(LEGACY_DOCS),':(exclude)$(p)')
@@ -28,7 +28,7 @@ SHFMT := $(RUN) shfmt -i 2 -ci
 
 .DEFAULT_GOAL := _usage
 _usage:
-	@echo "Sosho targets: setup, test, fix, up, down, logs."
+	@echo "Sosho targets: setup, test, fix, up, down, logs, worker, worker-install, worker-uninstall, worker-logs."
 	@echo "make setup: install mise, the pinned tools, and dependencies. Link the pi and yue2-music launchers."
 	@echo "make test: run every non-mutating check and test. Vale prints warnings only."
 	@echo "  Integration tests skip a service that does not answer. Run make up first."
@@ -37,6 +37,9 @@ _usage:
 	@echo "make up: start the Docker services. Print the service URLs."
 	@echo "make down: stop all Docker services, music profile included."
 	@echo "make logs: follow Docker logs for all services. Use S=<service> for one service."
+	@echo "make worker: run the host worker for pi sessions in the foreground."
+	@echo "make worker-install: install and start the systemd user service sosho-worker."
+	@echo "make worker-uninstall: stop and remove the service. make worker-logs: follow its log."
 	@echo "Music profile: docker compose -p sosho --profile music up -d"
 	@echo "Override variables in local.mk (gitignored) or on the command line."
 
@@ -86,7 +89,7 @@ setup:
 	else echo "No shell rc file changed."; fi
 	@if [ -f pnpm-workspace.yaml ] && grep -q '^  - ' pnpm-workspace.yaml; then PATH="$(NODE_BIN):$$PATH" $(RUN) pnpm install; fi
 
-LEGACY_TS_TESTS := packages/llm/test packages/memory/test
+LEGACY_TS_TESTS := packages/memory/test .pi/extensions/subagents/src
 
 test:
 	@rc=0; \
@@ -137,6 +140,7 @@ fix:
 
 up:
 	$(RUN) $(COMPOSE) up -d
+	@./bin/worker-service.sh restart
 	@echo "Langfuse:    http://127.0.0.1:3001"
 	@echo "LiteLLM:     http://127.0.0.1:4000"
 
@@ -145,3 +149,15 @@ down:
 
 logs:
 	$(RUN) $(COMPOSE) --profile music logs -f $(S)
+
+worker:
+	./bin/worker-service.sh run
+
+worker-install:
+	PATH="$(NODE_BIN):$$PATH" ./bin/worker-service.sh install
+
+worker-uninstall:
+	./bin/worker-service.sh uninstall
+
+worker-logs:
+	./bin/worker-service.sh logs

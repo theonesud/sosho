@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from pydantic import JsonValue
 
 from sosho_engine.spec_nodes import Condition
-from sosho_engine.templating import resolve_path
+from sosho_engine.templating import render_value, resolve_path
 
 
 def _numbers(left: JsonValue, right: JsonValue) -> tuple[float, float] | None:
@@ -38,7 +38,7 @@ def _contained(item: JsonValue, container: JsonValue) -> bool:
 
 def evaluate(condition: Condition, data: Mapping[str, JsonValue]) -> bool:
     left = resolve_path(data, condition.path)
-    right = condition.value
+    right = render_value(condition.value, data)
     op = condition.op
     simple = {
         "eq": lambda: left == right,

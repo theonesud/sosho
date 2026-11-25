@@ -35,7 +35,7 @@ def test_map_node_runs_a_child_workflow_for_each_item(api: Api) -> None:
     detail = run_to_end(api, wid, {"names": ["a", "b", "c"]})
     fan = dig(detail, "output", "output", "fan")
     results = dig(fan, "results")
-    assert _status(detail) == "SUCCESS"
+    assert _status(detail) == "succeeded"
     assert dig(fan, "count") == 3
     assert isinstance(results, list)
     assert [dig(item, "shout", "text") for item in results] == ["item:a", "item:b", "item:c"]
@@ -46,7 +46,7 @@ def test_map_node_rejects_more_items_than_its_limit(api: Api) -> None:
     nodes: list[JsonValue] = [trigger(), _map_node(_child_flow(api), max_items=2)]
     publish(api, draft(nodes, [edge("start", "fan")]), wid)
     detail = run_to_end(api, wid, {"names": [1, 2, 3]})
-    assert _status(detail) == "ERROR"
+    assert _status(detail) == "failed"
     assert "above 2" in str(dig(detail, "error"))
 
 
@@ -64,7 +64,9 @@ def test_subworkflow_node_returns_the_child_output(api: Api) -> None:
     assert dig(detail, "output", "output", "inner", "output", "shout", "text") == "item:zed"
 
 
-def _loop_flow(max_iterations: int, always: bool) -> tuple[list[JsonValue], list[JsonValue]]:
+def _loop_flow(
+    max_iterations: int, always: bool, on_limit: str = "exit"
+) -> tuple[list[JsonValue], list[JsonValue]]:
     again: Spec = {"path": "input", "op": "exists"}
     if not always:
         again = {"path": "loop.iteration", "op": "lt", "value": 3}
@@ -78,7 +80,7 @@ def _loop_flow(max_iterations: int, always: bool) -> tuple[list[JsonValue], list
     edges: list[JsonValue] = [
         edge("start", "work"),
         edge("work", "gate"),
-        edge("gate", "work", "again", loop=True, max_iterations=max_iterations),
+        edge("gate", "work", "again", loop=True, max_iterations=max_iterations, on_limit=on_limit),
     ]
     return nodes, edges
 
@@ -87,15 +89,15 @@ def test_loop_edge_repeats_until_condition_ends_it(api: Api) -> None:
     wid = unique("loop")
     publish(api, draft(*_loop_flow(5, always=False)), wid)
     detail = run_to_end(api, wid)
-    assert _status(detail) == "SUCCESS"
+    assert _status(detail) == "succeeded"
     assert dig(detail, "output", "steps") == 8
 
 
 def test_loop_limit_stops_a_loop_that_never_ends(api: Api) -> None:
     wid = unique("loopmax")
-    publish(api, draft(*_loop_flow(2, always=True)), wid)
+    publish(api, draft(*_loop_flow(2, always=True, on_limit="fail")), wid)
     detail = run_to_end(api, wid, {"go": True})
-    assert _status(detail) == "ERROR"
+    assert _status(detail) == "failed"
     assert "passed 2" in str(dig(detail, "error"))
 
 
@@ -108,7 +110,7 @@ def test_wait_node_sleeps_then_continues(api: Api) -> None:
     ]
     publish(api, draft(nodes, [edge("start", "nap"), edge("nap", "after")]), wid)
     detail = run_to_end(api, wid)
-    assert _status(detail) == "SUCCESS"
+    assert _status(detail) == "succeeded"
     assert dig(detail, "output", "output", "after") == {"value": "ok"}
 
 
@@ -118,7 +120,7 @@ def test_max_steps_policy_stops_the_run(api: Api) -> None:
     edges: list[JsonValue] = [edge("start", "a"), edge("a", "b")]
     publish(api, draft(nodes, edges, policy={"max_steps": 1}), wid)
     detail = run_to_end(api, wid)
-    assert _status(detail) == "ERROR"
+    assert _status(detail) == "failed"
     assert "passed 1 node executions" in str(dig(detail, "error"))
 
 
@@ -128,7 +130,7 @@ def test_llm_budget_policy_stops_the_run(api: Api) -> None:
     edges: list[JsonValue] = [edge("start", "a"), edge("a", "b")]
     publish(api, draft(nodes, edges, policy={"max_llm_calls": 1}), wid)
     detail = run_to_end(api, wid)
-    assert _status(detail) == "ERROR"
+    assert _status(detail) == "failed"
     assert "budget" in str(dig(detail, "error"))
 
 
@@ -148,7 +150,7 @@ def test_run_depth_policy_blocks_recursive_chains(api: Api) -> None:
     node: Spec = {"id": "inner", "kind": "subworkflow", "workflow_id": child, "version": 1}
     publish(api, draft([trigger(), node], [edge("start", "inner")]), wid)
     detail = run_to_end(api, wid)
-    assert _status(detail) == "ERROR"
+    assert _status(detail) == "failed"
     assert "depth 1 is above 0" in str(dig(detail, "error"))
 
 

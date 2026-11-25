@@ -64,11 +64,32 @@ def complete(state: RunState, node_id: str, output: JsonDict) -> None:
             _take_loop(state, index, edge)
 
 
+def _exhausted(state: RunState, index: int, edge: Edge) -> bool:
+    return state.loop_counts.get(index, 0) >= (edge.max_iterations or 0)
+
+
+def blocked_branches(state: RunState, node_id: str) -> list[str]:
+    return sorted(
+        {
+            edge.when
+            for index, edge in enumerate(state.spec.edges)
+            if edge.source == node_id
+            and edge.loop
+            and edge.when is not None
+            and edge.on_limit == "exit"
+            and _exhausted(state, index, edge)
+        }
+    )
+
+
 def _take_loop(state: RunState, index: int, edge: Edge) -> None:
-    count = state.loop_counts.get(index, 0) + 1
-    if count > (edge.max_iterations or 0):
-        raise LoopLimitError(f"loop {edge.source} to {edge.target} passed {edge.max_iterations}")
-    state.loop_counts[index] = count
+    if _exhausted(state, index, edge):
+        if edge.on_limit == "fail":
+            raise LoopLimitError(
+                f"loop {edge.source} to {edge.target} passed {edge.max_iterations}"
+            )
+        return
+    state.loop_counts[index] = state.loop_counts.get(index, 0) + 1
     plain = adjacency(state.spec.edges, include_loops=False)
     region = reachable([edge.target], plain)
     for node_id in region:

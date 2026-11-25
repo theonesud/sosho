@@ -41,6 +41,24 @@ RUNS = Table(
     Column("created_at", BigInteger, nullable=False),
     Index("engine_runs_by_workflow", "workflow_id", "created_at"),
 )
+SKILLS = Table(
+    "engine_skills",
+    METADATA,
+    Column("name", String(64), primary_key=True),
+)
+WORKERS = Table(
+    "engine_workers",
+    METADATA,
+    Column("executor_id", String(100), primary_key=True),
+    Column("app_version", String(100), nullable=False),
+    Column("seen_ms", BigInteger, nullable=False),
+)
+
+
+class WorkerBeat(BaseModel):
+    executor_id: str
+    app_version: str
+    seen_ms: int
 
 
 class WorkflowSummary(BaseModel):

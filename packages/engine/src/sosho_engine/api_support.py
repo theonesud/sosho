@@ -17,9 +17,10 @@ from sosho_engine.errors import (
     RateLimitError,
     RunLimitError,
 )
+from sosho_engine.issues import Issue
 from sosho_engine.spec import Workflow, WorkflowDraft, draft_to_workflow
 from sosho_engine.spec_nodes import MapNode, SubworkflowNode
-from sosho_engine.validation import Issue, SpecInvalidError, validate_workflow
+from sosho_engine.validation import SpecInvalidError, validate_workflow
 
 
 async def require_token(authorization: Annotated[str | None, Header()] = None) -> None:
@@ -74,7 +75,8 @@ def check_references(spec: Workflow) -> list[Issue]:
 
 async def validate_draft(workflow_id: str, draft: WorkflowDraft, version: int) -> list[Issue]:
     spec = draft_to_workflow(draft, workflow_id, version)
-    tools = runtime.current().tools.names()
-    issues = validate_workflow(spec, tools)
+    active = runtime.current()
+    skills = set(await asyncio.to_thread(active.store.list_skills))
+    issues = validate_workflow(spec, active.tools.names(), skills)
     issues.extend(await asyncio.to_thread(check_references, spec))
     return issues

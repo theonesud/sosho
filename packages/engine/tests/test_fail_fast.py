@@ -22,7 +22,7 @@ def _settle(api: Api, run_id: str) -> str:
     status = ""
     while time.monotonic() < deadline:
         status = wait_terminal(api, run_id, attempts=1)
-        if status == "ERROR":
+        if status == "failed":
             break
         time.sleep(0.05)
     return status
@@ -34,12 +34,12 @@ def test_failed_node_fails_the_run_without_waiting_for_a_human(api: Api) -> None
     nodes: list[JsonValue] = [trigger(), human, _failing()]
     publish(api, draft(nodes, [edge("start", "ask"), edge("start", "bad")]), wid)
     run_id = start(api, wid)
-    assert _settle(api, run_id) == "ERROR"
+    assert _settle(api, run_id) == "failed"
     detail = api.get(f"/runs/{run_id}").body
     assert "node bad failed" in str(dig(detail, "error"))
     assert wait_pending(api, run_id, attempts=1) == []
     statuses = {str(dig(child, "status")) for child in _children(api, run_id)}
-    assert statuses <= {"CANCELLED"}
+    assert statuses <= {"cancelled"}
 
 
 def test_failed_node_cancels_sibling_child_runs_of_a_map(api: Api) -> None:
@@ -57,13 +57,13 @@ def test_failed_node_cancels_sibling_child_runs_of_a_map(api: Api) -> None:
     nodes: list[JsonValue] = [trigger(), fan, _failing()]
     publish(api, draft(nodes, [edge("start", "fan"), edge("start", "bad")]), wid)
     run_id = start(api, wid, {"items": [1, 2]})
-    assert _settle(api, run_id) == "ERROR"
+    assert _settle(api, run_id) == "failed"
     found = _children(api, run_id)
     deadline = time.monotonic() + PATIENCE
     while time.monotonic() < deadline:
         found = _children(api, run_id)
-        if found and all(dig(item, "status") == "CANCELLED" for item in found):
+        if found and all(dig(item, "status") == "cancelled" for item in found):
             break
         time.sleep(0.1)
     assert found
-    assert all(dig(item, "status") == "CANCELLED" for item in found)
+    assert all(dig(item, "status") == "cancelled" for item in found)

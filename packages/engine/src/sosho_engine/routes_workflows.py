@@ -7,10 +7,11 @@ from pydantic import BaseModel
 from sosho_engine import runtime, triggers
 from sosho_engine.api_support import validate_draft
 from sosho_engine.catalog import Catalog, build_catalog
+from sosho_engine.issues import Issue
 from sosho_engine.spec import Workflow, WorkflowDraft
 from sosho_engine.spec_nodes import IDENTIFIER
 from sosho_engine.store_tables import VersionSummary, WorkflowSummary
-from sosho_engine.validation import Issue, SpecInvalidError
+from sosho_engine.validation import SpecInvalidError
 
 ID_RE = re.compile(IDENTIFIER)
 
@@ -41,7 +42,9 @@ router = APIRouter()
 
 @router.get("/nodes")
 async def nodes() -> Catalog:
-    return build_catalog(runtime.current().tools)
+    active = runtime.current()
+    skills = await asyncio.to_thread(active.store.list_skills)
+    return build_catalog(active.tools, skills)
 
 
 @router.get("/workflows")

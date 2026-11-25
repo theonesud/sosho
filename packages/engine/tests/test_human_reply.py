@@ -25,7 +25,7 @@ def test_second_reply_to_the_same_request_is_refused(api: Api) -> None:
     wait_pending(api, run_id)
     assert _reply(api, run_id, "approve") == 202
     assert _reply(api, run_id, "reject") == 409
-    assert wait_terminal(api, run_id) == "SUCCESS"
+    assert wait_terminal(api, run_id) == "succeeded"
     assert _reply(api, run_id, "approve") == 409
 
 
@@ -38,9 +38,9 @@ def test_invalid_action_does_not_end_the_wait(api: Api) -> None:
     DBOS.send(child, {"action": "input", "value": None}, HUMAN_TOPIC)
     time.sleep(1.0)
     detail = api.get(f"/runs/{run_id}").body
-    assert dig(detail, "summary", "status") == "PENDING"
+    assert dig(detail, "summary", "status") == "waiting"
     still = dig(detail, "pending_human")
     assert isinstance(still, list)
     assert len(still) == 1
     assert _reply(api, run_id, "approve") == 202
-    assert wait_terminal(api, run_id) == "SUCCESS"
+    assert wait_terminal(api, run_id) == "succeeded"

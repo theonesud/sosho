@@ -72,4 +72,4 @@ async def webhook(
         input=await _body_dict(request),
         trigger_node=node_id,
     )
-    return RunRef(run_id=await runs.start_run(params))
+    return RunRef(run_id=await runs.start_run(params, "webhook"))

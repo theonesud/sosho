@@ -3,7 +3,19 @@ from fastapi.testclient import TestClient
 from flows import Spec, draft, edge, tool, trigger, unique
 from pydantic import JsonValue
 
-KINDS = {"trigger", "llm", "agent", "tool", "router", "map", "join", "human", "subworkflow", "wait"}
+KINDS = {
+    "trigger",
+    "llm",
+    "agent",
+    "skill",
+    "tool",
+    "router",
+    "map",
+    "join",
+    "human",
+    "subworkflow",
+    "wait",
+}
 
 
 def _simple() -> Spec:
@@ -20,7 +32,9 @@ def _make(api: Api, prefix: str) -> str:
 def test_health_reports_ok_without_a_token(api: Api) -> None:
     response = api.send("GET", "/health", headers={})
     assert response.status == 200
-    assert response.body == {"status": "ok", "app_version": "test"}
+    assert dig(response.body, "status") == "ok"
+    assert dig(response.body, "app_version") == "test"
+    assert isinstance(dig(response.body, "worker", "alive"), bool)
 
 
 def test_nodes_catalog_lists_every_kind_tool_and_queue(api: Api) -> None:

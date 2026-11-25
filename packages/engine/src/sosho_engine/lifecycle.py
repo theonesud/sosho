@@ -7,8 +7,9 @@ from sqlalchemy.engine import make_url
 
 from sosho_engine import runtime
 from sosho_engine.catalog import QUEUES
+from sosho_engine.queues import HOST_QUEUE
 from sosho_engine.ratelimit import RateLimiter
-from sosho_engine.runtime import AgentPool, ModelFactory, Runtime
+from sosho_engine.runtime import ModelFactory, Runtime
 from sosho_engine.settings import Settings
 from sosho_engine.store import Store
 from sosho_engine.tools import ToolRegistry, builtin_tools
@@ -34,6 +35,7 @@ def dbos_config(settings: Settings) -> DBOSConfig:
         "name": APP_NAME,
         "system_database_url": settings.db_url,
         "application_version": settings.app_version,
+        "executor_id": settings.executor_id,
         "log_level": "WARNING",
         "run_migrations": True,
     }
@@ -44,10 +46,14 @@ def build_runtime(
 ) -> Runtime:
     registry = tools if tools is not None else builtin_tools()
     limiter = RateLimiter(settings.webhook_rate_per_minute)
-    return Runtime(settings, Store(settings.db_url), registry, models, AgentPool(models), limiter)
+    return Runtime(settings, Store(settings.db_url), registry, models, limiter)
 
 
-async def launch(active: Runtime) -> None:
+def engine_queues() -> list[str]:
+    return [name for name in QUEUES if name != HOST_QUEUE]
+
+
+async def launch(active: Runtime, listen: list[str]) -> None:
     sqlite = active.settings.sqlite_path()
     if sqlite is not None:
         await asyncio.to_thread(sqlite.parent.mkdir, parents=True, exist_ok=True)
@@ -56,6 +62,7 @@ async def launch(active: Runtime) -> None:
     runtime.install(active)
     start_tracing(active.settings)
     DBOS(config=dbos_config(active.settings))
+    DBOS.listen_queues(listen)
     await asyncio.to_thread(DBOS.launch)
     for name, limits in QUEUES.items():
         await DBOS.register_queue_async(

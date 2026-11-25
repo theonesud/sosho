@@ -1,18 +1,18 @@
 from sosho_engine.errors import PolicyError, RunLimitError
 from sosho_engine.jobs import Inherited, NodeJob
 from sosho_engine.spec import Policy, Workflow
-from sosho_engine.spec_nodes import AgentNode, LlmNode, Node
+from sosho_engine.spec_nodes import AgentNode, LlmNode, Node, SkillNode
 from sosho_engine.tools import JsonDict
 
 FANOUT_KINDS = frozenset({"map", "subworkflow"})
-COUNTED_KINDS = frozenset({"llm", "agent", "map", "subworkflow"})
+COUNTED_KINDS = frozenset({"llm", "agent", "skill", "map", "subworkflow"})
 
 
 def _want(node: Node) -> int:
     if isinstance(node, LlmNode):
         return node.retry.max_attempts
-    if isinstance(node, AgentNode):
-        return node.max_requests
+    if isinstance(node, (AgentNode, SkillNode)):
+        return node.max_turns * node.retry.max_attempts
     return 0
 
 
@@ -53,6 +53,7 @@ def effective_policy(policy: Policy, inherited: Inherited | None) -> Policy:
         update={
             "allowed_kinds": _meet(policy.allowed_kinds, inherited.allowed_kinds),
             "allowed_tools": _meet(policy.allowed_tools, inherited.allowed_tools),
+            "allowed_skills": _meet(policy.allowed_skills, inherited.allowed_skills),
             "max_llm_calls": min(policy.max_llm_calls, inherited.llm_budget),
             "max_depth": min(policy.max_depth, inherited.max_depth),
         }
@@ -65,6 +66,7 @@ def inherit_from(spec: Workflow, reserved: int, children: int) -> Inherited:
         llm_budget=child_budget(reserved, children),
         allowed_kinds=policy.allowed_kinds,
         allowed_tools=policy.allowed_tools,
+        allowed_skills=policy.allowed_skills,
         max_depth=policy.max_depth,
     )
 

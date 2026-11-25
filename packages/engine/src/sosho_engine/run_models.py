@@ -1,4 +1,4 @@
-from pydantic import BaseModel, JsonValue
+from pydantic import BaseModel, Field, JsonValue
 
 from sosho_engine.human import HumanReply
 
@@ -6,6 +6,7 @@ from sosho_engine.human import HumanReply
 class RunSummary(BaseModel):
     run_id: str
     status: str
+    dbos_status: str
     workflow_id: str | None
     version: int | None
     created_at: int | None
@@ -51,3 +52,4 @@ class InputRequest(BaseModel):
 class ForkRequest(BaseModel):
     node_id: str
     occurrence: int = 1
+    item: int | None = Field(default=None, ge=0)
