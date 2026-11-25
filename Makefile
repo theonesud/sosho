@@ -10,7 +10,7 @@ RUN := $(MISE) exec --
 
 COMPOSE := docker compose -p sosho
 
-LEGACY := legacy apps packages/llm packages/memory packages/workflow-engine packages/yue2 docker/Dockerfile.yue2-gateway .pi .agents/skills models
+LEGACY := legacy packages/llm packages/memory packages/yue2 docker/Dockerfile.yue2-gateway .pi .agents/skills models
 LEGACY_DOCS := docs/usecases.md
 EXCL := $(foreach p,$(LEGACY),':(exclude)$(p)')
 EXCL_MD := $(EXCL) $(foreach p,$(LEGACY_DOCS),':(exclude)$(p)')
@@ -34,8 +34,8 @@ _usage:
 	@echo "  Integration tests skip a service that does not answer. Run make up first."
 	@echo "  LIVE_STRICT=1 fails on a missing service. CLOUD=1 and HEAVY=1 add the opt-in tests."
 	@echo "make fix: apply safe auto-fixes (format and lint fixes)."
-	@echo "make up: start the Docker services and the Studio dev servers. Print the service URLs."
-	@echo "make down: stop the Studio dev servers and all Docker services, music profile included."
+	@echo "make up: start the Docker services. Print the service URLs."
+	@echo "make down: stop all Docker services, music profile included."
 	@echo "make logs: follow Docker logs for all services. Use S=<service> for one service."
 	@echo "Music profile: docker compose -p sosho --profile music up -d"
 	@echo "Override variables in local.mk (gitignored) or on the command line."
@@ -86,7 +86,7 @@ setup:
 	else echo "No shell rc file changed."; fi
 	@if [ -f pnpm-workspace.yaml ] && grep -q '^  - ' pnpm-workspace.yaml; then PATH="$(NODE_BIN):$$PATH" $(RUN) pnpm install; fi
 
-LEGACY_TS_TESTS := packages/llm/test packages/memory/test packages/workflow-engine/test apps/studio/server
+LEGACY_TS_TESTS := packages/llm/test packages/memory/test
 
 test:
 	@rc=0; \
@@ -137,24 +137,10 @@ fix:
 
 up:
 	$(RUN) $(COMPOSE) up -d
-	@mkdir -p .pi/run
-	@if ! lsof -iTCP:4101 -sTCP:LISTEN >/dev/null 2>&1; then \
-		nohup npm --prefix apps/studio run dev:api > .pi/run/studio-api.log 2>&1 & echo $$! > .pi/run/studio-api.pid; \
-	fi
-	@if ! lsof -iTCP:3000 -sTCP:LISTEN >/dev/null 2>&1; then \
-		nohup npm --prefix apps/studio run dev:ui > .pi/run/studio-ui.log 2>&1 & echo $$! > .pi/run/studio-ui.pid; \
-	fi
-	@echo "Studio UI:   http://127.0.0.1:3000"
-	@echo "Studio API:  http://127.0.0.1:4101/api/docs"
 	@echo "Langfuse:    http://127.0.0.1:3001"
 	@echo "LiteLLM:     http://127.0.0.1:4000"
-	@echo "LangGraph:   http://127.0.0.1:8123"
-	@echo "Langflow:    http://127.0.0.1:7860"
 
 down:
-	@for f in .pi/run/studio-ui.pid .pi/run/studio-api.pid; do \
-		if [ -f "$$f" ]; then kill "$$(cat "$$f")" 2>/dev/null || true; rm -f "$$f"; fi; \
-	done
 	$(RUN) $(COMPOSE) --profile music down
 
 logs:

@@ -71,7 +71,7 @@ def _pyproject_specs(path: Path) -> list[str]:
     "path", _tracked("*pyproject.toml"), ids=lambda p: str(p.relative_to(ROOT))
 )
 def test_python_dependencies_use_exact_versions(path: Path) -> None:
-    workspace = {"sosho-graph"}
+    workspace: set[str] = set()
     bad = [s for s in _pyproject_specs(path) if s not in workspace and not EXACT_PY.match(s)]
     assert bad == []
 

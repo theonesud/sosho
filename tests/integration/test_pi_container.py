@@ -11,7 +11,6 @@ DOCKER_SOCKET = "/var/run/" + "docker" + ".sock"
 SERVICE_URLS = [
     "http://litellm:4000/health/liveliness",
     "http://llama-cpp:8080/health",
-    "http://sosho-graph:8123/health",
 ]
 
 

@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from tests.conftest import LANGFLOW_URL, LANGFUSE_URL, STUDIO_API_URL, require_service
+from tests.conftest import LANGFUSE_URL, require_service
 
 pytestmark = pytest.mark.integration
 
@@ -18,15 +18,3 @@ def test_langfuse_public_health_returns_200() -> None:
     require_service("langfuse", LANGFUSE_URL)
     status = _get_status(f"{LANGFUSE_URL}/api/public/health")
     assert status == 200, f"langfuse health returned {status}"
-
-
-def test_langflow_health_returns_200() -> None:
-    require_service("langflow", LANGFLOW_URL)
-    status = _get_status(f"{LANGFLOW_URL}/health")
-    assert status == 200, f"langflow health returned {status}"
-
-
-def test_studio_health_returns_200_without_token() -> None:
-    require_service("studio-api", STUDIO_API_URL)
-    status = _get_status(f"{STUDIO_API_URL}/health")
-    assert status == 200, f"studio health returned {status}"

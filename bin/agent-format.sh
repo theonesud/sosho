@@ -36,7 +36,7 @@ case "$file" in
 esac
 
 case "$rel" in
-  legacy/* | apps/* | packages/llm/* | packages/memory/* | packages/workflow-engine/* | packages/yue2/* | .pi/* | .agents/skills/* | models/* | skills-lock.json) exit 0 ;;
+  legacy/* | packages/llm/* | packages/memory/* | packages/yue2/* | .pi/* | .agents/skills/* | models/* | skills-lock.json) exit 0 ;;
 esac
 
 command -v mise >/dev/null 2>&1 || exit 0

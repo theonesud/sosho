@@ -1,9 +1,4 @@
 [[comment]]
-path = "packages/graph/src/sosho_graph/runs.py"
-text = "# Check and set the status without an await in between. Two resumes cannot start twice."
-reason = "An await between the check and the set lets two resume calls start the same run. No test can catch the race reliably."
-
-[[comment]]
 path = "compose.yaml"
 text = "# llama-cpp uses service_started, because yue2 can unload it."
 reason = "With service_healthy, LiteLLM stops after a music job unloads the router models."
