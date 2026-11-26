@@ -111,8 +111,8 @@ Run every script with `python3 -I`. `C` is the campaign folder name.
 
 | Script | Use |
 |---|---|
-| `scripts/export_langfuse.py list --model M` | List recorded conversations in Langfuse. |
-| `scripts/export_langfuse.py export --model M --campaign C --group S1=HASH --singles W1=40` | Write replay files to `campaigns/C/replays/`, with secrets removed. |
+| `scripts/export_phoenix.py list --model M [--project P] [--since T]` | List recorded conversations in Phoenix. `M` is a LiteLLM alias or an upstream model name. |
+| `scripts/export_phoenix.py export --model M --campaign C --group S1=HASH --singles W1=40` | Write replay files to `campaigns/C/replays/`, with secrets removed. |
 | `scripts/run.py --campaign C queue b0 cand1 cand2 b0 --profile quick` | One batch. Starts and stops the engine container for each config, writes the ledger, and prints one score line per config. Use `--roles` to set the roles. |
 | `scripts/run.py --campaign C serve CONFIG` and `stop` | Leave one config running, for manual tests. |
 | `scripts/replay.py --base-url URL --campaign C --replay S1 [--limit N]` | M3 against a running server. |
@@ -122,3 +122,11 @@ Run every script with `python3 -I`. `C` is the campaign folder name.
 | `scripts/load_gen.py --procs 1 --duty 1.0` | Synthetic CPU load for the `stress` profile. |
 
 `campaigns/C/campaign.json` holds the engine image, model, port, context, replays, reps, sampling, and the containers to stop during runs. `campaigns/C/configs/NAME.json` holds one config: `serve_args`, `env`, `docker_args`, and `cache` (`fresh` for an empty cache on each start, or a folder name to keep it).
+
+### Phoenix replay source
+
+1. The source is the LiteLLM `chat` span in Phoenix, on `http://127.0.0.1:6006`.
+2. The span holds the full request in `gen_ai.input.messages` only if LiteLLM runs with `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=span_only`. The default is `no_content`.
+3. Phoenix does not keep `reasoning_effort`, `stream`, or `stream_options`. The replay file holds `null` for `reasoning_effort`.
+4. A raw Langfuse ClickHouse archive of 3710 events exists in Native format with zstd, at `campaigns/qwen36-35b-a3b-heretic-q4km__rustingstrata__beast/replays/langfuse-archive-2026-11-26/`.
+5. Reading the archive needs a ClickHouse server. Restore command, not verified: `zstd -dc <file> | clickhouse-client --query "INSERT INTO default.<table> FORMAT Native"`.

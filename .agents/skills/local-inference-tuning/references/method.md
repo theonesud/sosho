@@ -60,7 +60,7 @@ Count tokens from the server `usage` fields, not from stream chunks. Speculative
 
 The replay uses the recorded history, not the new model output. This keeps the workload identical between runs.
 
-Best source: the exact request bodies from a tracing tool, for example Langfuse or Arize Phoenix behind the LLM proxy. They hold the real system prompt, the tools, and the way the agent sends old reasoning back. Second-best source: the agent's session files. Rebuild the requests from those only when no trace exists.
+Best source: the exact request bodies from a tracing tool, for example Arize Phoenix behind the LLM proxy. Use `scripts/export_phoenix.py` and the notes in `SKILL.md` section 6. They hold the real system prompt, the tools, and the way the agent sends old reasoning back. Second-best source: the agent's session files. Rebuild the requests from those only when no trace exists.
 
 1. For each assistant turn t, use the recorded request, or build it from the recorded messages before turn t. Include the system prompt and the tool definitions. Keep `reasoning_content` on the old assistant messages if the agent sends it.
 2. The agent may send no sampling values and rely on the server preset. The replay sends the serving values explicitly, because engines have different defaults.
