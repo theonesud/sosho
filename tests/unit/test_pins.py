@@ -41,14 +41,36 @@ class PackageJson(BaseModel):
     optionalDependencies: dict[str, str] = {}  # noqa: N815
 
 
+PI_PACKAGE_PREFIX = "@earendil-works/pi-"
+
+
+def _npm_version_ok(name: str, version: str) -> bool:
+    if version.startswith("workspace:") or EXACT_SEMVER.match(version):
+        return True
+    return name.startswith(PI_PACKAGE_PREFIX) and version == "latest"
+
+
+def _unpinned_deps(deps: dict[str, str]) -> list[str]:
+    return [
+        f"{name}@{version}" for name, version in deps.items() if not _npm_version_ok(name, version)
+    ]
+
+
 def _npm_unpinned(path: Path) -> list[str]:
     data = PackageJson.model_validate_json(path.read_text())
-    deps = data.dependencies | data.devDependencies | data.optionalDependencies
-    return [
-        f"{name}@{version}"
-        for name, version in deps.items()
-        if not version.startswith("workspace:") and not EXACT_SEMVER.match(version)
-    ]
+    return _unpinned_deps(data.dependencies | data.devDependencies | data.optionalDependencies)
+
+
+def test_pi_package_may_use_latest() -> None:
+    assert _unpinned_deps({"@earendil-works/pi-coding-agent": "latest"}) == []
+
+
+def test_non_pi_package_with_latest_fails() -> None:
+    assert _unpinned_deps({"@langfuse/otel": "latest"}) == ["@langfuse/otel@latest"]
+
+
+def test_pi_package_with_range_fails() -> None:
+    assert _unpinned_deps({"@earendil-works/pi-coding-agent": "^1.6.0"}) != []
 
 
 @pytest.mark.parametrize("path", _tracked("*package.json"), ids=lambda p: str(p.relative_to(ROOT)))

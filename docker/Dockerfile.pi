@@ -14,8 +14,10 @@ RUN apt-get update \
     python3-venv=3.13.5-1 \
   && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g \
-    @earendil-works/pi-coding-agent@1.6.0 \
+ARG PI_CACHE_BUST=0
+RUN echo "pi cache bust: $PI_CACHE_BUST" \
+  && npm install -g \
+    @earendil-works/pi-coding-agent@latest \
     @dokobot/cli@2.11.0 \
     @langfuse/otel@6.1.1 \
     @langfuse/tracing@6.1.1 \

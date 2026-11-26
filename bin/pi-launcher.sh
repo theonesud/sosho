@@ -32,6 +32,8 @@ Environment:
   PI_MODE              container or raw. Default: container.
   PI_SKIP_WARMUP       1 skips the local model warm-up.
   PI_VERSION           Raw mode only. The pi version for the npx fallback.
+  SOSHO_PI_STATE       root forces the repository .pi state and cache for any
+                       working folder. The engine host worker sets it.
   SOSHO_ROOT           Repository root. Default: parent of the script directory.
   LANGFUSE_BASE_URL    Raw mode only. Default: http://127.0.0.1:3001.
                        Container mode uses http://langfuse-web:3000.
@@ -133,7 +135,19 @@ if [ "$MODE" = "container" ] && ! docker network inspect "$COMPOSE_NETWORK" >/de
   exit 1
 fi
 
-TARGET_PI="$WORKSPACE/.pi"
+REAL_ROOT="$(realpath "$SOSHO_ROOT")"
+REAL_WORKSPACE="$(realpath "$WORKSPACE")"
+INSIDE_REPO=0
+case "$REAL_WORKSPACE/" in
+  "$REAL_ROOT"/*) INSIDE_REPO=1 ;;
+esac
+ROOT_STATE="$INSIDE_REPO"
+[ "${SOSHO_PI_STATE:-}" = "root" ] && ROOT_STATE=1
+if [ "$ROOT_STATE" -eq 1 ]; then
+  TARGET_PI="$SOSHO_PI"
+else
+  TARGET_PI="$WORKSPACE/.pi"
+fi
 mkdir -p "$TARGET_PI/.cache" "$TARGET_PI/.config" "$TARGET_PI/scratchpad"
 
 AUTO_UPDATE_STAMP="$TARGET_PI/.cache/.last_ext_update"
@@ -148,7 +162,7 @@ if [ "$MODE" = "container" ] && [ $((NOW - LAST_UPDATE)) -gt 86400 ] && [ "$SKIP
     LATEST_PI_VERSION="$(curl -fsS -m 15 "https://registry.npmjs.org/@earendil-works%2fpi-coding-agent/latest" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version",""))' 2>/dev/null || true)"
     if [ -n "$IMAGE_PI_VERSION" ] && [ -n "$LATEST_PI_VERSION" ] && [ "$IMAGE_PI_VERSION" != "$LATEST_PI_VERSION" ]; then
       echo "New pi version available ($IMAGE_PI_VERSION -> $LATEST_PI_VERSION). Rebuilding $IMAGE_NAME..."
-      docker build --no-cache --pull -t "$IMAGE_NAME" -f "$SOSHO_ROOT/docker/Dockerfile.pi" "$SOSHO_ROOT" || true
+      docker build --pull --build-arg "PI_CACHE_BUST=$NOW" -t "$IMAGE_NAME" -f "$SOSHO_ROOT/docker/Dockerfile.pi" "$SOSHO_ROOT" || true
     fi
   fi
 
@@ -160,18 +174,20 @@ if [ "$MODE" = "container" ] && [ $((NOW - LAST_UPDATE)) -gt 86400 ] && [ "$SKIP
     -e "npm_config_cache=$TARGET_PI/.cache/npm" \
     --tmpfs "$HOME:uid=$(id -u),gid=$(id -g),mode=0755" \
     -v "$WORKSPACE:$WORKSPACE" \
+    -v "$TARGET_PI:$TARGET_PI" \
     -w "$WORKSPACE" \
     "$IMAGE_NAME" \
     update --all >/dev/null 2>&1 || true
   echo "$NOW" >"$AUTO_UPDATE_STAMP" 2>/dev/null || true
 fi
 
-if [ ! -f "$TARGET_PI/models.json" ] && [ -f "$SOSHO_PI/models.json" ]; then
-  cp "$SOSHO_PI/models.json" "$TARGET_PI/models.json"
+if [ "$ROOT_STATE" -eq 0 ]; then
+  if [ ! -f "$TARGET_PI/models.json" ] && [ -f "$SOSHO_PI/models.json" ]; then
+    cp "$SOSHO_PI/models.json" "$TARGET_PI/models.json"
+  fi
+  sync_llama_context "$TARGET_PI" "$WORKSPACE_ENV"
+  sync_compaction "$TARGET_PI"
 fi
-
-sync_llama_context "$TARGET_PI" "$WORKSPACE_ENV"
-sync_compaction "$TARGET_PI"
 
 LANGFUSE_URL="${LANGFUSE_BASE_URL:-http://127.0.0.1:3001}"
 env_value() {
@@ -205,20 +221,11 @@ if [ "$MODE" = "raw" ]; then
     exec "$HOST_PI" "${FINAL_ARGS[@]}"
   fi
 
-  PI_PKG="@earendil-works/pi-coding-agent"
-  RAW_VERSION="${PI_VERSION:-}"
-  if [ -z "$RAW_VERSION" ] && docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
-    RAW_VERSION="$(docker run --rm "$IMAGE_NAME" --version 2>/dev/null | head -n1 | tr -d '[:space:]' || true)"
-  fi
-  if [ -z "$RAW_VERSION" ]; then
-    echo "Error: no host pi binary and no pi version found. Set PI_VERSION or build $IMAGE_NAME." >&2
-    exit 1
-  fi
   command -v npx >/dev/null 2>&1 || {
     echo "Error: npx is required for raw mode without a host pi binary." >&2
     exit 1
   }
-  exec npx -y "$PI_PKG@$RAW_VERSION" "${FINAL_ARGS[@]}"
+  exec npx -y --prefer-online "@earendil-works/pi-coding-agent@${PI_VERSION:-latest}" "${FINAL_ARGS[@]}"
 fi
 
 MOUNTS=(
@@ -239,6 +246,7 @@ if [ "${#CONFIG_SRCS[@]}" -gt 0 ]; then
   done
 fi
 
+[ "$INSIDE_REPO" -eq 1 ] && [ -d "$SOSHO_ROOT/packages" ] && MOUNTS+=(-v "$SOSHO_ROOT/packages:$SOSHO_ROOT/packages:ro")
 [ -f "$HOME/.gitconfig" ] && MOUNTS+=(-v "$HOME/.gitconfig:$HOME/.gitconfig:ro")
 
 WORKTREES_DIR="$(realpath "$WORKSPACE/../worktrees" 2>/dev/null || echo "$(dirname "$WORKSPACE")/worktrees")"

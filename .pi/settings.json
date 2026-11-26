@@ -35,8 +35,8 @@
     "./extensions/subagents/src/index.ts",
     "./extensions/memory/src/index.ts"
   ],
-  "lastChangelogVersion": "1.5.2",
+  "lastChangelogVersion": "1.6.1",
   "extensionChangelogVersions": {
-    "{\"source\":\"npm:pi-lens\",\"scope\":\"project\"}": "4.5.1"
+    "{\"source\":\"npm:pi-lens\",\"scope\":\"project\"}": "4.5.2"
   }
 }
