@@ -1,8 +1,5 @@
 name: sosho
 
-include:
-  - path: docker/compose.langfuse.yaml
-
 services:
   model-download:
     image: python:3.13.18-slim-trixie
@@ -141,6 +138,8 @@ services:
         condition: service_started
       strata:
         condition: service_healthy
+      phoenix:
+        condition: service_started
     ports:
       - "127.0.0.1:4000:4000"
     networks: [sosho-net]
@@ -151,9 +150,9 @@ services:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?Run make setup to create it}
       DEEPINFRA_API_KEY: ${DEEPINFRA_API_KEY:-}
       REFUSELESS_API_KEY: ${REFUSELESS_API_KEY:-}
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?Run make setup to create it}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?Run make setup to create it}
-      LANGFUSE_HOST: http://langfuse-web:3000
+      LITELLM_OTEL_V2: "true"
+      PHOENIX_COLLECTOR_HTTP_ENDPOINT: http://phoenix:6006/v1/traces
+      PHOENIX_PROJECT_NAME: sosho
     healthcheck:
       # The LiteLLM image has no curl. Python is present.
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=3)"]
@@ -161,6 +160,68 @@ services:
       timeout: 3s
       retries: 20
       start_period: 10s
+
+  postgres:
+    image: postgres@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
+    restart: unless-stopped
+    mem_limit: 512m
+    ports:
+      - "127.0.0.1:${SOSHO_POSTGRES_PORT:-5432}:5432"
+    networks: [sosho-net]
+    environment:
+      POSTGRES_USER: ${SOSHO_PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${SOSHO_PG_PASSWORD:?Run make setup to create it}
+      POSTGRES_DB: ${SOSHO_PG_DB:-postgres}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SOSHO_PG_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  phoenix-db-init:
+    image: postgres@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
+    networks: [sosho-net]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${SOSHO_PG_USER:-postgres}
+      PGPASSWORD: ${SOSHO_PG_PASSWORD:?Run make setup to create it}
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        exists=$$(psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'phoenix'")
+        if [ "$$exists" != "1" ]; then psql -d postgres -c "CREATE DATABASE phoenix"; fi
+    restart: "no"
+
+  phoenix:
+    image: arizephoenix/phoenix:version-22.1.0@sha256:5c8690dc3578d77ef19b55c34c7fa374457a085db78d5ccfb3c10229a6889f72
+    container_name: phoenix
+    restart: unless-stopped
+    mem_limit: 1g
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      phoenix-db-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:6006:6006"
+    networks: [sosho-net]
+    environment:
+      PHOENIX_ENABLE_AUTH: "false"
+      PHOENIX_WORKING_DIR: /data
+      PHOENIX_SQL_DATABASE_URL: postgresql://${SOSHO_PG_USER:-postgres}:${SOSHO_PG_PASSWORD:?Run make setup to create it}@postgres:5432/phoenix
+    volumes:
+      - phoenix-data:/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:6006/healthz', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
 
   engine:
     build:
@@ -185,14 +246,11 @@ services:
       - "127.0.0.1:${SOSHO_ENGINE_PORT:-8123}:8123"
     networks: [sosho-net]
     environment:
-      SOSHO_ENGINE_DB_URL: postgresql://${LANGFUSE_PG_USER:-postgres}:${LANGFUSE_PG_PASSWORD:?Run make setup to create it}@postgres:5432/sosho_engine
+      SOSHO_ENGINE_DB_URL: postgresql://${SOSHO_PG_USER:-postgres}:${SOSHO_PG_PASSWORD:?Run make setup to create it}@postgres:5432/sosho_engine
       SOSHO_ENGINE_API_TOKEN: ${SOSHO_ENGINE_API_TOKEN:?Run make setup to create it}
       SOSHO_ENGINE_HOST: 0.0.0.0
       SOSHO_ENGINE_LITELLM_BASE_URL: http://litellm:4000/v1
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?Run make setup to create it}
-      LANGFUSE_HOST: http://langfuse-web:3000
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?Run make setup to create it}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?Run make setup to create it}
     healthcheck:
       test: ["CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8123/health', timeout=2)"]
       interval: 10s
@@ -305,6 +363,9 @@ networks:
     name: sosho-net
 
 volumes:
+  postgres-data:
+    name: sosho_postgres
+  phoenix-data:
   hf-cache:
   strata-cache:
   yue2-data:

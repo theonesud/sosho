@@ -66,7 +66,7 @@ def test_pi_package_may_use_latest() -> None:
 
 
 def test_non_pi_package_with_latest_fails() -> None:
-    assert _unpinned_deps({"@langfuse/otel": "latest"}) == ["@langfuse/otel@latest"]
+    assert _unpinned_deps({"example-package": "latest"}) == ["example-package@latest"]
 
 
 def test_pi_package_with_range_fails() -> None:
@@ -118,13 +118,12 @@ def test_mise_tools_and_node_use_exact_versions() -> None:
 
 def _compose_images() -> list[str]:
     images: list[str] = []
-    for path in (ROOT / "compose.yaml", ROOT / "docker" / "compose.langfuse.yaml"):
-        services = yaml.safe_load(path.read_text())["services"]
-        images.extend(
-            service["image"]
-            for service in services.values()
-            if "image" in service and "build" not in service
-        )
+    services = yaml.safe_load((ROOT / "compose.yaml").read_text())["services"]
+    images.extend(
+        service["image"]
+        for service in services.values()
+        if "image" in service and "build" not in service
+    )
     return images
 
 

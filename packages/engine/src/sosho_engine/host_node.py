@@ -31,11 +31,11 @@ CANCELLED = "CANCELLED"
 
 def trace_env(run_id: str, node_id: str) -> dict[str, str]:
     return {
-        "LANGFUSE_PI_PARENT_TRACE_ID": hashlib.sha256(run_id.encode()).hexdigest()[:32],
-        "LANGFUSE_PI_PARENT_SPAN_ID": hashlib.sha256(f"{run_id}:{node_id}".encode()).hexdigest()[
+        "SOSHO_TRACE_PARENT_TRACE_ID": hashlib.sha256(run_id.encode()).hexdigest()[:32],
+        "SOSHO_TRACE_PARENT_SPAN_ID": hashlib.sha256(f"{run_id}:{node_id}".encode()).hexdigest()[
             :16
         ],
-        "LANGFUSE_PI_PARENT_SESSION_ID": run_id,
+        "SOSHO_TRACE_PARENT_SESSION_ID": run_id,
     }
 
 

@@ -137,8 +137,8 @@ def test_worker_builds_its_database_url_from_the_postgres_variables(
 ) -> None:
     monkeypatch.delenv("SOSHO_ENGINE_DB_URL", raising=False)
     monkeypatch.setenv("SOSHO_ENGINE_API_TOKEN", TOKEN)
-    monkeypatch.setenv("LANGFUSE_PG_USER", "u")
-    monkeypatch.setenv("LANGFUSE_PG_PASSWORD", "p@ss/w")
+    monkeypatch.setenv("SOSHO_PG_USER", "u")
+    monkeypatch.setenv("SOSHO_PG_PASSWORD", "p@ss/w")
     monkeypatch.setenv("SOSHO_POSTGRES_PORT", "5433")
     url = worker_settings().db_url
     assert url == "postgresql://u:p%40ss%2Fw@127.0.0.1:5433/sosho_engine"

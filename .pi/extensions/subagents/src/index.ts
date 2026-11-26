@@ -148,8 +148,8 @@ async function executeSingleSubagent(
     const childEnv: NodeJS.ProcessEnv = {
       ...process.env,
       SOSHO_SUBAGENT_DEPTH: String(currentDepth + 1),
-      LANGFUSE_PI_PARENT_SESSION_ID:
-        process.env.LANGFUSE_PI_PARENT_SESSION_ID ||
+      SOSHO_TRACE_PARENT_SESSION_ID:
+        process.env.SOSHO_TRACE_PARENT_SESSION_ID ||
         ctx.sessionManager?.getSessionId?.() ||
         process.env.SOSHO_SESSION_ID ||
         "",

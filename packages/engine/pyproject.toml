@@ -8,7 +8,6 @@ dependencies = [
   "dbos==3.7.0",
   "fastapi==0.165.0",
   "httpx==0.28.1",
-  "langfuse==5.2.0",
   "psycopg[binary]==3.3.9",
   "pydantic==2.14.4",
   "pydantic-ai==2.74.0",

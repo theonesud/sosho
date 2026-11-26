@@ -56,7 +56,6 @@ router_settings:
     - main: ["subagent"]
 
 litellm_settings:
-  success_callback: ["langfuse"]
-  failure_callback: ["langfuse"]
+  callbacks: ["arize_phoenix"]
   drop_params: true
   request_timeout: 120

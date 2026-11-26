@@ -43,7 +43,7 @@ def test_agent_argv_has_the_session_flags_the_role_the_extensions_and_the_prompt
     assert argv[1:8] == HEAD
     assert argv[8:10] == ["--model", PI_ROLE]
     assert argv[10:13:2] == ["-e", "-e"]
-    assert [Path(item).parts[-3] for item in argv[11:14:2]] == ["guard", "langfuse"]
+    assert [Path(item).parts[-3] for item in argv[11:14:2]] == ["guard", "phoenix"]
     assert argv[-1] == "Instructions:\nBe calm\n\nTask:\ngo now"
     assert "--append-system-prompt" not in argv
 
@@ -98,9 +98,9 @@ def test_env_has_the_root_the_warmup_switch_and_the_trace_ids() -> None:
     assert env["PI_SKIP_WARMUP"] == "1"
     assert env["SOSHO_ROOT"] == str(ROOT)
     assert env["SOSHO_PI_STATE"] == "root"
-    assert env["LANGFUSE_PI_PARENT_SESSION_ID"] == "run-1"
-    assert len(env["LANGFUSE_PI_PARENT_TRACE_ID"]) == 32
-    assert len(env["LANGFUSE_PI_PARENT_SPAN_ID"]) == 16
+    assert env["SOSHO_TRACE_PARENT_SESSION_ID"] == "run-1"
+    assert len(env["SOSHO_TRACE_PARENT_TRACE_ID"]) == 32
+    assert len(env["SOSHO_TRACE_PARENT_SPAN_ID"]) == 16
 
 
 def test_default_pi_command_is_the_launcher_in_the_repository() -> None:

@@ -9,8 +9,8 @@ The engine runs workflows as durable DBOS Transact workflows. A workflow is a ve
 - A step can run again after a crash. Each tool must be safe to run twice.
 - The engine stores workflow definitions and versions in the same database.
 - A saved version never changes. A run uses one version for its whole life.
-- LiteLLM serves the model roles. Langfuse receives traces when you set its keys.
-- DBOS data and engine tables use the Postgres server of Langfuse. The database is `sosho_engine`. The engine creates it at start.
+- LiteLLM serves the model roles. Phoenix receives the traces of LiteLLM and of pi. LiteLLM sends its spans with the callback `arize_phoenix`. The pi extension `phoenix` sends the pi spans.
+- DBOS data and engine tables use the `postgres` service in `compose.yaml`. The database is `sosho_engine`. The engine creates it at start. Phoenix uses the separate database `phoenix` on the same server.
 
 ## 2 Node Kinds
 
@@ -107,7 +107,7 @@ The host worker is a process of the same package. Command: `python -m sosho_engi
 - The worker writes a heartbeat to the table `engine_workers`. `GET /health` shows `worker.alive`, `worker.version`, and `worker.version_mismatch`. `alive` is true when a worker with the same version sent a heartbeat in the last 30 seconds.
 - Enqueued host work waits while the worker is down. It runs when the worker starts. A restarted worker recovers its own pending work.
 - DBOS also lets any process with the same version take a run from the internal queue. This happens after a recovery, a resume, a fork, or a cron start. For this reason the worker carries the full runtime. It can run any workflow.
-- The worker runs each node as `bin/pi-launcher.sh --raw -p --no-session --mode json --provider litellm --model <role> <prompt>`. The environment has `PI_SKIP_WARMUP=1` and `SOSHO_ROOT=<repo>`. The extensions `guard` and `langfuse` of the repository load with `-e`. `instructions` go in the first user message under the heading `Instructions:`, before the heading `Task:`.
+- The worker runs each node as `bin/pi-launcher.sh --raw -p --no-session --mode json --provider litellm --model <role> <prompt>`. The environment has `PI_SKIP_WARMUP=1` and `SOSHO_ROOT=<repo>`. The extensions `guard` and `phoenix` of the repository load with `-e`. `instructions` go in the first user message under the heading `Instructions:`, before the heading `Task:`.
 - The working directory is `<runs_dir>/<run_id>/<node_id>`. The default `runs_dir` is `~/.sosho/runs`. The worker deletes and creates the directory again at each step run. A second run of the step after a crash gives the same result.
 - The worker links each needed skill as `<workdir>/.agents/skills/<name>`. The pi flag `--skill` did not load skills in a test. The directory did.
 - The directory keeps `events.jsonl` with every JSON event line and `stderr.log`.
@@ -115,7 +115,7 @@ The host worker is a process of the same package. Command: `python -m sosho_engi
 - The step fails when pi exits with a code other than 0. It also fails when the last assistant message has `stopReason` `error`. In JSON mode pi exits with 0 in that case. A line that is not JSON is skipped.
 - The worker kills the pi process group at `timeout_seconds`. The default is 900 seconds. It also kills it when the run is cancelled, when the output is above 20 MiB, and when the session needs more than `max_turns` turns.
 - `retry` runs pi again. A failed attempt counts as `max_turns` requests.
-- The environment has `LANGFUSE_PI_PARENT_TRACE_ID`, `LANGFUSE_PI_PARENT_SPAN_ID`, and `LANGFUSE_PI_PARENT_SESSION_ID`. The trace id is a hash of the run id. The engine writes no span for the run. Verified in Langfuse: the pi spans `Subagent Turn` carry that trace id. Their parent span id is a hash of the run id and node id. No observation exists for that parent span. The LiteLLM generations nest under the pi spans.
+- The environment has `SOSHO_TRACE_PARENT_TRACE_ID`, `SOSHO_TRACE_PARENT_SPAN_ID`, and `SOSHO_TRACE_PARENT_SESSION_ID`. The trace id is a hash of the run id. The engine writes no span for the run. The span `pi session` of the node uses that trace id. Its parent span id is a hash of the run id and node id. No span exists for that parent. Not verified in Phoenix.
 
 GPU limit: the worker lets one pi session at a time use a role in `gpu_roles`. The default is `local-uncensored`. A session on another role runs in parallel. The queue `host` has 4 slots. A waiting local session holds one slot. Every `llm` node with a role that is not direct uses the same gate. The gate is the only GPU limit. A direct `llm` node does not use the gate.
 
@@ -129,7 +129,7 @@ Service commands:
 | `make worker-logs` | Follow the journal of the unit. |
 | `make up` | Starts the containers, then restarts the unit when it is active. |
 
-The unit holds no secret. It has `EnvironmentFile=` that points to the repository secrets file. Systemd reads the file at each start. The unit restarts on failure, and it starts at login. Run `loginctl enable-linger` to start it at boot. The worker builds its database URL from `LANGFUSE_PG_USER`, `LANGFUSE_PG_PASSWORD`, and `SOSHO_POSTGRES_PORT`.
+The unit holds no secret. It has `EnvironmentFile=` that points to the repository secrets file. Systemd reads the file at each start. The unit restarts on failure, and it starts at login. Run `loginctl enable-linger` to start it at boot. The worker builds its database URL from `SOSHO_PG_USER`, `SOSHO_PG_PASSWORD`, and `SOSHO_POSTGRES_PORT`.
 
 ### 4.3 LLM nodes
 
@@ -244,7 +244,6 @@ The API limits the body size. CORS allows only loopback origins.
 | `SOSHO_ENGINE_WEBHOOK_RATE_PER_MINUTE` | Webhook requests for each trigger in one minute. The default is 60. |
 | `SOSHO_ENGINE_PORT` | Host port in `compose.yaml`. The default is 8123. |
 | `LITELLM_MASTER_KEY` | Key for LiteLLM. |
-| `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | Langfuse tracing. |
 
 ## 8 Limits
 

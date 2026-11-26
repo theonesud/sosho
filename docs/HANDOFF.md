@@ -23,13 +23,13 @@ Work method: Claude Code acts as coordinator only. Sonnet subagents write code. 
 - A fix is in commit `728fcdc`. It sets `SOSHO_ENGINE_PI_LINE_CAP_BYTES` high in that test. It also adds a separate line-cap case. The fix is not run yet.
 - `make test-fast` exited 0 in 77 seconds. This run came before the latest changes. It is not rerun after them.
 - The previous full run, before the test reduction, took 18 minutes 45 seconds. It had 493 tests and 88 percent coverage.
-- `compose.yaml` services: `model-download`, `llama-cpp`, `strata`, `litellm`, and `engine`. The `music` profile adds the `yue2-*` services. The Langfuse stack in `docker/compose.langfuse.yaml` adds `postgres`.
+- `compose.yaml` services: `model-download`, `llama-cpp`, `strata`, `litellm`, and `engine`. The `music` profile adds the `yue2-*` services. The services `postgres`, `phoenix-db-init`, and `phoenix` are in the same file. The volume `sosho_postgres` holds the data of `postgres`. It is a copy of the old volume `sosho_langfuse_postgres`. The old volume stays until the owner deletes it.
 - The engine listens on `127.0.0.1:8123`. Every route needs the bearer token `SOSHO_ENGINE_API_TOKEN`, except `GET /health` and the webhook route.
 - The DBOS system database `sosho_engine` lives on the `postgres` service. The host worker reaches it on `127.0.0.1:${SOSHO_POSTGRES_PORT:-5432}`.
 - The host worker runs as the systemd user service `sosho-worker`.
 - The DBOS executor id of the engine is `engine`. The id of the worker is `host-worker`. Source: `packages/engine/src/sosho_engine/settings.py:9`.
 - Each process needs its own executor id. With a shared id, one process can take over the pending runs of the other.
-- In Langfuse, the pi spans and the LiteLLM generations share one trace. LiteLLM records no cost for these calls. The session id appears only on the pi spans.
+- Phoenix at `http://127.0.0.1:6006` receives the traces. The pi extension sends the header `traceparent` on each LiteLLM request, so that the LiteLLM span is a child of the pi span. A live run on 2026-11-26 verified the link. The LiteLLM `chat` span has the same trace id as the pi `LLM Call` span. LiteLLM records no cost for these calls. Phoenix shows no cost.
 
 ## 3 Engine summary
 
@@ -48,7 +48,7 @@ Read `packages/engine/README.md` for the API and the run rules. This section lis
   - A node with `queue: local-gpu` is rejected.
   - A non-direct `llm` node runs on `host` with the pi flags `--no-tools --no-skills --no-context-files` and one turn.
   - A direct `llm` node runs with no queue or on `cloud-io`.
-- An `agent` or `skill` node runs `bin/pi-launcher.sh --raw -p --no-session --mode json --provider litellm --model <role>` on the host worker. The worker loads the extensions `guard` and `langfuse` with `-e`.
+- An `agent` or `skill` node runs `bin/pi-launcher.sh --raw -p --no-session --mode json --provider litellm --model <role>` on the host worker. The worker loads the extensions `guard` and `phoenix` with `-e`.
 - The optional field `thinking` of a pi node sets the pi flag `--thinking`. The values are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. An unset field passes no flag. A direct `llm` node with `thinking` fails validation. The issue code is `thinking_direct`.
 - A version has a policy. The fields are `allowed_kinds`, `allowed_tools`, `allowed_skills`, `max_steps`, `max_run_seconds`, `max_llm_calls`, and `max_depth`.
 - The worker gate covers every pi session whose role is in `SOSHO_ENGINE_GPU_ROLES`. This includes `agent`, `skill`, and `llm` nodes. The gate is the only GPU limit. The default value is `local-uncensored`. All chat calls run as pi sessions on the host worker behind this gate.
@@ -124,7 +124,7 @@ The owner must start host Chrome with the Dokobot extension first. The file `~/.
 
 ### 3 Cost and session id
 
-- Add cost for local and cloud models in LiteLLM, so that Langfuse shows cost.
+- Add cost for local and cloud models in LiteLLM, so that Phoenix shows cost.
 - Put the session id on the LiteLLM records.
 
 ### 4 Legacy paths
@@ -137,14 +137,14 @@ The owner must start host Chrome with the Dokobot extension first. The file `~/.
 
 f) Local inference work of 2026-11-26. State and open items.
    - Record: `.agents/skills/local-inference-tuning/`. Read `SKILL.md` first. The campaign `PLAN.md` holds every measurement. The skill folder came from `~/local-inference-tuning`. It is in commit `960dc5d`. The ignored campaign data stays only on this machine.
-   - The skill `.gitignore` keeps out the campaign data: the replays hold real recorded pi requests from Langfuse. Never commit them.
+   - The skill `.gitignore` keeps out the campaign data: the replays hold real recorded pi requests from the old Langfuse stack. Never commit them.
    - Two checks failed after the move: the agent-docs checker read the git-ignored replay files, and `tests/unit/test_direct_hosts.py` flagged the harness scripts. Fixes in commits `990873f` and `960dc5d`: `files_under()` in `bin/agent_docs/common.py` skips git-ignored files, with a test in `tests/unit/test_check_agent_docs.py`. `LLAMA_ALLOWED` in `tests/unit/test_direct_hosts.py` lists the skill `scripts/run.py`, the campaign `PLAN.md`, and `step-gates.sh`.
    - `make test-fast` exit code 0 on 2026-11-26 evening, with all of the above in the work tree: 452 passed, 0 lint errors.
    - Result: the `strata` config replays the recorded agent sessions 12.5% faster than RustingStrata defaults, and 11.9% faster with one extra busy CPU core. Gates: greedy agreement with the defaults at the noise floor, needle 3 of 3 at 32K and 64K, llama.cpp cross-check partial pass.
    - Not done: the `base` load test with the owner's real apps, the token-by-token parity tool, a KL divergence measure of q8 KV, and a speed comparison against llama.cpp on this machine. The llama.cpp yardstick container exited at start with an empty log. The owner chose RustingStrata without that comparison.
    - YuE2 music jobs can wait up to 15 minutes for the `strata` unload. Fix idea: add an unload endpoint to the fork. Ask the owner.
    - The fork: `~/rustingstrata`, branch `lit/c12-cpu-prefill`, remote `fork` = `git@github.com:theonesud/RustingStrata.git`. It has the CPU-split patch, the chunk limit, and `MODIFICATIONS.md`, which the license requires. `NOTICE.md` holds the license credit for this repository.
-   - Disk: about 27 GB free. The Langfuse ClickHouse container grows its writable layer and uses about one CPU core all the time. On 2026-11-26 the disk ran full during a benchmark batch. Check `df -h /` before a build or a batch.
+   - Disk: about 27 GB free. The removed Langfuse ClickHouse container used about one CPU core all the time. On 2026-11-26 the disk ran full during a benchmark batch. Check `df -h /` before a build or a batch.
    - Cleanup candidates, ask the owner first: the local images `rustingstrata:v1.3.7`, `rustingstrata:c12`, and `rustingstrata:c12b` (461 MB each), the old folder `~/rustingstrata-bench`, the Rust toolchain in `~/.rustup` and `~/.cargo`, and the empty root-owned folder `/tmp/lit-cpu-cache`.
    - The `pi-sandbox:latest` image is missing. `test_container_mode_reports_the_version_and_answers_through_litellm` fails until `make up` builds it.
 
@@ -226,6 +226,9 @@ When the list changes, edit every file that names these paths. See `Makefile`, `
 
 ## 8 Traps
 
+- `make up` runs only `try-restart` for the worker. After a manual `systemctl --user stop sosho-worker`, the worker stays down. Run `systemctl --user start sosho-worker`.
+- Phoenix accepts OTLP only as protobuf. The extension uses `@opentelemetry/exporter-trace-otlp-proto`. The extension is silent on export errors. Set `PI_PHOENIX_DEBUG=1` to write them to stderr.
+- pi fires `before_provider_headers` before `before_provider_request`. The extension starts the `LLM Call` span in the headers hook, so that the `traceparent` header has the span id.
 - Each engine code change changes the app version. The version is a hash of the package source unless `SOSHO_ENGINE_APP_VERSION` is set. Pending runs of the old version do not recover. After each engine code change, run `make up`. It restarts the worker.
 - Run every pi probe with `</dev/null`. `pi -p` reads stdin when stdin is a pipe that stays open. It prints nothing until stdin closes. This is the probable cause of the two hung probes from 2026-11-25. Not verified for those runs. The engine uses `DEVNULL`.
 - The worker can take any workflow from the DBOS internal queue. This happens after a recovery, a resume, a fork, or a cron start. The worker is not only for host work.
@@ -254,9 +257,11 @@ When the list changes, edit every file that names these paths. See `Makefile`, `
 - Biome 2.6.8 does not read `.config/biome.json`. Keep `biome.json` at the root.
 - `mise exec -C <dir>` changes the working directory. Do not use it to run a command in a scratch folder.
 - pnpm 12 reads `saveExact` only from `pnpm-workspace.yaml`. npm reads `save-exact` from the `.npmrc` beside each `package.json`. Both files set it.
-- The pi Langfuse extension pins `@langfuse/otel` 6.1.1, `@opentelemetry/exporter-trace-otlp-http` 0.223.2, and `@opentelemetry/sdk-trace-node` 2.12.0. See `.pi/extensions/langfuse/package.json`. Do not change one version alone.
-- Langfuse v4 runs in events-only mode. `/api/public/traces` returns 404. Read spans from `/api/public/v2/observations`. This is not verified in the repository code.
-- A new Langfuse `SALT` breaks the stored project API key. Delete its `api_keys` row and restart `langfuse-web`. The startup setup creates the key again.
+- The Phoenix extension pins `@opentelemetry/api` 1.10.0, `@opentelemetry/sdk-trace` 3.1.1, `@opentelemetry/resources` 3.1.1, and `@opentelemetry/exporter-trace-otlp-proto` 0.301.2. See `.pi/extensions/phoenix/package.json`. OpenTelemetry JS 3 packages and the 0.301 exporter go together. Do not change one version alone.
+- Phoenix reads the project name from the header `x-project-name` or from the resource attribute `openinference.project.name`. Verified in the Phoenix 22.1.0 source.
+- Phoenix uses `PHOENIX_SQL_DATABASE_URL` to select Postgres. The one-shot service `phoenix-db-init` creates the database `phoenix` if it is missing. This works on the existing volume.
+- LiteLLM needs `LITELLM_OTEL_V2=true` for the callback `arize_phoenix`. LiteLLM issue 27388 says that `success_callback` did not send spans. The image has the OpenTelemetry packages. It has no `openinference` package.
+- LiteLLM v2 tracing reads an incoming `traceparent` header through the FastAPI instrumentation. This is from the LiteLLM source. It is not verified in a live run.
 - Router presets in `docker/llama-models.ini` cannot read environment variables.
 - In `docker/llama-models.ini`, `decision` and `embed` have `device = none` and `n-gpu-layers = 0`. `n-gpu-layers = 0` alone still reserved VRAM. The `embed` model failed with `cudaMalloc failed: out of memory` while Qwen3.6 was loaded. With `device = none`, neither process holds VRAM. `llama-cpp` has no GPU reservation now.
 - In `docker/llama-models.ini`, both presets have `sleep-idle-seconds = 900`.

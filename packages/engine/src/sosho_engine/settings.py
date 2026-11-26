@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     pi_line_cap_bytes: int = Field(default=20_971_520, ge=1024)
     gpu_roles: list[str] = ["local-uncensored"]
     direct_roles: list[str] = list(DEFAULT_DIRECT_ROLES)
-    pi_extensions: list[str] = ["guard", "langfuse"]
+    pi_extensions: list[str] = ["guard", "phoenix"]
     worker_poll_seconds: float = Field(default=2.0, gt=0.0)
     worker_beat_seconds: float = Field(default=10.0, gt=0.0)
     worker_alive_seconds: float = Field(default=30.0, gt=0.0)
@@ -41,18 +41,11 @@ class Settings(BaseSettings):
     litellm_api_key: SecretStr | None = Field(
         default=None, validation_alias=AliasChoices("LITELLM_MASTER_KEY")
     )
-    pg_user: str = Field(default="postgres", validation_alias=AliasChoices("LANGFUSE_PG_USER"))
+    pg_user: str = Field(default="postgres", validation_alias=AliasChoices("SOSHO_PG_USER"))
     pg_password: SecretStr | None = Field(
-        default=None, validation_alias=AliasChoices("LANGFUSE_PG_PASSWORD")
+        default=None, validation_alias=AliasChoices("SOSHO_PG_PASSWORD")
     )
     pg_port: int = Field(default=5432, validation_alias=AliasChoices("SOSHO_POSTGRES_PORT"))
-    langfuse_host: str | None = Field(default=None, validation_alias=AliasChoices("LANGFUSE_HOST"))
-    langfuse_public_key: str | None = Field(
-        default=None, validation_alias=AliasChoices("LANGFUSE_PUBLIC_KEY")
-    )
-    langfuse_secret_key: SecretStr | None = Field(
-        default=None, validation_alias=AliasChoices("LANGFUSE_SECRET_KEY")
-    )
 
     def pi_path(self) -> str:
         return self.pi_command or str(self.repo_root / "bin" / "pi-launcher.sh")

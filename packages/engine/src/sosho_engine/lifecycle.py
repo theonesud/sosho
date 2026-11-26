@@ -13,7 +13,6 @@ from sosho_engine.runtime import ModelFactory, Runtime
 from sosho_engine.settings import Settings
 from sosho_engine.store import Store
 from sosho_engine.tools import ToolRegistry, builtin_tools
-from sosho_engine.tracing import start_tracing
 
 APP_NAME = "sosho-engine"
 
@@ -60,7 +59,6 @@ async def launch(active: Runtime, listen: list[str]) -> None:
     await asyncio.to_thread(ensure_database, active.settings.db_url)
     await asyncio.to_thread(active.store.create_tables)
     runtime.install(active)
-    start_tracing(active.settings)
     DBOS(config=dbos_config(active.settings))
     DBOS.listen_queues(listen)
     await asyncio.to_thread(DBOS.launch)

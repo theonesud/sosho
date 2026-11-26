@@ -56,7 +56,7 @@ next-env.d.ts
 terraform.tfstate
 bun.lock
 package-lock.json
-!.pi/extensions/langfuse/package-lock.json
+!.pi/extensions/phoenix/package-lock.json
 yarn.lock
 
 models/

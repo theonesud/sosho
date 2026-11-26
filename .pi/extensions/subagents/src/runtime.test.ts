@@ -15,8 +15,8 @@ import {
 const tmp = mkdtempSync(join(tmpdir(), "sosho-subagent-test-"));
 
 try {
-  // 1. Depth tracking uses SOSHO_SUBAGENT_DEPTH independently of LANGFUSE_PI_PARENT_DEPTH
-  assert.equal(getSubagentDepth({ LANGFUSE_PI_PARENT_DEPTH: "9" }), 0);
+  // 1. Depth tracking uses SOSHO_SUBAGENT_DEPTH independently of SOSHO_TRACE_PARENT_DEPTH
+  assert.equal(getSubagentDepth({ SOSHO_TRACE_PARENT_DEPTH: "9" }), 0);
   assert.equal(isSubagentDepthAllowed({ SOSHO_SUBAGENT_DEPTH: "0" }), true);
   assert.equal(isSubagentDepthAllowed({ SOSHO_SUBAGENT_DEPTH: "1" }), true);
   assert.equal(isSubagentDepthAllowed({ SOSHO_SUBAGENT_DEPTH: "2" }), true);

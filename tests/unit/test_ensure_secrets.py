@@ -5,7 +5,7 @@ from pathlib import Path
 from tests.conftest import ROOT
 
 SCRIPT = ROOT / "bin" / "ensure-secrets.sh"
-KEYS = ("LANGFUSE_NEXTAUTH_SECRET", "LANGFUSE_SALT", "LANGFUSE_ENCRYPTION_KEY")
+KEYS = ("LITELLM_MASTER_KEY", "SOSHO_ENGINE_API_TOKEN")
 
 
 def _run(target: Path) -> subprocess.CompletedProcess[str]:
@@ -34,12 +34,12 @@ def test_creates_a_private_file_with_one_random_value_per_key(tmp_path: Path) ->
 
 def test_fills_empty_lines_and_keeps_set_values(tmp_path: Path) -> None:
     target = tmp_path / "local.env"
-    target.write_text("OTHER=1\nLANGFUSE_SALT=keep-me\nLANGFUSE_NEXTAUTH_SECRET=  # note\n")
+    target.write_text("OTHER=1\nSOSHO_ENGINE_API_TOKEN=keep-me\nLITELLM_MASTER_KEY=  # note\n")
     _run(target)
     values = _values(target)
-    assert values["LANGFUSE_SALT"] == ["keep-me"]
-    assert len(values["LANGFUSE_NEXTAUTH_SECRET"]) == 1
-    assert values["LANGFUSE_NEXTAUTH_SECRET"][0] != ""
+    assert values["SOSHO_ENGINE_API_TOKEN"] == ["keep-me"]
+    assert len(values["LITELLM_MASTER_KEY"]) == 1
+    assert values["LITELLM_MASTER_KEY"][0] != ""
     assert "OTHER=1" in target.read_text()
 
 

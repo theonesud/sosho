@@ -94,6 +94,7 @@ setup:
 
 COVFLAG := $(if $(COV),--cov)
 LEGACY_TS_TESTS := packages/memory/test .pi/extensions/subagents/src
+EXT_TS_TESTS := .pi/extensions/phoenix/src
 
 test: PYTEST_SELECT :=
 test-fast: PYTEST_SELECT := -m "not integration"
@@ -126,6 +127,11 @@ test test-fast:
 		if out=$$(PATH="$(NODE_BIN):$$PATH" $(RUN) pnpm --dir "$$pkg" exec tsx "$${f#"$$pkg"/}" 2>&1); then echo "ok   $$f"; \
 		else echo "FAIL $$f"; printf '%s\n' "$$out" | grep -m3 -E 'Error|assert' || true; rc=1; fi; \
 	done; done; \
+	echo "== extension tsx tests"; \
+	for d in $(EXT_TS_TESTS); do for f in $$d/*.test.ts; do \
+		if out=$$(PATH="$(NODE_BIN):$$PATH" $(RUN) pnpm exec tsx "$$f" 2>&1); then echo "ok   $$f"; \
+		else echo "FAIL $$f"; printf '%s\n' "$$out" | grep -m3 -E 'Error|assert' || true; rc=1; fi; \
+	done; done; \
 	echo "== pytest"; \
 	$(RUN) uv run pytest -q -rs $(PYTEST_SELECT) $(COVFLAG); t=$$?; \
 	if [ $$t -eq 5 ]; then echo "NOTE: no pytest tests found. Skip."; elif [ $$t -ne 0 ]; then rc=1; fi; \
@@ -154,7 +160,7 @@ fix:
 up:
 	$(RUN) $(COMPOSE) up -d
 	@./bin/worker-service.sh restart
-	@echo "Langfuse:    http://127.0.0.1:3001"
+	@echo "Phoenix:     http://127.0.0.1:6006"
 	@echo "LiteLLM:     http://127.0.0.1:4000"
 
 down:

@@ -30,7 +30,7 @@
   "extensions": [
     "./extensions/guard/src/index.ts",
     "-builtin:llama.cpp",
-    "./extensions/langfuse/src/index.ts",
+    "./extensions/phoenix/src/index.ts",
     "./extensions/scratchpad/src/index.ts",
     "./extensions/subagents/src/index.ts",
     "./extensions/memory/src/index.ts"

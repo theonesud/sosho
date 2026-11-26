@@ -35,8 +35,9 @@ Environment:
   SOSHO_PI_STATE       root forces the repository .pi state and cache for any
                        working folder. The engine host worker sets it.
   SOSHO_ROOT           Repository root. Default: parent of the script directory.
-  LANGFUSE_BASE_URL    Raw mode only. Default: http://127.0.0.1:3001.
-                       Container mode uses http://langfuse-web:3000.
+  PHOENIX_COLLECTOR_ENDPOINT
+                       Raw mode only. Default: http://127.0.0.1:6006.
+                       Container mode uses http://phoenix:6006.
 EOF
 }
 
@@ -189,14 +190,12 @@ if [ "$ROOT_STATE" -eq 0 ]; then
   sync_compaction "$TARGET_PI"
 fi
 
-LANGFUSE_URL="${LANGFUSE_BASE_URL:-http://127.0.0.1:3001}"
+PHOENIX_URL="${PHOENIX_COLLECTOR_ENDPOINT:-http://127.0.0.1:6006}"
 env_value() {
   if [ -f "$WORKSPACE_ENV" ]; then
     sed -n "s/^$1=//p" "$WORKSPACE_ENV" | tail -n 1
   fi
 }
-LANGFUSE_PK="${LANGFUSE_PUBLIC_KEY:-$(env_value LANGFUSE_PUBLIC_KEY)}"
-LANGFUSE_SK="${LANGFUSE_SECRET_KEY:-$(env_value LANGFUSE_SECRET_KEY)}"
 LITELLM_KEY="${LITELLM_MASTER_KEY:-$(env_value LITELLM_MASTER_KEY)}"
 
 warm_local_model "$TARGET_PI" "$SOSHO_PI" "$SKIP_WARMUP" "$LITELLM_KEY"
@@ -213,9 +212,7 @@ if [ "$MODE" = "raw" ]; then
   export XDG_CACHE_HOME="$TARGET_PI/.cache"
   export XDG_CONFIG_HOME="$TARGET_PI/.config"
   export npm_config_cache="$TARGET_PI/.cache/npm"
-  export LANGFUSE_BASE_URL="$LANGFUSE_URL"
-  export LANGFUSE_PUBLIC_KEY="$LANGFUSE_PK"
-  export LANGFUSE_SECRET_KEY="$LANGFUSE_SK"
+  export PHOENIX_COLLECTOR_ENDPOINT="$PHOENIX_URL"
 
   if HOST_PI="$(find_host_pi)"; then
     exec "$HOST_PI" "${FINAL_ARGS[@]}"
@@ -235,7 +232,7 @@ MOUNTS=(
 
 CONFIG_DIR="$SOSHO_PI/run/container"
 CONFIG_SRCS=()
-for name in models.json langfuse.json model-roles.json; do
+for name in models.json model-roles.json; do
   if [ -f "$TARGET_PI/$name" ]; then CONFIG_SRCS+=("$TARGET_PI/$name"); fi
 done
 CONFIG_MOUNTS=()
@@ -277,9 +274,7 @@ exec docker run "${DOCKER_INTERACTIVE_FLAGS[@]}" --rm \
   -e "XDG_CACHE_HOME=$TARGET_PI/.cache" \
   -e "XDG_CONFIG_HOME=$TARGET_PI/.config" \
   -e "npm_config_cache=$TARGET_PI/.cache/npm" \
-  -e "LANGFUSE_BASE_URL=http://langfuse-web:3000" \
-  -e "LANGFUSE_PUBLIC_KEY=$LANGFUSE_PK" \
-  -e "LANGFUSE_SECRET_KEY=$LANGFUSE_SK" \
+  -e "PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006" \
   --tmpfs "$HOME:uid=$(id -u),gid=$(id -g),mode=0755" \
   "${ENV_ARGS[@]}" \
   "${MOUNTS[@]}" \
