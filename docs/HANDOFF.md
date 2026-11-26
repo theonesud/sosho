@@ -16,9 +16,8 @@ Work method: Claude Code acts as coordinator only. Sonnet subagents write code. 
 
 ## 2 State
 
-- Date of this state: 2026-11-26, evening. Branch `refactor`. Last commit `0a72d29`, pushed to `origin/refactor`. The owner asked for that push.
-- The work of 2026-11-25 and 2026-11-26 is in commits `b197c69` to `0a72d29`. Commit `728fcdc` holds the unfinished prompt order change (section 4, item 0). Commit `0a72d29` moves `local-uncensored` to the `strata` service. Ask the owner before the next commit or a push.
-- Not committed: the skill folder `.agents/skills/local-inference-tuning/`, the path updates in `AGENTS.md` 8.2 and in this file, and the check fixes for that folder. See section 4, item 0f.
+- Date of this state: 2026-11-26, evening. Branch `refactor`. Everything is committed and pushed to `origin/refactor`. The owner asked for those pushes.
+- The work of 2026-11-25 and 2026-11-26 is in commits `b197c69` to `0a72d29`. Commit `728fcdc` holds the unfinished prompt order change (section 4, item 0). Commit `0a72d29` moves `local-uncensored` to the `strata` service. Commit `990873f` makes the agent docs checker skip git-ignored files. Commit `960dc5d` adds the skill `.agents/skills/local-inference-tuning/`. Ask the owner before the next commit or a push.
 - Last full run: `make test COV=1` exit code 2, in 10 minutes 35 seconds. Pytest result: 501 passed, 1 failed. Coverage: 96 percent.
 - The failure: `test_limits_stop_the_node_and_count_calls_on_both_paths`. The per-line cap tripped before the total cap.
 - A fix is in commit `728fcdc`. It sets `SOSHO_ENGINE_PI_LINE_CAP_BYTES` high in that test. It also adds a separate line-cap case. The fix is not run yet.
@@ -137,11 +136,10 @@ The owner must start host Chrome with the Dokobot extension first. The file `~/.
 - Fix `lefthook validate`. On 2026-11-25 it exits 1 with `x-legacy: Value is array but should be object`. The same error appears for `x-legacy-docs`.
 
 f) Local inference work of 2026-11-26. State and open items.
-   - Record: `.agents/skills/local-inference-tuning/`. Read `SKILL.md` first. The campaign `PLAN.md` holds every measurement. The skill folder came from `~/local-inference-tuning`. It is not committed yet.
+   - Record: `.agents/skills/local-inference-tuning/`. Read `SKILL.md` first. The campaign `PLAN.md` holds every measurement. The skill folder came from `~/local-inference-tuning`. It is in commit `960dc5d`. The ignored campaign data stays only on this machine.
    - The skill `.gitignore` keeps out the campaign data: the replays hold real recorded pi requests from Langfuse. Never commit them.
-   - Two checks failed after the move: the agent-docs checker read the git-ignored replay files, and `tests/unit/test_direct_hosts.py` flagged the harness scripts. Fixes, not committed: `files_under()` in `bin/agent_docs/common.py` skips git-ignored files, with a test in `tests/unit/test_check_agent_docs.py`. `LLAMA_ALLOWED` in `tests/unit/test_direct_hosts.py` lists the skill `scripts/run.py`, the campaign `PLAN.md`, and `step-gates.sh`.
+   - Two checks failed after the move: the agent-docs checker read the git-ignored replay files, and `tests/unit/test_direct_hosts.py` flagged the harness scripts. Fixes in commits `990873f` and `960dc5d`: `files_under()` in `bin/agent_docs/common.py` skips git-ignored files, with a test in `tests/unit/test_check_agent_docs.py`. `LLAMA_ALLOWED` in `tests/unit/test_direct_hosts.py` lists the skill `scripts/run.py`, the campaign `PLAN.md`, and `step-gates.sh`.
    - `make test-fast` exit code 0 on 2026-11-26 evening, with all of the above in the work tree: 452 passed, 0 lint errors.
-   - Next commit, after the owner asks: the skill folder, the check fixes, and the path updates in `AGENTS.md` and this file.
    - Result: the `strata` config replays the recorded agent sessions 12.5% faster than RustingStrata defaults, and 11.9% faster with one extra busy CPU core. Gates: greedy agreement with the defaults at the noise floor, needle 3 of 3 at 32K and 64K, llama.cpp cross-check partial pass.
    - Not done: the `base` load test with the owner's real apps, the token-by-token parity tool, a KL divergence measure of q8 KV, and a speed comparison against llama.cpp on this machine. The llama.cpp yardstick container exited at start with an empty log. The owner chose RustingStrata without that comparison.
    - YuE2 music jobs can wait up to 15 minutes for the `strata` unload. Fix idea: add an unload endpoint to the fork. Ask the owner.
