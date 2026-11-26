@@ -13,18 +13,6 @@ LANGFUSE_URL = os.environ.get("SOSHO_LANGFUSE_URL", "http://127.0.0.1:3001")
 ENGINE_URL = os.environ.get("SOSHO_ENGINE_URL", "http://127.0.0.1:8123")
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    del config
-    gates = {
-        "cloud": ("CLOUD", "cloud model test. Set CLOUD=1 to run it."),
-        "heavy": ("HEAVY", "large GPU model test. Set HEAVY=1 to run it."),
-    }
-    for item in items:
-        for marker, (env, reason) in gates.items():
-            if marker in item.keywords and os.environ.get(env) != "1":
-                item.add_marker(pytest.mark.skip(reason=reason))
-
-
 def require_service(name: str, url: str) -> None:
     try:
         httpx.get(url, timeout=3.0)
@@ -35,21 +23,22 @@ def require_service(name: str, url: str) -> None:
         pytest.skip(msg)
 
 
-@pytest.fixture(scope="session")
-def litellm_key() -> str:
-    key = os.environ.get("LITELLM_MASTER_KEY", "")
-    if key:
-        return key
+def container_env(container: str, name: str) -> str:
     docker = shutil.which("docker")
     if docker is None:
-        pytest.skip("docker not found. Cannot read the LiteLLM key.")
+        return ""
     result = subprocess.run(  # noqa: S603
-        [docker, "exec", "litellm", "printenv", "LITELLM_MASTER_KEY"],
+        [docker, "exec", container, "printenv", name],
         capture_output=True,
         text=True,
         check=False,
     )
-    key = result.stdout.strip()
+    return result.stdout.strip()
+
+
+@pytest.fixture(scope="session")
+def litellm_key() -> str:
+    key = os.environ.get("LITELLM_MASTER_KEY", "") or container_env("litellm", "LITELLM_MASTER_KEY")
     if not key:
         pytest.skip("The LiteLLM key is not set. Run make setup, then make up.")
     return key
@@ -57,19 +46,9 @@ def litellm_key() -> str:
 
 @pytest.fixture(scope="session")
 def engine_token() -> str:
-    token = os.environ.get("SOSHO_ENGINE_API_TOKEN", "")
-    if token:
-        return token
-    docker = shutil.which("docker")
-    if docker is None:
-        pytest.skip("docker not found. Cannot read the engine token.")
-    result = subprocess.run(  # noqa: S603
-        [docker, "exec", "engine", "printenv", "SOSHO_ENGINE_API_TOKEN"],
-        capture_output=True,
-        text=True,
-        check=False,
+    token = os.environ.get("SOSHO_ENGINE_API_TOKEN", "") or container_env(
+        "engine", "SOSHO_ENGINE_API_TOKEN"
     )
-    token = result.stdout.strip()
     if not token:
         pytest.skip("The engine token is not set. Run make setup, then make up.")
     return token

@@ -1,4 +1,4 @@
-.PHONY: setup test fix up down logs worker worker-install worker-uninstall worker-logs
+.PHONY: setup test test-fast cov fix up down logs worker worker-install worker-uninstall worker-logs
 
 MISE := $(shell command -v mise 2>/dev/null || echo $(HOME)/.local/bin/mise)
 
@@ -28,11 +28,14 @@ SHFMT := $(RUN) shfmt -i 2 -ci
 
 .DEFAULT_GOAL := _usage
 _usage:
-	@echo "Sosho targets: setup, test, fix, up, down, logs, worker, worker-install, worker-uninstall, worker-logs."
+	@echo "Sosho targets: setup, test, test-fast, cov, fix, up, down, logs, worker, worker-install, worker-uninstall, worker-logs."
 	@echo "make setup: install mise, the pinned tools, and dependencies. Link the pi and yue2-music launchers."
 	@echo "make test: run every non-mutating check and test. Vale prints warnings only."
 	@echo "  Integration tests skip a service that does not answer. Run make up first."
-	@echo "  LIVE_STRICT=1 fails on a missing service. CLOUD=1 and HEAVY=1 add the opt-in tests."
+	@echo "  LIVE_STRICT=1 fails on a missing service. Tests call only local models."
+	@echo "make test-fast: run every check and pytest -m 'not integration'. No model, no GPU, no live stack."
+	@echo "  The pre-push hook runs it. Skip the outdated dependency report."
+	@echo "make cov: run only the pytest tests with coverage. make test COV=1 adds coverage to the full run."
 	@echo "make fix: apply safe auto-fixes (format and lint fixes)."
 	@echo "make up: start the Docker services. Print the service URLs."
 	@echo "make down: stop all Docker services, music profile included."
@@ -89,12 +92,17 @@ setup:
 	else echo "No shell rc file changed."; fi
 	@if [ -f pnpm-workspace.yaml ] && grep -q '^  - ' pnpm-workspace.yaml; then PATH="$(NODE_BIN):$$PATH" $(RUN) pnpm install; fi
 
+COVFLAG := $(if $(COV),--cov)
 LEGACY_TS_TESTS := packages/memory/test .pi/extensions/subagents/src
 
-test:
+test: PYTEST_SELECT :=
+test-fast: PYTEST_SELECT := -m "not integration"
+test-fast: FAST := 1
+test test-fast:
 	@rc=0; \
 	echo "== agent docs"; ./bin/check-agent-docs.sh || rc=1; \
 	echo "== comments"; $(RUN) uv run python bin/check-comments.py $(ALL_FILES) || rc=1; \
+	echo "== file length"; $(RUN) uv run python bin/check-file-length.py $(ALL_FILES) || rc=1; \
 	echo "== biome"; $(RUN) pnpm exec biome check --no-errors-on-unmatched . || rc=1; \
 	echo "== tsc"; \
 	if [ -z "$(TSCONFIGS)" ]; then echo "NOTE: no TypeScript project found. Skip tsc."; \
@@ -118,18 +126,23 @@ test:
 		if out=$$(PATH="$(NODE_BIN):$$PATH" $(RUN) pnpm --dir "$$pkg" exec tsx "$${f#"$$pkg"/}" 2>&1); then echo "ok   $$f"; \
 		else echo "FAIL $$f"; printf '%s\n' "$$out" | grep -m3 -E 'Error|assert' || true; rc=1; fi; \
 	done; done; \
-	echo "== pytest (unit and integration)"; \
-	$(RUN) uv run pytest -q -rs; t=$$?; \
+	echo "== pytest"; \
+	$(RUN) uv run pytest -q -rs $(PYTEST_SELECT) $(COVFLAG); t=$$?; \
 	if [ $$t -eq 5 ]; then echo "NOTE: no pytest tests found. Skip."; elif [ $$t -ne 0 ]; then rc=1; fi; \
 	echo "== pytest (yue2 gateway)"; \
 	$(RUN) uv run pytest -q -p no:cacheprovider packages/yue2/gateway/test_gateway.py || rc=1; \
-	echo "== outdated dependencies (warnings only)"; \
-	$(RUN) pnpm outdated -r || true; \
-	$(RUN) uv pip list --outdated || true; \
+	if [ -z "$(FAST)" ]; then \
+		echo "== outdated dependencies (warnings only)"; \
+		$(RUN) pnpm outdated -r || true; \
+		$(RUN) uv pip list --outdated || true; \
+	fi; \
 	echo "== vale (warnings only)"; \
 	if [ -z "$(MD_FILES)" ]; then echo "NOTE: no in-scope Markdown file. Skip Vale."; \
 	else $(RUN) vale --config .config/vale/vale.ini --no-exit $(MD_FILES) || true; fi; \
 	exit $$rc
+
+cov:
+	$(RUN) uv run pytest -q -rs --cov
 
 fix:
 	$(RUN) pnpm exec biome check --write --no-errors-on-unmatched .

@@ -9,7 +9,6 @@ pytestmark = pytest.mark.integration
 
 HEALTH_TIMEOUT = 10.0
 MODEL_TIMEOUT = 180.0
-CLOUD_ROLES = ("main", "subagent", "subagent-code", "cloud-uncensored")
 
 
 class RoleEntry(BaseModel):
@@ -122,14 +121,6 @@ def test_embed_role_returns_vector(litellm_key: str) -> None:
     assert vector, "embedding vector is empty"
 
 
-@pytest.mark.heavy
 def test_chat_local_uncensored_role_answers(litellm_key: str) -> None:
     require_service("litellm", LITELLM_URL)
     _assert_chat_answers("local-uncensored", litellm_key)
-
-
-@pytest.mark.cloud
-@pytest.mark.parametrize("role", CLOUD_ROLES)
-def test_chat_cloud_role_answers(role: str, litellm_key: str) -> None:
-    require_service("litellm", LITELLM_URL)
-    _assert_chat_answers(role, litellm_key)

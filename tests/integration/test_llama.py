@@ -132,6 +132,5 @@ def test_embedding_model_returns_vector() -> None:
     assert vector, "embedding vector is empty"
 
 
-@pytest.mark.heavy
 def test_chat_35b_model_answers() -> None:
     _assert_answered(HEAVY_CHAT_MODEL)

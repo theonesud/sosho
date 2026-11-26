@@ -13,12 +13,11 @@ import httpx
 import pytest
 from pydantic import BaseModel, JsonValue
 
-from tests.conftest import ENGINE_URL, ROOT, require_service
+from tests.conftest import ENGINE_URL, require_service
 
 pytestmark = pytest.mark.integration
 
 UNIT = "sosho-worker.service"
-FAKE_PI = ROOT / "packages" / "engine" / "tests" / "fake_pi.py"
 POSTGRES_PORT = int(os.environ.get("SOSHO_POSTGRES_PORT") or "5432")
 TERMINAL = {"succeeded", "failed", "cancelled"}
 POLL_ATTEMPTS = 3000
@@ -115,19 +114,6 @@ def _unit_active() -> bool:
     )
 
 
-def _unit(action: str) -> None:
-    systemctl = shutil.which("systemctl")
-    if systemctl is not None:
-        subprocess.run([systemctl, "--user", action, UNIT], check=False)  # noqa: S603
-
-
-def _fake_pi(root: Path) -> Path:
-    pi = root / "fake-pi"
-    pi.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{FAKE_PI}" "$@"\n')
-    pi.chmod(0o755)
-    return pi
-
-
 def _spawn(engine_token: str, version: str, extra: dict[str, str]) -> subprocess.Popen[bytes]:
     env = {
         **os.environ,
@@ -163,29 +149,6 @@ def engine(engine_token: str) -> Iterator[Engine]:
 
 
 @pytest.fixture
-def fake_worker(engine: Engine, engine_token: str, tmp_path: Path) -> Iterator[Path]:
-    restart = _unit_active()
-    if restart:
-        _unit("stop")
-    state = tmp_path / "state"
-    state.mkdir()
-    extra = {
-        "SOSHO_ENGINE_PI_COMMAND": str(_fake_pi(tmp_path)),
-        "SOSHO_ENGINE_RUNS_DIR": str(tmp_path / "runs"),
-        "FAKE_PI_STATE": str(state),
-    }
-    process = _spawn(engine_token, engine.health().app_version, extra)
-    try:
-        _wait_alive(engine)
-        yield tmp_path / "runs"
-    finally:
-        process.terminate()
-        process.wait(timeout=30)
-        if restart:
-            _unit("start")
-
-
-@pytest.fixture
 def real_worker(engine: Engine, engine_token: str) -> Iterator[None]:
     if _unit_active() and engine.health().worker.alive:
         yield
@@ -205,30 +168,11 @@ def _first_skill(engine: Engine) -> str:
     return str(skills[0])
 
 
-def test_agent_node_routes_through_postgres_to_the_host_worker(
-    engine: Engine, fake_worker: Path
-) -> None:
-    skill = _first_skill(engine)
-    node: dict[str, JsonValue] = {
-        "id": "n",
-        "kind": "agent",
-        "role": "main",
-        "prompt": "tool:hello",
-        "skills": [skill],
-    }
-    view = engine.run(engine.publish(node), 60)
-    assert view.summary.status == "succeeded", view.error
-    workdir = next(fake_worker.glob("*/n"))
-    assert (workdir / "out.txt").read_text() == "written"
-    assert (workdir / ".agents" / "skills" / skill).is_symlink()
-    assert "fake done:tool:hello" in str(view.output)
-
-
-@pytest.mark.heavy
-def test_agent_node_on_the_local_model_writes_a_file_and_replies_done(
+def test_agent_node_routes_through_postgres_and_runs_pi_on_the_local_model(
     engine: Engine, real_worker: None
 ) -> None:
     del real_worker
+    skill = _first_skill(engine)
     prompt = (
         "Create a file named hello.txt in the current directory that contains the word hi. "
         "Then reply with exactly DONE."
@@ -237,7 +181,9 @@ def test_agent_node_on_the_local_model_writes_a_file_and_replies_done(
         "id": "n",
         "kind": "agent",
         "role": "local-uncensored",
+        "thinking": "off",
         "prompt": prompt,
+        "skills": [skill],
         "timeout_seconds": 900,
         "max_turns": 12,
     }
@@ -250,4 +196,6 @@ def test_agent_node_on_the_local_model_writes_a_file_and_replies_done(
     node_out = result["n"]
     assert isinstance(node_out, dict)
     assert "DONE" in str(node_out["text"])
-    assert (Path(str(node_out["workdir"])) / "hello.txt").is_file()
+    workdir = Path(str(node_out["workdir"]))
+    assert (workdir / "hello.txt").is_file()
+    assert (workdir / ".agents" / "skills" / skill).is_symlink()

@@ -76,4 +76,4 @@ commit-msg:
 pre-push:
   commands:
     test:
-      run: mise exec -- make test
+      run: mise exec -- make test-fast
