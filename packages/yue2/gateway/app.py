@@ -11,7 +11,7 @@ with the contract we borrowed from YuE2-Turbo:
 
 The engine runs one inference at a time on a single GPU, so this process owns a
 single-worker queue. It also handles artifact retention and (optionally) unloads
-the engine model after each job so the VRAM goes back to llama.cpp.
+the engine model after each job so the VRAM goes back to the LLM server.
 """
 
 from __future__ import annotations
@@ -51,8 +51,9 @@ RETENTION_SECONDS = int(os.environ.get("YUE2_RETENTION_SECONDS", "86400"))
 MAX_GIB = float(os.environ.get("YUE2_MAX_GIB", "5"))
 DEFAULT_FORMAT = os.environ.get("YUE2_AUDIO_FORMAT", "flac")
 
-# VRAM handshake: unload active llama-cpp models over HTTP while YuE2 runs (no Docker socket needed).
-LLAMA_URL = os.environ.get("YUE2_LLAMA_URL", "http://llama-cpp:8080").rstrip("/")
+# VRAM handshake: the strata server has no unload call. Wait until its --auto-unload frees the model.
+LLAMA_URL = os.environ.get("YUE2_LLAMA_URL", "http://strata:8080").rstrip("/")
+LLAMA_UNLOAD_TIMEOUT = float(os.environ.get("YUE2_LLAMA_UNLOAD_TIMEOUT_SECONDS", "960"))
 BIND_HOST = os.environ.get("YUE2_BIND_HOST", "127.0.0.1").strip()
 DOCKER_SOCKET = os.environ.get("YUE2_DOCKER_SOCKET", "")
 LLAMA_CONTAINER = os.environ.get("YUE2_LLAMA_CONTAINER", "llama-cpp")
@@ -191,7 +192,7 @@ async def unload_engine_model() -> None:
 
 
 class DockerCtl:
-    """Coordinate GPU VRAM with llama-cpp via its unprivileged HTTP model unload API.
+    """Coordinate GPU VRAM with the LLM server through its health endpoint.
 
     Falls back to Docker socket only when YUE2_DOCKER_SOCKET is explicitly configured
     and YUE2_LLAMA_URL is empty.
@@ -257,36 +258,12 @@ class DockerCtl:
             return "unknown"
 
     async def pause(self) -> bool:
-        """Unload active llama-cpp models via HTTP to free VRAM. Returns True if any model was unloaded."""
+        """Wait until the LLM server has freed its model. Return True if the VRAM is free."""
         if not self.enabled:
             return False
         async with self._lock:
             if self._use_http:
-                unloaded = False
-                self._unloaded_models = []
-                try:
-                    async with httpx.AsyncClient(timeout=30) as client:
-                        r = await client.get(f"{LLAMA_URL}/v1/models")
-                        if r.status_code == 200:
-                            models = r.json().get("data", [])
-                            for m in models:
-                                status = (m.get("status") or {}).get("value")
-                                mid = m.get("id")
-                                if mid and status in ("loaded", "loading"):
-                                    LOG.info(
-                                        "unloading llama-cpp model %s via HTTP to free VRAM", mid
-                                    )
-                                    ur = await client.post(
-                                        f"{LLAMA_URL}/models/unload", json={"model": mid}
-                                    )
-                                    if ur.status_code == 200:
-                                        self._unloaded_models.append(mid)
-                                        unloaded = True
-                    if unloaded:
-                        await asyncio.sleep(2)
-                except Exception as exc:
-                    LOG.warning("could not unload llama-cpp models via HTTP: %s", exc)
-                return unloaded
+                return await self._wait_unloaded()
             try:
                 if not await self._running():
                     LOG.info("%s not running; GPU already free", LLAMA_CONTAINER)
@@ -302,10 +279,25 @@ class DockerCtl:
                 LOG.warning("could not stop %s: %s", LLAMA_CONTAINER, exc)
                 return False
 
+    async def _wait_unloaded(self) -> bool:
+        deadline = time.time() + LLAMA_UNLOAD_TIMEOUT
+        while time.time() < deadline:
+            try:
+                async with httpx.AsyncClient(timeout=5) as client:
+                    r = await client.get(f"{LLAMA_URL}/health")
+                if r.status_code == 200 and r.json().get("unloaded"):
+                    LOG.info("LLM server %s has freed its model; VRAM is free", LLAMA_URL)
+                    return True
+            except Exception as exc:
+                LOG.warning("LLM health check failed: %s", exc)
+            await asyncio.sleep(5)
+        LOG.warning("LLM server %s still holds its model after %.0fs", LLAMA_URL, LLAMA_UNLOAD_TIMEOUT)
+        return False
+
     async def resume(self) -> None:
         async with self._lock:
             if self._use_http:
-                # llama-cpp stays running in router mode and reloads models on demand.
+                # The LLM server stays running and reloads its model on demand.
                 # Verify it is still healthy.
                 try:
                     async with httpx.AsyncClient(timeout=10) as client:

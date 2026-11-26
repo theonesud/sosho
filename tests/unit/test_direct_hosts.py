@@ -16,9 +16,11 @@ CLOUD_ALLOWED = {"docker/litellm.yaml"}
 LLAMA_ALLOWED = {
     "compose.yaml",
     "docker/litellm.yaml",
+    "docs/HANDOFF.md",
     "packages/yue2/AGENTS.md",
     "packages/yue2/gateway/app.py",
     "tests/integration/test_llama.py",
+    "tests/integration/test_strata.py",
 }
 PENDING = {
     ".pi/models.json": ".pi/models.next.json",

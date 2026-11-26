@@ -11,7 +11,7 @@ services:
       HF_XET_HIGH_PERFORMANCE: "1"
       HF_TOKEN: ${HF_TOKEN:-}
       MODELS: |
-        HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive Qwen3.6-35B-A3B Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf mmproj-Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-f16.gguf
+        llmfan46/Qwen3.6-35B-A3B-uncensored-heretic-Native-MTP-Preserved-GGUF Qwen3.6-35B-A3B-heretic Qwen3.6-35B-A3B-uncensored-heretic-Native-MTP-Preserved-Q4_K_M.gguf
         unsloth/Qwen3-1.7B-GGUF Qwen3-1.7B Qwen3-1.7B-Q4_K_M.gguf
         ggml-org/embeddinggemma-300M-GGUF embeddinggemma-300M embeddinggemma-300M-Q8_0.gguf
     volumes:
@@ -53,6 +53,44 @@ services:
     volumes:
       - ./models:/models:ro
       - ./docker/llama-models.ini:/etc/llama/models.ini:ro
+    command:
+      - --models-preset
+      - /etc/llama/models.ini
+      - --models-max
+      - "2"
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+
+  strata:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.strata
+    image: sosho-strata:c33b153
+    pull_policy: build
+    container_name: strata
+    restart: unless-stopped
+    depends_on:
+      model-download:
+        condition: service_completed_successfully
+    networks: [sosho-net]
+    ipc: host
+    cpu_shares: 1024
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+    environment:
+      STRATA_CPU_PF_ROWS: "8"
+      STRATA_CPU_PF_MAX_TOKENS: "1024"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8080/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+    volumes:
+      - ./models/Qwen3.6-35B-A3B-heretic:/models:ro
+      - strata-cache:/cache
     deploy:
       resources:
         reservations:
@@ -61,14 +99,36 @@ services:
               count: all
               capabilities: [gpu]
     command:
-      - --models-preset
-      - /etc/llama/models.ini
-      - --models-max
-      - "3"
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8080"
+      - serve
+      - --model
+      - /models/Qwen3.6-35B-A3B-uncensored-heretic-Native-MTP-Preserved-Q4_K_M.gguf
+      - --alias
+      - Qwen3.6-35B-A3B
+      - --addr
+      - 0.0.0.0:8080
+      - --allowed-hosts
+      - strata
+      - --gpu
+      - --ctx
+      - "65536"
+      - --vram-margin
+      - "256"
+      - --kv
+      - q8
+      - --auto-unload
+      - "900"
+      - --temp
+      - "0.6"
+      - --top-p
+      - "0.95"
+      - --top-k
+      - "20"
+      - --min-p
+      - "0"
+      - --presence-penalty
+      - "0"
+      - --repeat-penalty
+      - "1"
 
   litellm:
     image: ghcr.io/berriai/litellm:v1.110.2
@@ -78,8 +138,9 @@ services:
     security_opt: [no-new-privileges:true]
     depends_on:
       llama-cpp:
-        # llama-cpp uses service_started, because yue2 can unload it.
         condition: service_started
+      strata:
+        condition: service_healthy
     ports:
       - "127.0.0.1:4000:4000"
     networks: [sosho-net]
@@ -234,7 +295,7 @@ services:
       YUE2_RETENTION_SECONDS: ${YUE2_RETENTION_SECONDS:-86400}
       YUE2_MAX_GIB: ${YUE2_MAX_GIB:-5}
       YUE2_STOP_LLAMA: ${YUE2_STOP_LLAMA:-true}
-      YUE2_LLAMA_URL: http://llama-cpp:8080
+      YUE2_LLAMA_URL: http://strata:8080
       YUE2_BIND_HOST: 127.0.0.1
     volumes:
       - yue2-data:/data
@@ -245,4 +306,5 @@ networks:
 
 volumes:
   hf-cache:
+  strata-cache:
   yue2-data:

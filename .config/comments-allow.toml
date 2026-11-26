@@ -1,10 +1,5 @@
 [[comment]]
 path = "compose.yaml"
-text = "# llama-cpp uses service_started, because yue2 can unload it."
-reason = "With service_healthy, LiteLLM stops after a music job unloads the router models."
-
-[[comment]]
-path = "compose.yaml"
 text = "# The LiteLLM image has no curl. Python is present."
 reason = "A curl healthcheck fails in this image and marks a working LiteLLM as unhealthy."
 
@@ -37,3 +32,8 @@ reason = "Moving the updater to sosho-net gives a network update step access to 
 path = "tests/unit/test_configs.py"
 text = "# The output is not printed. It can hold values from .env."
 reason = "Printing the compose config output on failure leaks secret values into logs."
+
+[[comment]]
+path = "docker/Dockerfile.strata"
+text = "# target-cpu=native builds the image for the CPU of the build host (i5-12400F, AVX2). Do not run it on another CPU."
+reason = "The flag makes the binary fail with an illegal instruction on another CPU. The name does not show this."

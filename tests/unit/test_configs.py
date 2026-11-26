@@ -16,6 +16,9 @@ LOCAL_HOST = "127.0.0.1"
 DOCKER_SOCKET = "/var/run/docker.sock"
 LLAMA_HOST = "llama-cpp"
 LLAMA_PORT = 8080
+STRATA_HOST = "strata"
+STRATA_ROLE = "local-uncensored"
+LLAMA_ROLES = {"decision", "embed"}
 LOCAL_ROLES = {"decision", "embed", "local-uncensored"}
 EXPECTED_ROLES = {
     "main",
@@ -45,6 +48,8 @@ class ComposeService(BaseModel):
     networks: list[str] | dict[str, object] | None = None
     ports: list[str] = []
     volumes: list[str] = []
+    command: list[str] | str = []
+    deploy: dict[str, object] = {}
 
 
 class ComposeFile(BaseModel):
@@ -178,6 +183,12 @@ def container_to_host(path: str) -> Path:
     return ROOT / "models" / path.removeprefix("/models/")
 
 
+def strata_command() -> list[str]:
+    command = load_compose_services()[STRATA_HOST].command
+    assert isinstance(command, list), "strata command is not a list"
+    return command
+
+
 def test_docker_compose_config_exits_zero() -> None:
     docker = shutil.which("docker")
     if docker is None:
@@ -232,7 +243,7 @@ def test_llama_model_sections_are_unique_and_have_a_model_key() -> None:
 
 
 @pytest.mark.integration
-def test_llama_model_and_projector_files_exist_on_disk() -> None:
+def test_model_files_exist_on_disk() -> None:
     if not (ROOT / "models").is_dir():
         pytest.skip("models/ is missing. The model-download services create it.")
     parser = read_llama_ini()
@@ -243,6 +254,14 @@ def test_llama_model_and_projector_files_exist_on_disk() -> None:
                 host_path = container_to_host(parser.get(section, key))
                 if not host_path.is_file():
                     missing.append(str(host_path))
+    strata = load_compose_services()[STRATA_HOST]
+    command = strata_command()
+    strata_file = command[command.index("--model") + 1]
+    strata_folder = next(v for v in strata.volumes if v.endswith(":/models:ro"))
+    host_folder = ROOT / strata_folder.split(":", 1)[0]
+    strata_path = host_folder / strata_file.removeprefix("/models/")
+    if not strata_path.is_file():
+        missing.append(str(strata_path))
     assert not missing, "missing model files: " + ", ".join(missing)
 
 
@@ -252,10 +271,10 @@ def test_litellm_model_names_are_exactly_the_planned_roles() -> None:
     assert set(names) == EXPECTED_ROLES
 
 
-def test_local_roles_use_the_llama_router_and_known_model_sections() -> None:
+def test_llama_roles_use_the_llama_router_and_known_model_sections() -> None:
     sections = set(llama_section_headers())
     entries = {entry.model_name: entry for entry in read_litellm().model_list}
-    for role in sorted(LOCAL_ROLES):
+    for role in sorted(LLAMA_ROLES):
         params = entries[role].litellm_params
         url = urlparse(params.api_base)
         assert url.hostname == LLAMA_HOST, f"{role} api_base host is {url.hostname}"
@@ -263,6 +282,41 @@ def test_local_roles_use_the_llama_router_and_known_model_sections() -> None:
         assert params.model.startswith("openai/"), f"{role} model has no openai/ prefix"
         model_id = params.model.removeprefix("openai/")
         assert model_id in sections, f"{role} model {model_id} is not in llama-models.ini"
+
+
+def test_local_uncensored_uses_strata_with_the_served_alias() -> None:
+    params = {e.model_name: e for e in read_litellm().model_list}[STRATA_ROLE].litellm_params
+    url = urlparse(params.api_base)
+    assert url.hostname == STRATA_HOST, f"api_base host is {url.hostname}"
+    assert url.port == LLAMA_PORT, f"api_base port is {url.port}"
+    assert params.model.startswith("openai/"), "model has no openai/ prefix"
+    command = strata_command()
+    alias = command[command.index("--alias") + 1]
+    assert params.model.removeprefix("openai/") == alias
+    assert "Qwen3.6-35B-A3B" not in llama_section_headers()
+
+
+def test_only_strata_reserves_the_gpu_among_the_chat_services() -> None:
+    services = load_compose_services()
+    assert "nvidia" in str(services[STRATA_HOST].deploy), "strata has no GPU reservation"
+    assert not services[LLAMA_HOST].deploy, "llama-cpp reserves a GPU"
+
+
+def test_strata_serves_sampling_defaults_and_unloads_when_idle() -> None:
+    command = strata_command()
+    expected = {
+        "--temp": "0.6",
+        "--top-p": "0.95",
+        "--top-k": "20",
+        "--min-p": "0",
+        "--presence-penalty": "0",
+        "--repeat-penalty": "1",
+        "--auto-unload": "900",
+        "--kv": "q8",
+        "--ctx": "65536",
+    }
+    for flag, value in expected.items():
+        assert command[command.index(flag) + 1] == value, f"{flag} is not {value}"
 
 
 def test_cloud_roles_do_not_point_at_llama_cpp() -> None:

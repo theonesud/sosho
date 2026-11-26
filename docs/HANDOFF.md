@@ -8,7 +8,7 @@ Sosho is an AI workbench that runs on one GPU workstation. One human owner and a
 
 The workflow backend is `packages/engine`, module `sosho_engine`. It is a JSON graph interpreter on DBOS Transact 3.7.0, written in Python. Workflows are versioned JSON. Agents write them now. The owner writes them on a canvas later. Build the backend first. Build the UI after the backend.
 
-Every model call goes through the LiteLLM proxy. Do not add direct provider or llama.cpp access. Claude Code is the exception. It calls Anthropic directly. The llama.cpp port has no host port.
+Every model call goes through the LiteLLM proxy. Do not add direct provider, llama.cpp, or RustingStrata access. Claude Code is the exception. It calls Anthropic directly. The llama.cpp and `strata` ports have no host port.
 
 `agent`, `skill`, and `llm` nodes run pi sessions on the host worker. Only `llm` nodes whose role is in `SOSHO_ENGINE_DIRECT_ROLES` are plain model calls in the engine. The default value is `decision`. Calls for embeddings stay direct LiteLLM calls.
 
@@ -24,7 +24,7 @@ Work method: Claude Code acts as coordinator only. Sonnet subagents write code. 
 - A fix is in commit `728fcdc`. It sets `SOSHO_ENGINE_PI_LINE_CAP_BYTES` high in that test. It also adds a separate line-cap case. The fix is not run yet.
 - `make test-fast` exited 0 in 77 seconds. This run came before the latest changes. It is not rerun after them.
 - The previous full run, before the test reduction, took 18 minutes 45 seconds. It had 493 tests and 88 percent coverage.
-- `compose.yaml` services: `model-download`, `llama-cpp`, `litellm`, and `engine`. The `music` profile adds the `yue2-*` services. The Langfuse stack in `docker/compose.langfuse.yaml` adds `postgres`.
+- `compose.yaml` services: `model-download`, `llama-cpp`, `strata`, `litellm`, and `engine`. The `music` profile adds the `yue2-*` services. The Langfuse stack in `docker/compose.langfuse.yaml` adds `postgres`.
 - The engine listens on `127.0.0.1:8123`. Every route needs the bearer token `SOSHO_ENGINE_API_TOKEN`, except `GET /health` and the webhook route.
 - The DBOS system database `sosho_engine` lives on the `postgres` service. The host worker reaches it on `127.0.0.1:${SOSHO_POSTGRES_PORT:-5432}`.
 - The host worker runs as the systemd user service `sosho-worker`.
@@ -68,7 +68,7 @@ a) Prompt order change is half done.
    - Run `uv run pytest packages/engine/tests/test_pi_command.py packages/engine/tests/test_host_nodes.py -q`.
    - Fix the failures. Then run `make test` once.
 b) Checkpoint experiment. No gain. Cause not found.
-   - `docker/llama-models.ini`, Qwen3.6 preset: `checkpoint-min-step = 1024` and `ctx-checkpoints = 32`. The owner approved these keys. `llama-cpp` runs with them.
+   - Old llama.cpp result. The Qwen3.6 preset had `checkpoint-min-step = 1024` and `ctx-checkpoints = 32`. The preset is removed. `strata` now serves `local-uncensored`. The result below does not apply to `strata`. Not verified on `strata`.
    - Measurements. Logs `/tmp/llama_step2.log`, `/tmp/llama_step3.log`, and `/tmp/llama_step4.log` may be gone after a reboot.
    - The first request of each new pi session still evaluates the full prompt.
    - Baseline, no checkpoints: 35 to 44 seconds for 8656 to 8772 tokens. The prefix match is 0.80 to 0.87.
@@ -149,7 +149,9 @@ Decisions made by the owner on 2026-11-25 and 2026-11-26. Most rules are now in 
 - The sandbox stays off.
 - One file limit of 1000 lines. One function limit of 60 lines. The checker is `bin/check-file-length.py`.
 - Unused Docker items are removed.
-- Keep `--fit` for Qwen3.6. Do not use `cpu-moe`.
+- `local-uncensored` runs on the `strata` service: RustingStrata built from the fork `theonesud/RustingStrata`, commit `c33b153a08bbc53ababf578eecb33ed6a0fec33e`, with the model Qwen3.6-35B-A3B Heretic Q4_K_M. Keep the tuned flags in `compose.yaml`. The tuning record is `/home/sud/local-inference-tuning/campaigns/qwen36-35b-a3b-heretic-q4km__rustingstrata__beast/PLAN.md`. It lives outside this repository.
+- `strata` has no host port. It serves the model alias `Qwen3.6-35B-A3B`. It has sampling defaults `temp` 0.6, `top-p` 0.95, `top-k` 20, `min-p` 0, because pi sends no sampling values. It unloads the model after 900 idle seconds. `/health` answers 200 while unloaded.
+- The image is built for the CPU of this host with `target-cpu=native`.
 - `decision` and `embed` run on the CPU only. They use `device = none` and `sleep-idle-seconds = 900`.
 - Qwen sampling for precise coding: `temp` 0.6, `top-p` 0.95, `top-k` 20, `min-p` 0.0, `presence-penalty` 0.0, `repeat-penalty` 1.0. The prompt has no "reason in English" line.
 - All chat model calls run through pi. The exception is the roles in `SOSHO_ENGINE_DIRECT_ROLES`. The default is `decision`. Embeddings are direct.
@@ -240,12 +242,11 @@ When the list changes, edit every file that names these paths. See `Makefile`, `
 - Langfuse v4 runs in events-only mode. `/api/public/traces` returns 404. Read spans from `/api/public/v2/observations`. This is not verified in the repository code.
 - A new Langfuse `SALT` breaks the stored project API key. Delete its `api_keys` row and restart `langfuse-web`. The startup setup creates the key again.
 - Router presets in `docker/llama-models.ini` cannot read environment variables.
-- In `docker/llama-models.ini`, Qwen3.6 has no `cpu-moe`. It uses the llama.cpp `--fit` defaults.
-- In `docker/llama-models.ini`, `decision` and `embed` have `device = none` and `n-gpu-layers = 0`. `n-gpu-layers = 0` alone still reserved VRAM. The `embed` model failed with `cudaMalloc failed: out of memory` while Qwen3.6 was loaded. With `device = none`, neither process holds VRAM.
-- In `docker/llama-models.ini`, all three presets have `sleep-idle-seconds = 900`.
+- In `docker/llama-models.ini`, `decision` and `embed` have `device = none` and `n-gpu-layers = 0`. `n-gpu-layers = 0` alone still reserved VRAM. The `embed` model failed with `cudaMalloc failed: out of memory` while Qwen3.6 was loaded. With `device = none`, neither process holds VRAM. `llama-cpp` has no GPU reservation now.
+- In `docker/llama-models.ini`, both presets have `sleep-idle-seconds = 900`.
 - Claude Code reads its hook settings when a session starts. After a change to the hooks or a hook script path, restart Claude Code.
 - OpenCode rejects the schema keys `providers` and `permissions`. Use `provider`, `permission`, and a flat `mcp` map. See `opencode.json`.
-- The YuE2 gateway unloads all llama.cpp models before a music job. The models load again on the next request. The reload is not verified in this session.
+- RustingStrata has no unload call. Before a music job, the YuE2 gateway waits until `GET http://strata:8080/health` shows `"unloaded": true`. That state follows 900 idle seconds. The wait ends after `YUE2_LLAMA_UNLOAD_TIMEOUT_SECONDS`, default 960. Then the job runs. A chat request during a music job loads the model again and can fail for lack of VRAM. Not verified with a live music job.
 - The pi `llm` path ignores `temperature` and `max_tokens`.
 - The OpenAI client retries a status 5xx by itself. The fault proxy answers status 400, so each engine attempt makes one request.
 - A direct `llm` node in the same wave as a slow node waits for that node. Put it in an earlier wave when a test needs its result first.

@@ -9,7 +9,7 @@ Use the `yue2-music` command to generate songs. The command is `packages/yue2/ge
 
 The first start can take many minutes. The service downloads the model during the first start. Later starts take less time.
 
-While music generation runs, the local `llama-cpp` model is unloaded. The `local-uncensored` tier is not available during that time. After the job queue empties, `llama-cpp` does not reload its models. A model loads again when a request needs it.
+A music job waits until the `strata` service has freed the `local-uncensored` model. This happens after 900 idle seconds, so a job can wait up to 16 minutes. The `local-uncensored` tier is not available during the job. A request loads the model again after the job.
 
 ## Command Line Usage
 
@@ -45,6 +45,6 @@ Use the HTTP API only when the command cannot run. Start the services first with
 ## Notes
 
 1. The command starts the services when they are not ready. The first start downloads the model. Allow many minutes.
-2. The gateway unloads `llama-cpp` models when a job starts. This frees graphics card memory for YuE2.
+2. The gateway waits until `strata` has freed its model. This frees graphics card memory for YuE2.
 3. If `YUE2_API_KEY` is set, pass `Authorization: Bearer <key>` on HTTP requests.
 4. If the start times out, the command prints the logs command. Run that command and read the error text.

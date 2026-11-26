@@ -34,7 +34,7 @@ model_list:
   - model_name: local-uncensored
     litellm_params:
       model: openai/Qwen3.6-35B-A3B
-      api_base: http://llama-cpp:8080/v1
+      api_base: http://strata:8080/v1
       api_key: local
       timeout: 600
       stream_timeout: 600

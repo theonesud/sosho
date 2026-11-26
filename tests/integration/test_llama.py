@@ -15,7 +15,6 @@ pytestmark = pytest.mark.integration
 HEALTH_TIMEOUT = 10.0
 MODEL_TIMEOUT = 180.0
 CHAT_MODEL = "Qwen3-1.7B"
-HEAVY_CHAT_MODEL = "Qwen3.6-35B-A3B"
 
 
 class ModelEntry(BaseModel):
@@ -109,12 +108,13 @@ def test_health_returns_200() -> None:
     assert resp.status == 200, resp.text
 
 
-def test_models_lists_every_preset_section() -> None:
+def test_models_lists_every_preset_section_and_no_gpu_model() -> None:
     expected = set(_load_presets().sections())
     resp = _llama("/v1/models")
     assert resp.status == 200, resp.text
     listed = {entry.id for entry in ModelList.model_validate_json(resp.text).data}
     assert expected <= listed, f"missing from /v1/models: {sorted(expected - listed)}"
+    assert "Qwen3.6-35B-A3B" not in listed, "llama-cpp still lists the GPU model"
 
 
 def test_chat_qwen3_1_7b_answers() -> None:
@@ -130,7 +130,3 @@ def test_embedding_model_returns_vector() -> None:
     assert resp.status == 200, resp.text
     vector = EmbeddingResponse.model_validate_json(resp.text).data[0].embedding
     assert vector, "embedding vector is empty"
-
-
-def test_chat_35b_model_answers() -> None:
-    _assert_answered(HEAVY_CHAT_MODEL)

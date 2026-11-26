@@ -21,7 +21,7 @@ To stop the services and release RAM/VRAM:
 docker compose stop yue2-gateway yue2-engine
 ```
 
-> **VRAM Coordination**: The engine is lazy-loaded. The gateway automatically pauses `llama-cpp` when generation starts, generates audio, and unloads/resumes `llama-cpp` once complete.
+> **VRAM Coordination**: The engine is lazy-loaded. The gateway waits until the `strata` LLM server has freed its model (`--auto-unload`, 900 idle seconds) before generation starts. It then generates audio. `strata` loads its model again on the next chat request.
 
 ---
 
