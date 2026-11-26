@@ -70,18 +70,19 @@ CAUTION: Destructive and outward-facing actions are hard to undo.
 - Write output to the exact path that the user names. Follow the order that the user specifies.
 - Account for every item before you report a batch as complete. Compare the result with the source before you report a multi-item task as done.
 - Do not write more than 100 lines in one tool call. Write large tool output to a file. Read that file in parts.
-- Write a comment only if it is necessary. Pin each dependency to its newest stable exact version. Follow `docs/standards/code.md` sections 7 and 11.
+- Write a comment only if it is necessary. Pin each dependency to its newest stable exact version. Follow `docs/standards/code.md` sections 7 and 11. Exception: always use the latest version of pi and pi extensions.
 
 ## 5 Verification
 
-5.1 Run `make test` after any change. Run it also after any change to agent files.
+5.1 After a change, run only the tests that cover the change. Run `make test` only at intervals, for example before you report a finished batch of work. The pre-push hook runs `make test-fast`.
 
 5.2 Use these commands. Make is the entry point.
 
 | Command | Purpose |
 | :--- | :--- |
 | `make setup` | Install tools, dependencies, and git hooks. Run it one time on each machine. |
-| `make test` | Run all checks and all tests. It does not change files. |
+| `make test` | Run all checks and all tests, live tests included. It does not change files. |
+| `make test-fast` | Run all checks and the tests that are not marked `integration`. No model call, no live stack. It does not change files. |
 | `make fix` | Format and fix files. |
 
 5.3 These actions run automatically in every agent through its adapter file. Section 7 lists the adapter files.
@@ -90,7 +91,7 @@ CAUTION: Destructive and outward-facing actions are hard to undo.
 - After each edit, `bin/agent-post-edit.sh` runs. Then `bin/agent-format.sh` formats the edited file.
 - At pre-commit, the hook fixes and re-stages staged files. It also scans for secrets and warns on prose.
 - At commit-msg, the hook checks the Conventional Commits format.
-- At pre-push, the hook runs `make test`.
+- At pre-push, the hook runs `make test-fast`.
 
 5.4 The hooks must pass. Never use `--no-verify`.
 
@@ -117,3 +118,27 @@ NOTE: Later stages add rows for documentation, architecture, and structure.
 | All agents | `AGENTS.md`, `.agents/skills`, `bin/agent-guard.py`, `bin/agent-post-edit.sh`, `bin/agent-format.sh` |
 
 7.1 Put only tool-specific facts in adapter files.
+
+## 8 Project Rules
+
+8.1 Architecture:
+
+- Send every model call through the LiteLLM proxy. Do not add direct access to a provider or to llama.cpp. Claude Code is the only exception. It calls Anthropic directly.
+- Run every chat model call as a pi session. Do not add a second call path beside pi.
+- Exception: calls to the `decision` and `embed` roles go directly to LiteLLM. They do not run in pi.
+- Build the backend first. Do not start the UI, the memory layer, or self-improvement work until the owner approves it.
+
+8.2 Models and GPU:
+
+- Keep the `decision` and `embed` models on the CPU.
+- Let llama.cpp `--fit` place the `local-uncensored` model on the GPU.
+- Let each idle model unload from memory.
+- Before you propose a model or GPU change, read `docker/llama-models.ini`, its git log, and the current llama.cpp docs. The owner tuned these settings.
+- Ask the owner before you run a benchmark.
+
+8.3 Tests:
+
+- Use the real pi in tests. Do not use a fake pi.
+- Use only local models in tests. Do not use cloud roles or provider API keys.
+- Get the maximum coverage in the minimum time. Prefer fewer tests that check more behavior.
+- Keep the pre-push hook fast. Do not run GPU calls, model calls, or live stack tests in it.
