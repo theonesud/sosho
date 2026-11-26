@@ -13,9 +13,10 @@ Read when: You write or change any code.
 
 ## 2 Size Limits
 
-2.1 Keep a function at 40 lines or fewer.
-2.2 Keep a file at 300 lines or fewer.
+2.1 Keep a function at 60 lines or fewer.
+2.2 Keep a file at 1000 lines or fewer.
 2.3 If a change will exceed a limit, split the code first.
+2.4 `bin/check-file-length.py` checks rule 2.2 for `.py`, `.ts`, `.tsx`, `.mts`, `.js`, `.mjs`, `.cjs`, and `.sh` files. `make test` fails on each file over its limit.
 
 ## 3 Types and Boundaries
 
@@ -84,6 +85,7 @@ WARNING: A secret in source code can leak to other people.
 11.1 Add a dependency only if it removes real code.
 11.2 Pin each dependency to one exact version. This covers npm and Python packages, Docker images, Dockerfile base images, mise tools, and `npx` package arguments.
 11.3 Do not use a version range or a floating tag. Examples: `^1.2.0`, `~1.2`, `>=1.2`, `*`, `latest`, `7-alpine`.
+11.3.1 Exception by owner decision: pi and each pi package must use `latest`. A pi package name starts with `@earendil-works/pi-`, or it is a pi extension package in `.pi/settings.json`. Pin all other packages exactly.
 11.4 If an image has no exact version tag, pin it by `sha256` digest.
 11.5 Use the newest stable version when you add or update a dependency.
 11.6 Update outdated dependencies in a separate change. `make test` lists them as warnings.
