@@ -1,0 +1,1 @@
+{"description": "B0 with the suffix and ngram-cache drafters", "serve_args": ["--gpu", "--ctx", "65536", "--spec-type", "suffix,ngram-cache"], "env": {}, "docker_args": [], "cache": "fresh"}

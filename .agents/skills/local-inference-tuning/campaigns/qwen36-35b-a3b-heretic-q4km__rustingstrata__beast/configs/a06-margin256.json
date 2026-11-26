@@ -1,0 +1,1 @@
+{"description": "B0 with 256 MB VRAM margin", "serve_args": ["--gpu", "--ctx", "65536", "--vram-margin", "256"], "env": {}, "docker_args": [], "cache": "fresh"}

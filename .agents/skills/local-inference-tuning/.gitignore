@@ -1,0 +1,6 @@
+# Campaign data: real recorded requests, model answers, engine logs, and engine caches.
+campaigns/*/replays/
+campaigns/*/gates/
+campaigns/*/runs/
+campaigns/*/runs-*.log
+campaigns/*/cache/

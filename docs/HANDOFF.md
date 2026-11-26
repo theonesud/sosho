@@ -16,9 +16,9 @@ Work method: Claude Code acts as coordinator only. Sonnet subagents write code. 
 
 ## 2 State
 
-- Date of this state: 2026-11-26. Branch `refactor`. Last commit `6315ff7`. Nothing is pushed.
-- The work of 2026-11-25 and 2026-11-26 is in commits `b197c69` to `6315ff7`. Commit `728fcdc` holds the unfinished prompt order change (section 4, item 0). Ask the owner before the next commit or a push.
-- Nothing is pushed.
+- Date of this state: 2026-11-26, evening. Branch `refactor`. Last commit `0a72d29`, pushed to `origin/refactor`. The owner asked for that push.
+- The work of 2026-11-25 and 2026-11-26 is in commits `b197c69` to `0a72d29`. Commit `728fcdc` holds the unfinished prompt order change (section 4, item 0). Commit `0a72d29` moves `local-uncensored` to the `strata` service. Ask the owner before the next commit or a push.
+- Not committed: the skill folder `.agents/skills/local-inference-tuning/`, the path updates in `AGENTS.md` 8.2 and in this file, and the check fixes for that folder. See section 4, item 0f.
 - Last full run: `make test COV=1` exit code 2, in 10 minutes 35 seconds. Pytest result: 501 passed, 1 failed. Coverage: 96 percent.
 - The failure: `test_limits_stop_the_node_and_count_calls_on_both_paths`. The per-line cap tripped before the total cap.
 - A fix is in commit `728fcdc`. It sets `SOSHO_ENGINE_PI_LINE_CAP_BYTES` high in that test. It also adds a separate line-cap case. The fix is not run yet.
@@ -136,6 +136,20 @@ The owner must start host Chrome with the Dokobot extension first. The file `~/.
 
 - Fix `lefthook validate`. On 2026-11-25 it exits 1 with `x-legacy: Value is array but should be object`. The same error appears for `x-legacy-docs`.
 
+f) Local inference work of 2026-11-26. State and open items.
+   - Record: `.agents/skills/local-inference-tuning/`. Read `SKILL.md` first. The campaign `PLAN.md` holds every measurement. The skill folder came from `~/local-inference-tuning`. It is not committed yet.
+   - The skill `.gitignore` keeps out the campaign data: the replays hold real recorded pi requests from Langfuse. Never commit them.
+   - Two checks failed after the move: the agent-docs checker read the git-ignored replay files, and `tests/unit/test_direct_hosts.py` flagged the harness scripts. Fixes, not committed: `files_under()` in `bin/agent_docs/common.py` skips git-ignored files, with a test in `tests/unit/test_check_agent_docs.py`. `LLAMA_ALLOWED` in `tests/unit/test_direct_hosts.py` lists the skill `scripts/run.py`, the campaign `PLAN.md`, and `step-gates.sh`.
+   - `make test-fast` exit code 0 on 2026-11-26 evening, with all of the above in the work tree: 452 passed, 0 lint errors.
+   - Next commit, after the owner asks: the skill folder, the check fixes, and the path updates in `AGENTS.md` and this file.
+   - Result: the `strata` config replays the recorded agent sessions 12.5% faster than RustingStrata defaults, and 11.9% faster with one extra busy CPU core. Gates: greedy agreement with the defaults at the noise floor, needle 3 of 3 at 32K and 64K, llama.cpp cross-check partial pass.
+   - Not done: the `base` load test with the owner's real apps, the token-by-token parity tool, a KL divergence measure of q8 KV, and a speed comparison against llama.cpp on this machine. The llama.cpp yardstick container exited at start with an empty log. The owner chose RustingStrata without that comparison.
+   - YuE2 music jobs can wait up to 15 minutes for the `strata` unload. Fix idea: add an unload endpoint to the fork. Ask the owner.
+   - The fork: `~/rustingstrata`, branch `lit/c12-cpu-prefill`, remote `fork` = `git@github.com:theonesud/RustingStrata.git`. It has the CPU-split patch, the chunk limit, and `MODIFICATIONS.md`, which the license requires. `NOTICE.md` holds the license credit for this repository.
+   - Disk: about 27 GB free. The Langfuse ClickHouse container grows its writable layer and uses about one CPU core all the time. On 2026-11-26 the disk ran full during a benchmark batch. Check `df -h /` before a build or a batch.
+   - Cleanup candidates, ask the owner first: the local images `rustingstrata:v1.3.7`, `rustingstrata:c12`, and `rustingstrata:c12b` (461 MB each), the old folder `~/rustingstrata-bench`, the Rust toolchain in `~/.rustup` and `~/.cargo`, and the empty root-owned folder `/tmp/lit-cpu-cache`.
+   - The `pi-sandbox:latest` image is missing. `test_container_mode_reports_the_version_and_answers_through_litellm` fails until `make up` builds it.
+
 ## 5 Decisions that wait for the owner
 
 Do not start these without the owner:
@@ -149,10 +163,14 @@ Decisions made by the owner on 2026-11-25 and 2026-11-26. Most rules are now in 
 - The sandbox stays off.
 - One file limit of 1000 lines. One function limit of 60 lines. The checker is `bin/check-file-length.py`.
 - Unused Docker items are removed.
-- `local-uncensored` runs on the `strata` service: RustingStrata built from the fork `theonesud/RustingStrata`, commit `c33b153a08bbc53ababf578eecb33ed6a0fec33e`, with the model Qwen3.6-35B-A3B Heretic Q4_K_M. Keep the tuned flags in `compose.yaml`. The tuning record is `/home/sud/local-inference-tuning/campaigns/qwen36-35b-a3b-heretic-q4km__rustingstrata__beast/PLAN.md`. It lives outside this repository.
+- `local-uncensored` runs on the `strata` service: RustingStrata built from the fork `theonesud/RustingStrata`, commit `c33b153a08bbc53ababf578eecb33ed6a0fec33e`, with the model Qwen3.6-35B-A3B Heretic Q4_K_M. Keep the tuned flags in `compose.yaml`. The tuning record is `.agents/skills/local-inference-tuning/campaigns/qwen36-35b-a3b-heretic-q4km__rustingstrata__beast/PLAN.md`.
 - `strata` has no host port. It serves the model alias `Qwen3.6-35B-A3B`. It has sampling defaults `temp` 0.6, `top-p` 0.95, `top-k` 20, `min-p` 0, because pi sends no sampling values. It unloads the model after 900 idle seconds. `/health` answers 200 while unloaded.
 - The image is built for the CPU of this host with `target-cpu=native`.
 - `decision` and `embed` run on the CPU only. They use `device = none` and `sleep-idle-seconds = 900`.
+- `decision` and `embed` stay on llama.cpp. RustingStrata has no embeddings endpoint and serves one model per server. Its CPU path ran Qwen3-1.7B at 3.9 tokens per second, against 34 tokens per second decode and 223 tokens per second prompt on llama.cpp. In-process embeddings in the memory package were discussed and not chosen.
+- The owner chose RustingStrata over llama.cpp for `local-uncensored`. The speed difference on this machine is not measured.
+- The engine fork is public on GitHub at `theonesud/RustingStrata`. The owner asked for the push.
+- The tuning skill lives in `.agents/skills/local-inference-tuning/`. The owner decides the model and the engine. The skill does the rest.
 - Qwen sampling for precise coding: `temp` 0.6, `top-p` 0.95, `top-k` 20, `min-p` 0.0, `presence-penalty` 0.0, `repeat-penalty` 1.0. The prompt has no "reason in English" line.
 - All chat model calls run through pi. The exception is the roles in `SOSHO_ENGINE_DIRECT_ROLES`. The default is `decision`. Embeddings are direct.
 - The optional node field `thinking` sets the pi `--thinking` level. Direct `llm` nodes reject it.
@@ -251,3 +269,11 @@ When the list changes, edit every file that names these paths. See `Makefile`, `
 - The OpenAI client retries a status 5xx by itself. The fault proxy answers status 400, so each engine attempt makes one request.
 - A direct `llm` node in the same wave as a slow node waits for that node. Put it in an earlier wave when a test needs its result first.
 - `bin/check-agent-docs.sh` is a wrapper for `bin/check-agent-docs.py` and the package `bin/agent_docs/`.
+- Do not run `rustingstrata calibrate` for `strata`. The log warns "not calibrated on this machine". The benchmarked config ran without calibration. Calibration picks MTP drafts, and MTP made agent turns slower.
+- `strata` needs `--allowed-hosts strata`. Without it the engine answers LiteLLM with "bad Host header".
+- The `strata` cache volume keeps the expert routing profile between restarts. The benchmarks used an empty cache on each start. The effect is not measured.
+- On `strata`, an agent turn that adds a few hundred tokens pays about 0.9 seconds before the first token without the fork patch. The engine copies most experts over PCIe for any prefill. The fork settings `STRATA_CPU_PF_ROWS=8` and `STRATA_CPU_PF_MAX_TOKENS=1024` cut that cost. Do not remove them.
+- Expert adaptation must stay on. `STRATA_ADAPT_EVERY=0` cut decode from 69 to 48 tokens per second.
+- The `strata` prompt cache works per conversation. Separate requests with the same system prompt get no cache hit.
+- `pgrep -f PATTERN` matches the shell that runs it. Use `ps -eo args | grep '^...'`.
+- Pinned apt package versions in `docker/Dockerfile.strata` can leave the Ubuntu mirrors. A later build can then fail.

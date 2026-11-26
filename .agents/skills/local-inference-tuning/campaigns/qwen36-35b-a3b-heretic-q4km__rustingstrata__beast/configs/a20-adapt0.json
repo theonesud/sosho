@@ -1,0 +1,1 @@
+{"description": "B0 with expert adaptation off: no settle uploads after each prefill", "serve_args": ["--gpu", "--ctx", "65536"], "env": {"STRATA_ADAPT_EVERY": "0"}, "docker_args": [], "cache": "fresh"}

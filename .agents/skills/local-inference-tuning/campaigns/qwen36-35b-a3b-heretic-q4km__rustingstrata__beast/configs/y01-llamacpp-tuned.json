@@ -1,0 +1,11 @@
+{
+  "description": "Yardstick: llama.cpp b12407 with the owner's tuned preset from sosho docker/llama-models.ini (text only, no mmproj), same Heretic GGUF",
+  "image": "ghcr.io/ggml-org/llama.cpp:server-cuda-b12407",
+  "command": ["-m", "{model}", "--host", "0.0.0.0", "--port", "8080", "--jinja",
+              "-c", "65536", "-np", "1", "-t", "8", "-tb", "12", "-ctk", "q4_0", "-ctv", "q4_0",
+              "-b", "2048", "-ub", "512", "-fa", "on", "--moe-cache-mib", "1536", "--mlock",
+              "--reasoning", "on", "--reasoning-preserve", "-cms", "1024", "--ctx-checkpoints", "32"],
+  "env": {},
+  "docker_args": ["--entrypoint", "/app/llama-server"],
+  "cache": "fresh"
+}

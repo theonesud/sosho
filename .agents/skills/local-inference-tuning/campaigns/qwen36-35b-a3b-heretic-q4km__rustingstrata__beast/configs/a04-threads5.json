@@ -1,0 +1,1 @@
+{"description": "B0 with 5 CPU expert threads", "serve_args": ["--gpu", "--ctx", "65536", "--threads", "5"], "env": {}, "docker_args": [], "cache": "fresh"}

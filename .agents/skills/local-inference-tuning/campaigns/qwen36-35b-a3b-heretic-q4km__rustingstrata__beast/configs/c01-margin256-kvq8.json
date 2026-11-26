@@ -1,0 +1,1 @@
+{"description": "B0 with 256 MB VRAM margin and q8 KV: more resident experts, fewer uploads per prefill", "serve_args": ["--gpu", "--ctx", "65536", "--vram-margin", "256", "--kv", "q8"], "env": {}, "docker_args": [], "cache": "fresh"}

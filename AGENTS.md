@@ -133,7 +133,7 @@ NOTE: Later stages add rows for documentation, architecture, and structure.
 - Keep the `decision` and `embed` models on the CPU.
 - Serve the `local-uncensored` model with the `strata` service. It runs a custom build of RustingStrata, with the tuned flags and environment in `compose.yaml` and the build in `docker/Dockerfile.strata`. It is the only GPU user in the chat stack.
 - Let each idle model unload from memory.
-- Before you propose a change to the `local-uncensored` model or the GPU, read the `strata` service in `compose.yaml`, its git log, and `/home/sud/local-inference-tuning/campaigns/qwen36-35b-a3b-heretic-q4km__rustingstrata__beast/PLAN.md`. The owner tuned these settings. That file is the record of the tuning. It lives outside this repository.
+- Before you propose a change to the `local-uncensored` model or the GPU, read the `strata` service in `compose.yaml`, its git log, and `.agents/skills/local-inference-tuning/campaigns/qwen36-35b-a3b-heretic-q4km__rustingstrata__beast/PLAN.md`. The owner tuned these settings. That file is the record of the tuning.
 - Before you propose a change to the `decision` or `embed` models, read `docker/llama-models.ini`, its git log, and the current llama.cpp docs.
 - Ask the owner before you run a benchmark.
 

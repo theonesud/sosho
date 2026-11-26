@@ -1,0 +1,43 @@
+{
+  "arch": "qwen35moe",
+  "best": {
+    "chunk": 2048.0,
+    "mtp": 1.0,
+    "short": 32.0
+  },
+  "bytes": 21780313248,
+  "chunk": 2048,
+  "ctx": 65536,
+  "gpu": "NVIDIA GeForce RTX 3060 Ti",
+  "measured": {
+    "decode_tok_s": 109.3,
+    "prefill_tok_s": 163.5
+  },
+  "mtp": 1,
+  "schema": 2,
+  "search": {
+    "elapsed_ms": 438630,
+    "samples_used": 24,
+    "score": 1.1679000000000002,
+    "seed": 1,
+    "stop_reason": "budget"
+  },
+  "short": 32,
+  "workloads": [
+    {
+      "pp": 128,
+      "task": "coding",
+      "tg": 64
+    },
+    {
+      "pp": 512,
+      "task": "coding",
+      "tg": 64
+    },
+    {
+      "pp": 2048,
+      "task": "coding",
+      "tg": 64
+    }
+  ]
+}

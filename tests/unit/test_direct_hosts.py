@@ -14,6 +14,9 @@ LLAMA_URL = re.compile(r"[A-Za-z0-9.-]+:8080\b")
 
 CLOUD_ALLOWED = {"docker/litellm.yaml"}
 LLAMA_ALLOWED = {
+    ".agents/skills/local-inference-tuning/campaigns/qwen36-35b-a3b-heretic-q4km__rustingstrata__beast/PLAN.md",
+    ".agents/skills/local-inference-tuning/campaigns/qwen36-35b-a3b-heretic-q4km__rustingstrata__beast/step-gates.sh",
+    ".agents/skills/local-inference-tuning/scripts/run.py",
     "compose.yaml",
     "docker/litellm.yaml",
     "docs/HANDOFF.md",

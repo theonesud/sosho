@@ -1,0 +1,1 @@
+{"description": "B0 with 2 MTP drafts", "serve_args": ["--gpu", "--ctx", "65536", "--mtp", "2"], "env": {}, "docker_args": [], "cache": "fresh"}

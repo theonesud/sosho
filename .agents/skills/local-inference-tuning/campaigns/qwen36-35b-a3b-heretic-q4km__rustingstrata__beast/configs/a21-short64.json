@@ -1,0 +1,1 @@
+{"description": "B0 with short-prompt threshold 64: prefills under 64 tokens use the decode path, no expert upload", "serve_args": ["--gpu", "--ctx", "65536", "--short", "64"], "env": {}, "docker_args": [], "cache": "fresh"}

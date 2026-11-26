@@ -1,0 +1,1 @@
+{"description": "C12 fork on c01 flags: missed experts with at most 16 rows per chunk run on the CPU in prefill", "image": "rustingstrata:c12", "serve_args": ["--gpu", "--ctx", "65536", "--vram-margin", "256", "--kv", "q8"], "env": {"STRATA_CPU_PF_ROWS": "16"}, "docker_args": [], "cache": "fresh"}

@@ -1,0 +1,62 @@
+{
+ "engine": "rustingstrata",
+ "image": "rustingstrata:v1.3.7",
+ "models_dir": "/home/sud/sosho/models/Qwen3.6-35B-A3B-heretic",
+ "model_file": "Qwen3.6-35B-A3B-uncensored-heretic-Native-MTP-Preserved-Q4_K_M.gguf",
+ "request_model": "Qwen3.6-35B-A3B-uncensored-heretic-Native-MTP-Preserved-Q4_K_M",
+ "ctx": 65536,
+ "port": 8091,
+ "uid": 1000,
+ "gid": 1000,
+ "health_timeout_s": 900,
+ "stop_containers": [
+  "llama-cpp"
+ ],
+ "sampling": {
+  "temperature": 0.6,
+  "top_p": 0.95,
+  "top_k": 20,
+  "min_p": 0.0,
+  "presence_penalty": 0.0,
+  "repeat_penalty": 1.0
+ },
+ "profiles": {
+  "quick": {
+   "m3": {
+    "replays": {
+     "S1": 0,
+     "W1": 10
+    },
+    "reps": 1
+   },
+   "m2": {
+    "decode_samples": 3,
+    "prefill": [
+     4096,
+     32768
+    ],
+    "prefill_reps": 1,
+    "needle": false
+   }
+  },
+  "full": {
+   "m3": {
+    "replays": {
+     "S1": 0,
+     "S2": 0,
+     "W1": 0
+    },
+    "reps": 1
+   },
+   "m2": {
+    "decode_samples": 6,
+    "prefill": [
+     4096,
+     32768
+    ],
+    "prefill_reps": 2,
+    "needle": true
+   }
+  }
+ }
+}

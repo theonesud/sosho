@@ -1,0 +1,7 @@
+{
+  "description": "B0: engine defaults. Only --gpu and the 64K context. Empty cache on every start.",
+  "serve_args": ["--gpu", "--ctx", "65536"],
+  "env": {},
+  "docker_args": [],
+  "cache": "fresh"
+}

@@ -1,0 +1,1 @@
+{"description": "C12b fork, c01 flags, rows 8, CPU split only for chunks of at most 1024 tokens (0: all)", "image": "rustingstrata:c12b", "serve_args": ["--gpu", "--ctx", "65536", "--vram-margin", "256", "--kv", "q8"], "env": {"STRATA_CPU_PF_ROWS": "8", "STRATA_CPU_PF_MAX_TOKENS": "1024"}, "docker_args": [], "cache": "fresh"}

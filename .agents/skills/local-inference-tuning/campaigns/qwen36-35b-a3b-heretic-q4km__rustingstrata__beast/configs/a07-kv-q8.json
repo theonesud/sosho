@@ -1,0 +1,1 @@
+{"description": "B0 with q8 KV cache", "serve_args": ["--gpu", "--ctx", "65536", "--kv", "q8"], "env": {}, "docker_args": [], "cache": "fresh"}
