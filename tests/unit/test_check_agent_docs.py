@@ -2,6 +2,7 @@ import importlib
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -354,6 +355,10 @@ def test_helpers_tolerate_bad_input(tree: Path) -> None:
     assert common.files_under("absent") == []
     _put("d/e/f.txt")
     assert common.files_under("d") == [str(Path("d/e/f.txt"))]
+    subprocess.run(["git", "init", "-q"], check=True)  # noqa: S607
+    _put(".gitignore", "d/skip.txt\n")
+    _put("d/skip.txt")
+    assert sorted(common.files_under("d")) == [str(Path("d/e/f.txt"))]
     paths = [p for p, _ in common.walk({"a": [{"b": 1}, 2], "c": 3})]
     assert paths == [("a", "b"), ("a",), ("c",)]
 

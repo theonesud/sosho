@@ -2,6 +2,7 @@ import glob
 import json
 import os
 import re
+import subprocess
 from collections.abc import Iterator
 from typing import TypeGuard
 
@@ -103,7 +104,27 @@ def expand(pattern: str) -> list[str]:
     ]
 
 
+def ignored_by_git(paths: list[str]) -> set[str]:
+    if not paths:
+        return set()
+    try:
+        result = subprocess.run(
+            ["git", "check-ignore", "--stdin", "-z"],  # noqa: S607
+            input="\0".join(paths),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return set()
+    if result.returncode not in (0, 1):
+        return set()
+    return {p for p in result.stdout.split("\0") if p}
+
+
 def files_under(directory: str) -> list[str]:
     if not os.path.isdir(directory):
         return []
-    return [os.path.join(r, n) for r, _, names in os.walk(directory) for n in names]
+    found = [os.path.join(r, n) for r, _, names in os.walk(directory) for n in names]
+    ignored = ignored_by_git(found)
+    return [f for f in found if f not in ignored]
