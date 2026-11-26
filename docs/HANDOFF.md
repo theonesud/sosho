@@ -29,7 +29,7 @@ Work method: Claude Code acts as coordinator only. Sonnet subagents write code. 
 - The host worker runs as the systemd user service `sosho-worker`.
 - The DBOS executor id of the engine is `engine`. The id of the worker is `host-worker`. Source: `packages/engine/src/sosho_engine/settings.py:9`.
 - Each process needs its own executor id. With a shared id, one process can take over the pending runs of the other.
-- Phoenix at `http://127.0.0.1:6006` receives the traces. The pi extension sends the header `traceparent` on each LiteLLM request, so that the LiteLLM span is a child of the pi span. A live run on 2026-11-26 verified the link. The LiteLLM `chat` span has the same trace id as the pi `LLM Call` span. LiteLLM records no cost for these calls. Phoenix shows no cost.
+- Phoenix at `http://127.0.0.1:6006` receives the traces. The pi extension sends the headers `traceparent` and `x-litellm-session-id` on each LiteLLM request. The LiteLLM span is a child of the pi span. A live run on 2026-11-27 verified the link. The LiteLLM `chat` span has the same trace id as the pi `LLM Call` span. It has `session.id` equal to the pi session id. The Phoenix sessions view groups the trace under that id. The local models have `model_info` with zero cost. The `chat` span has `litellm.cost.total` 0.0.
 
 ## 3 Engine summary
 
@@ -124,8 +124,9 @@ The owner must start host Chrome with the Dokobot extension first. The file `~/.
 
 ### 3 Cost and session id
 
-- Add cost for local and cloud models in LiteLLM, so that Phoenix shows cost.
-- Put the session id on the LiteLLM records.
+- Done for session id. The header `x-litellm-session-id` makes LiteLLM write `session.id` on the `chat` span. The header `x-litellm-customer-id` also sets an end user, but the OTel v2 path does not map it to `session.id`.
+- Done for local models. `decision`, `embed`, and `local-uncensored` have zero cost in `docker/litellm.yaml`.
+- Partial for cloud models. The built-in LiteLLM price map has no price for `main`, `subagent`, `subagent-code`, and `cloud-uncensored`. Their cost stays empty until the owner gives prices for `model_info`.
 
 ### 4 Legacy paths
 
@@ -226,7 +227,6 @@ When the list changes, edit every file that names these paths. See `Makefile`, `
 
 ## 8 Traps
 
-- `make up` runs only `try-restart` for the worker. After a manual `systemctl --user stop sosho-worker`, the worker stays down. Run `systemctl --user start sosho-worker`.
 - Phoenix accepts OTLP only as protobuf. The extension uses `@opentelemetry/exporter-trace-otlp-proto`. The extension is silent on export errors. Set `PI_PHOENIX_DEBUG=1` to write them to stderr.
 - pi fires `before_provider_headers` before `before_provider_request`. The extension starts the `LLM Call` span in the headers hook, so that the `traceparent` header has the span id.
 - Each engine code change changes the app version. The version is a hash of the package source unless `SOSHO_ENGINE_APP_VERSION` is set. Pending runs of the old version do not recover. After each engine code change, run `make up`. It restarts the worker.
@@ -261,6 +261,8 @@ When the list changes, edit every file that names these paths. See `Makefile`, `
 - Phoenix reads the project name from the header `x-project-name` or from the resource attribute `openinference.project.name`. Verified in the Phoenix 22.1.0 source.
 - Phoenix uses `PHOENIX_SQL_DATABASE_URL` to select Postgres. The one-shot service `phoenix-db-init` creates the database `phoenix` if it is missing. This works on the existing volume.
 - LiteLLM needs `LITELLM_OTEL_V2=true` for the callback `arize_phoenix`. LiteLLM issue 27388 says that `success_callback` did not send spans. The image has the OpenTelemetry packages. It has no `openinference` package.
+- On the OTel v2 path, LiteLLM writes `session.id` from the header `x-litellm-session-id`. It does not write it from `user_api_key_end_user_id`. The older v1 function `_set_session_and_user_attrs` does that, and v2 does not call it.
+- LiteLLM sends the full message text to Phoenix. The variable `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` is `span_only` in `compose.yaml`. Phoenix stores the text unredacted, on loopback with auth off. The `chat` span has `gen_ai.input.messages`.
 - LiteLLM v2 tracing reads an incoming `traceparent` header through the FastAPI instrumentation. This is from the LiteLLM source. It is not verified in a live run.
 - Router presets in `docker/llama-models.ini` cannot read environment variables.
 - In `docker/llama-models.ini`, `decision` and `embed` have `device = none` and `n-gpu-layers = 0`. `n-gpu-layers = 0` alone still reserved VRAM. The `embed` model failed with `cudaMalloc failed: out of memory` while Qwen3.6 was loaded. With `device = none`, neither process holds VRAM. `llama-cpp` has no GPU reservation now.

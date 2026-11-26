@@ -111,6 +111,13 @@ export class Recorder {
     return formatTraceparent(ids.traceId, ids.spanId);
   }
 
+  requestHeaders(): Record<string, string> {
+    const traceparent = this.traceparent();
+    if (!traceparent) return {};
+    const sessionId = this.options.identity.sessionId;
+    return { traceparent, "x-litellm-session-id": sessionId };
+  }
+
   endLlm(info: LlmEnd): void {
     if (!this.llm) return;
     const own = this.llm.linked

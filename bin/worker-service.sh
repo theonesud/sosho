@@ -84,7 +84,8 @@ case "${1:-}" in
     ;;
   restart)
     command -v systemctl >/dev/null 2>&1 || exit 0
-    if systemctl --user try-restart "$UNIT_NAME" 2>/dev/null; then
+    [ -f "$UNIT_PATH" ] || exit 0
+    if systemctl --user restart "$UNIT_NAME"; then
       echo "Restarted $UNIT_NAME"
     fi
     ;;

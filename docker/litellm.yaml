@@ -23,6 +23,9 @@ model_list:
       api_base: http://llama-cpp:8080/v1
       api_key: local
       timeout: 120
+    model_info:
+      input_cost_per_token: 0
+      output_cost_per_token: 0
 
   - model_name: embed
     litellm_params:
@@ -30,6 +33,9 @@ model_list:
       api_base: http://llama-cpp:8080/v1
       api_key: local
       timeout: 120
+    model_info:
+      input_cost_per_token: 0
+      output_cost_per_token: 0
 
   - model_name: local-uncensored
     litellm_params:
@@ -38,6 +44,9 @@ model_list:
       api_key: local
       timeout: 600
       stream_timeout: 600
+    model_info:
+      input_cost_per_token: 0
+      output_cost_per_token: 0
 
   - model_name: cloud-uncensored
     litellm_params:

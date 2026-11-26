@@ -109,8 +109,7 @@ function registerLlmEvents(pi: ExtensionAPI, current: () => Runtime | undefined)
         linked: ctx.model?.provider === LITELLM_PROVIDER,
         ...(ctx.model ? { model: ctx.model.id, provider: ctx.model.provider } : {}),
       });
-      const traceparent = runtime.recorder.traceparent();
-      if (traceparent) event.headers.traceparent = traceparent;
+      Object.assign(event.headers, runtime.recorder.requestHeaders());
     }),
   );
   pi.on("message_end", (event) => guard(() => endAssistantMessage(current(), event.message)));

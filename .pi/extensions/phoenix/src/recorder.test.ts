@@ -19,12 +19,17 @@ assert.equal(env.SOSHO_TRACE_PARENT_DEPTH, "1");
 recorder.beginTurn(0);
 recorder.beginLlm({ input: "hello", model: "main", provider: "openai", linked: false });
 assert.equal(recorder.traceparent(), undefined);
+assert.deepEqual(recorder.requestHeaders(), {});
 recorder.endLlm({
   output: "x".repeat(50),
   usage: { input: 10, output: 5, cacheRead: 0, cacheWrite: 0 },
 });
 recorder.beginLlm({ input: "again", model: "main", provider: "litellm", linked: true });
 assert.match(recorder.traceparent() ?? "", /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
+assert.deepEqual(recorder.requestHeaders(), {
+  traceparent: recorder.traceparent(),
+  "x-litellm-session-id": "s1",
+});
 recorder.endLlm({ output: "done", usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 } });
 recorder.beginTool("t1", "bash", { command: "echo topsecret" });
 recorder.endTool("t1", "out", true);
