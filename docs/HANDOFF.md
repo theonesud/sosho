@@ -16,12 +16,12 @@ Work method: Claude Code acts as coordinator only. Sonnet subagents write code. 
 
 ## 2 State
 
-- Date of this state: 2026-11-26. Branch `refactor`. Last commit `a42176a`.
-- The working tree holds a large set of uncommitted changes from 2026-11-25 and 2026-11-26. The owner said: do not commit until the owner asks.
+- Date of this state: 2026-11-26. Branch `refactor`. Last commit `6315ff7`. Nothing is pushed.
+- The work of 2026-11-25 and 2026-11-26 is in commits `b197c69` to `6315ff7`. Commit `728fcdc` holds the unfinished prompt order change (section 4, item 0). Ask the owner before the next commit or a push.
 - Nothing is pushed.
 - Last full run: `make test COV=1` exit code 2, in 10 minutes 35 seconds. Pytest result: 501 passed, 1 failed. Coverage: 96 percent.
 - The failure: `test_limits_stop_the_node_and_count_calls_on_both_paths`. The per-line cap tripped before the total cap.
-- A fix is in the working tree. It sets `SOSHO_ENGINE_PI_LINE_CAP_BYTES` high in that test. It also adds a separate line-cap case. The fix is not run yet.
+- A fix is in commit `728fcdc`. It sets `SOSHO_ENGINE_PI_LINE_CAP_BYTES` high in that test. It also adds a separate line-cap case. The fix is not run yet.
 - `make test-fast` exited 0 in 77 seconds. This run came before the latest changes. It is not rerun after them.
 - The previous full run, before the test reduction, took 18 minutes 45 seconds. It had 493 tests and 88 percent coverage.
 - `compose.yaml` services: `model-download`, `llama-cpp`, `litellm`, and `engine`. The `music` profile adds the `yue2-*` services. The Langfuse stack in `docker/compose.langfuse.yaml` adds `postgres`.
