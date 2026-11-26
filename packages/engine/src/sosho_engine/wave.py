@@ -13,14 +13,15 @@ from sosho_engine.fanout import Handle, Launcher, merge_fanout, plan_fanout, sta
 from sosho_engine.jobs import NodeJob, NodeResult, RunParams
 from sosho_engine.launch import limit_seconds, remaining_seconds
 from sosho_engine.nodeflow import node_workflow
+from sosho_engine.placement import is_host_node
 from sosho_engine.queues import HOST_QUEUE, get_queue
 from sosho_engine.scheduler import RunState, blocked_branches, join_inputs, node_data
 from sosho_engine.spec import Workflow
-from sosho_engine.spec_nodes import HOST_KINDS, MapNode, SubworkflowNode
+from sosho_engine.spec_nodes import MapNode, SubworkflowNode
 from sosho_engine.steps import run_inline_step
 from sosho_engine.tools import JsonDict
 
-CHILD_KINDS = frozenset({"agent", "skill", "human", "wait"})
+CHILD_KINDS = frozenset({"human", "wait"})
 TIMEOUT_GRACE_SECONDS = 30.0
 Announce = Callable[[dict[str, str]], Awaitable[None]]
 
@@ -93,7 +94,9 @@ def child_id(ctx: RunContext, state: RunState, node_id: str) -> str:
 
 def _is_child(job: NodeJob) -> bool:
     node = job.node
-    return node.kind in CHILD_KINDS or (node.kind in ("llm", "tool") and node.queue is not None)
+    if node.kind in CHILD_KINDS or (node.kind in ("llm", "tool") and node.queue is not None):
+        return True
+    return is_host_node(node, runtime.current().settings.direct_roles)
 
 
 async def _enqueue(queue: str | None, payload: dict[str, JsonValue]) -> Handle:
@@ -106,7 +109,7 @@ async def _start_child(
     job: NodeJob, cid: str, remaining: float | None
 ) -> WorkflowHandleAsync[JsonDict]:
     node = job.node
-    on_host = node.kind in HOST_KINDS
+    on_host = is_host_node(node, runtime.current().settings.direct_roles)
     queue = HOST_QUEUE if on_host else node.queue
     payload: dict[str, JsonValue] = job.model_dump(mode="json")
     with SetWorkflowID(cid):

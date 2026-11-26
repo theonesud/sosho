@@ -1,6 +1,15 @@
 import pytest
 from engine_support import Api, dig, publish, run_to_end
-from flows import Spec, draft, edge, tool, trigger, unique
+from flows import (
+    DIRECT_ROLE,
+    PI_ROLE,
+    Spec,
+    draft,
+    edge,
+    tool,
+    trigger,
+    unique,
+)
 from pydantic import JsonValue
 from sosho_engine.conditions import evaluate
 from sosho_engine.spec import WorkflowDraft, draft_to_workflow
@@ -95,9 +104,9 @@ def _node_of(kind: str) -> Spec:
 @pytest.mark.parametrize("kind", ["agent", "tool", "llm", "router", "join"])
 def test_retry_on_a_kind_that_uses_it_is_valid(kind: str) -> None:
     nodes: dict[str, Spec] = {
-        "agent": {"id": "n", "kind": "agent", "role": "main", "prompt": "go"},
+        "agent": {"id": "n", "kind": "agent", "role": PI_ROLE, "prompt": "go"},
         "tool": tool("n", "echo"),
-        "llm": {"id": "n", "kind": "llm", "role": "fast", "prompt": "hi"},
+        "llm": {"id": "n", "kind": "llm", "role": DIRECT_ROLE, "prompt": "hi"},
         "router": _router("input.a") | {"id": "n"},
         "join": {"id": "n", "kind": "join"},
     }
@@ -108,28 +117,3 @@ def test_retry_on_a_kind_that_uses_it_is_valid(kind: str) -> None:
         assert _codes([trigger(), *extra, chosen], edges) == set()
     else:
         assert _codes([trigger(), chosen], [edge("start", "n")]) == set()
-
-
-def test_agent_retry_runs_the_agent_again_after_a_failure(host_api: Api) -> None:
-    wid = unique("agentretry")
-    node: Spec = {
-        "id": "n",
-        "kind": "agent",
-        "role": "main",
-        "prompt": "flaky:{{input.tag}}",
-        "max_turns": 3,
-        "retry": {"max_attempts": 2, "interval_seconds": 0},
-    }
-    publish(host_api, draft([trigger(), node], [edge("start", "n")]), wid)
-    detail = run_to_end(host_api, wid, {"tag": wid})
-    assert dig(detail, "summary", "status") == "succeeded"
-    assert str(dig(detail, "output", "output", "n", "text")).startswith("fake done:")
-    assert dig(detail, "output", "llm_calls") == 4
-
-
-def test_agent_without_retry_fails_on_the_first_error(host_api: Api) -> None:
-    wid = unique("agentnoretry")
-    node: Spec = {"id": "n", "kind": "agent", "role": "main", "prompt": "flaky:{{input.tag}}"}
-    publish(host_api, draft([trigger(), node], [edge("start", "n")]), wid)
-    detail = run_to_end(host_api, wid, {"tag": wid})
-    assert dig(detail, "summary", "status") == "failed"

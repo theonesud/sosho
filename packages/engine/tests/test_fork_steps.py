@@ -12,26 +12,28 @@ def _node(kind: str) -> Spec:
         return {"id": "n", "kind": "wait", "seconds": 0}
     if kind == "human":
         return {"id": "n", "kind": "human", "prompt": "ok?", "wait_seconds": 0.1}
-    return {"id": "n", "kind": "agent", "role": "main", "prompt": "go"}
+    raise ValueError(kind)
 
 
 def _fork(api: Api, run_id: str, node: str, occurrence: int) -> int:
     return api.post(f"/runs/{run_id}/fork", {"node_id": node, "occurrence": occurrence}).status
 
 
-@pytest.mark.parametrize("kind", ["wait", "human", "agent"])
-def test_a_child_node_in_a_single_pass_run_has_one_execution(host_api: Api, kind: str) -> None:
+@pytest.mark.parametrize("kind", ["wait", "human"])
+def test_a_child_node_in_a_single_pass_run_has_one_execution(api: Api, kind: str) -> None:
     wid = unique(f"fk{kind}")
     nodes: list[JsonValue] = [trigger(), _node(kind), tool("t", "echo", value="x")]
     edges: list[JsonValue] = [edge("start", "n"), edge("n", "t")]
     if kind == "human":
         edges = [edge("start", "n"), edge("n", "t", "reject")]
-    publish(host_api, draft(nodes, edges), wid)
-    detail = run_to_end(host_api, wid)
+    publish(api, draft(nodes, edges), wid)
+    detail = run_to_end(api, wid)
     run_id = str(dig(detail, "summary", "run_id"))
     assert dig(detail, "summary", "status") == "succeeded"
-    assert _fork(host_api, run_id, "n", 2) == 404
-    assert _fork(host_api, run_id, "n", 1) == 202
+    assert _fork(api, run_id, "n", 2) == 404
+    forked = api.post(f"/runs/{run_id}/fork", {"node_id": "n", "occurrence": 1})
+    assert forked.status == 202
+    assert wait_terminal(api, str(dig(forked.body, "run_id"))) == "succeeded"
 
 
 def test_second_execution_of_a_looped_node_can_be_forked(api: Api) -> None:

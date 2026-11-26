@@ -6,7 +6,12 @@ from sosho_engine.validation import PI_ROLES
 
 KIND_INFO: dict[str, tuple[str, str]] = {
     "trigger": ("Trigger", "Start a run. Modes: manual, cron, webhook, workflow_finished."),
-    "llm": ("LLM", "Send one prompt to a model role and return the text."),
+    "llm": (
+        "LLM",
+        "Send one prompt to a model role and return the text. "
+        "Runs as a pi session without tools on the host worker. "
+        "Roles in direct_roles call LiteLLM in the engine.",
+    ),
     "agent": (
         "Agent",
         "Run a pi session on a model role with optional skills. Runs on the host worker.",
@@ -21,7 +26,6 @@ KIND_INFO: dict[str, tuple[str, str]] = {
     "wait": ("Wait", "Sleep for a fixed time. The sleep survives a restart."),
 }
 QUEUES: dict[str, dict[str, int]] = {
-    "local-gpu": {"global_concurrency": 1, "worker_concurrency": 1},
     "cloud-io": {"global_concurrency": 8, "worker_concurrency": 8},
     "host-browser": {"global_concurrency": 2, "worker_concurrency": 2},
     "host": {"global_concurrency": 4, "worker_concurrency": 4},

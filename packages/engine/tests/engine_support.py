@@ -6,17 +6,11 @@ from pathlib import Path
 from typing import Protocol
 
 from fastapi.testclient import TestClient
+from live_support import ROUTE, litellm_key
 from pydantic import BaseModel, JsonValue
-from pydantic_ai.messages import (
-    ModelMessage,
-    ModelRequest,
-    ModelResponse,
-    TextPart,
-    UserPromptPart,
-)
 from pydantic_ai.models import Model
-from pydantic_ai.models.function import AgentInfo, FunctionModel
 from sosho_engine.lifecycle import build_runtime
+from sosho_engine.models import litellm_models
 from sosho_engine.runtime import Runtime
 from sosho_engine.settings import Settings
 from sosho_engine.tools import JsonDict, ToolRegistry, builtin_tools
@@ -25,35 +19,20 @@ TOKEN = "test-token-0123456789abcdef"  # noqa: S105
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
 TERMINAL = {"succeeded", "failed", "cancelled"}
 CALLS: Counter[str] = Counter()
-
-
-def last_prompt(messages: list[ModelMessage]) -> str:
-    for message in reversed(messages):
-        if isinstance(message, ModelRequest):
-            for part in message.parts:
-                if isinstance(part, UserPromptPart) and isinstance(part.content, str):
-                    return part.content
-    return ""
-
-
+POLL_ATTEMPTS = 400
+DIRECT_ROLES = ["decision"]
 SLOW_SECONDS = 3.0
 
 
-async def _chat(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-    del info
-    prompt = last_prompt(messages)
-    CALLS[f"llm:{prompt}"] += 1
-    if prompt.startswith("slow:"):
-        await asyncio.sleep(SLOW_SECONDS)
-    if prompt.startswith("flaky:") and CALLS[f"llm:{prompt}"] < 3:
-        raise RuntimeError("model is flaky")
-    if prompt.startswith("json:"):
-        return ModelResponse(parts=[TextPart('{"answer": 42, "label": "big"}')])
-    return ModelResponse(parts=[TextPart(f"echo:{prompt}")])
-
-
-def fake_models(role: str) -> Model:
-    return FunctionModel(_chat, model_name="fake-chat")
+def live_models(role: str) -> Model:
+    settings = Settings.model_validate(
+        {
+            "api_token": TOKEN,
+            "litellm_base_url": ROUTE.base_url,
+            "LITELLM_MASTER_KEY": litellm_key(),
+        }
+    )
+    return litellm_models(settings)(role)
 
 
 class CountParams(BaseModel):
@@ -98,12 +77,17 @@ def test_tools() -> ToolRegistry:
 
 def base_settings(db_path: Path) -> Settings:
     return Settings.model_validate(
-        {"db_url": f"sqlite:///{db_path}", "api_token": TOKEN, "app_version": "test"}
+        {
+            "db_url": f"sqlite:///{db_path}",
+            "api_token": TOKEN,
+            "app_version": "test",
+            "direct_roles": DIRECT_ROLES,
+        }
     )
 
 
 def make_runtime(db_path: Path) -> Runtime:
-    return build_runtime(base_settings(db_path), fake_models, test_tools())
+    return build_runtime(base_settings(db_path), live_models, test_tools())
 
 
 def dig(value: JsonValue, *path: str | int) -> JsonValue:
@@ -139,8 +123,9 @@ class Reply:
 
 
 class Api:
-    def __init__(self, client: TestClient) -> None:
+    def __init__(self, client: TestClient, attempts: int = POLL_ATTEMPTS) -> None:
         self._client = client
+        self.attempts = attempts
 
     def _reply(self, response: HttpResponse) -> Reply:
         try:
@@ -181,9 +166,9 @@ class Api:
         return self.send("DELETE", path)
 
 
-def wait_terminal(api: Api, run_id: str, attempts: int = 400) -> str:
+def wait_terminal(api: Api, run_id: str, attempts: int | None = None) -> str:
     status = ""
-    for _ in range(attempts):
+    for _ in range(attempts or api.attempts):
         status = str(dig(api.get(f"/runs/{run_id}").body, "summary", "status"))
         if status in TERMINAL:
             return status
@@ -191,8 +176,8 @@ def wait_terminal(api: Api, run_id: str, attempts: int = 400) -> str:
     return status
 
 
-def wait_pending(api: Api, run_id: str, attempts: int = 400) -> list[JsonValue]:
-    for _ in range(attempts):
+def wait_pending(api: Api, run_id: str, attempts: int | None = None) -> list[JsonValue]:
+    for _ in range(attempts or api.attempts):
         pending = dig(api.get(f"/runs/{run_id}").body, "pending_human")
         if isinstance(pending, list) and pending:
             return pending

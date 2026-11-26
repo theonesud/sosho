@@ -1,24 +1,24 @@
 import pytest
 from engine_support import Api, dig, wait_terminal
-from flows import Spec, draft, edge, trigger, unique
+from flows import PI_ROLE, Spec, draft, edge, trigger, unique
 from pydantic import JsonValue
 from sosho_engine.budget import effective_policy, inherit_from, reserve
 from sosho_engine.errors import PolicyError
 from sosho_engine.host_node import check_skills_allowed
 from sosho_engine.spec import Policy, Workflow, WorkflowDraft, draft_to_workflow
 from sosho_engine.spec_nodes import AgentNode, SkillNode
-from sosho_engine.validation import validate_workflow
+from sosho_engine.validation import PI_ROLES, validate_workflow
 
 Nodes = list[JsonValue]
 KNOWN = {"alpha", "beta"}
 
 
 def _agent(**extra: JsonValue) -> Spec:
-    return {"id": "n", "kind": "agent", "role": "main", "prompt": "go", **extra}
+    return {"id": "n", "kind": "agent", "role": PI_ROLE, "prompt": "go", **extra}
 
 
 def _skill(**extra: JsonValue) -> Spec:
-    return {"id": "n", "kind": "skill", "skill": "alpha", "task": "t", "role": "main", **extra}
+    return {"id": "n", "kind": "skill", "skill": "alpha", "task": "t", "role": PI_ROLE, **extra}
 
 
 def _codes(node: Spec, skills: set[str] | None = None, **policy: JsonValue) -> set[str]:
@@ -50,7 +50,7 @@ def test_roles_that_cannot_run_pi_are_rejected(role: str) -> None:
 
 def test_host_nodes_accept_only_the_host_queue() -> None:
     assert _codes(_agent(queue="host")) == set()
-    assert _codes(_agent(queue="local-gpu")) == {"host_queue"}
+    assert _codes(_agent(queue="cloud-io")) == {"host_queue"}
     other: Spec = {"id": "n", "kind": "tool", "tool": "echo", "queue": "host"}
     assert _codes(other) == {"host_queue"}
 
@@ -89,13 +89,7 @@ def test_reservation_covers_max_turns_for_each_attempt() -> None:
 def test_skill_catalog_is_listed_in_the_node_catalog(host_api: Api) -> None:
     body = host_api.get("/nodes").body
     assert dig(body, "skills") == ["alpha", "beta"]
-    assert dig(body, "pi_roles") == [
-        "cloud-uncensored",
-        "local-uncensored",
-        "main",
-        "subagent",
-        "subagent-code",
-    ]
+    assert dig(body, "pi_roles") == sorted(PI_ROLES)
 
 
 def test_save_rejects_an_unknown_skill_with_a_clear_issue(host_api: Api) -> None:

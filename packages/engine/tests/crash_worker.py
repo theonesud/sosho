@@ -3,8 +3,9 @@ import os
 import sys
 from pathlib import Path
 
-from engine_support import TOKEN, fake_models
-from flows import draft, edge, tool, trigger
+from engine_support import TOKEN, live_models
+from flows import SHORT, draft, edge, llm, tool, trigger
+from live_support import ROUTE
 from pydantic import BaseModel, JsonValue
 from sosho_engine import lifecycle, runs
 from sosho_engine.jobs import RunParams
@@ -45,14 +46,16 @@ def _tools(marker: Path, mode: str):
 def _parallel_spec() -> WorkflowDraft:
     nodes: list[JsonValue] = [
         trigger(),
+        llm("ask", SHORT),
         tool("left", "mark", label="left"),
         tool("right", "slow", label="right"),
         {"id": "merge", "kind": "join"},
         tool("last", "mark", label="last"),
     ]
     edges: list[JsonValue] = [
-        edge("start", "left"),
-        edge("start", "right"),
+        edge("start", "ask"),
+        edge("ask", "left"),
+        edge("ask", "right"),
         edge("left", "merge"),
         edge("right", "merge"),
         edge("merge", "last"),
@@ -64,22 +67,25 @@ def _serial_spec() -> WorkflowDraft:
     nodes: list[JsonValue] = [
         trigger(),
         tool("first", "mark", label="first"),
+        llm("ask", SHORT),
         tool("middle", "slow", label="middle"),
         tool("last", "mark", label="last"),
     ]
     edges: list[JsonValue] = [
         edge("start", "first"),
-        edge("first", "middle"),
+        edge("first", "ask"),
+        edge("ask", "middle"),
         edge("middle", "last"),
     ]
     return WorkflowDraft.model_validate(draft(nodes, edges))
 
 
 async def main(mode: str, db: Path, marker: Path, run_id: str, shape: str) -> None:
+    ROUTE.base_url = os.environ["CRASH_LITELLM_BASE_URL"]
     settings = Settings.model_validate(
         {"db_url": f"sqlite:///{db}", "api_token": TOKEN, "app_version": "test"}
     )
-    active = lifecycle.build_runtime(settings, fake_models, _tools(marker, mode))
+    active = lifecycle.build_runtime(settings, live_models, _tools(marker, mode))
     await lifecycle.launch(active, lifecycle.engine_queues())
     if mode == "start":
         await asyncio.to_thread(active.store.create_workflow, "crash", "crash", None)

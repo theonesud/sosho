@@ -3,6 +3,7 @@ from pathlib import Path
 from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from sosho_engine.placement import DEFAULT_DIRECT_ROLES
 from sosho_engine.version import PACKAGE_DIR, source_version
 
 REPO_ROOT = PACKAGE_DIR.parents[3]
@@ -25,7 +26,9 @@ class Settings(BaseSettings):
     pi_command: str | None = None
     pi_default_timeout_seconds: float = Field(default=900.0, gt=0.0)
     pi_stdout_cap_bytes: int = Field(default=20_971_520, ge=1024)
+    pi_line_cap_bytes: int = Field(default=20_971_520, ge=1024)
     gpu_roles: list[str] = ["local-uncensored"]
+    direct_roles: list[str] = list(DEFAULT_DIRECT_ROLES)
     pi_extensions: list[str] = ["guard", "langfuse"]
     worker_poll_seconds: float = Field(default=2.0, gt=0.0)
     worker_beat_seconds: float = Field(default=10.0, gt=0.0)

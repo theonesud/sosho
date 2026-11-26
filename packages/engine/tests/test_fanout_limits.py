@@ -1,8 +1,11 @@
-from engine_support import CALLS, Api, dig, publish, run_to_end
-from flows import Spec, draft, edge, llm, tool, trigger, unique
+from engine_support import Api, dig, publish, run_to_end
+from fault_proxy import routed
+from flows import PI_ROLE, SHORT, Spec, draft, edge, llm, tool, trigger, unique
 from pydantic import JsonValue
+from worker_support import WorkerHandle, worker_with
 
 ITEMS = 10
+HOST_ITEMS = 2
 
 
 def _status(detail: JsonValue) -> JsonValue:
@@ -19,7 +22,7 @@ def _queued_tool_child(api: Api) -> str:
 
 def _agent_child(api: Api) -> str:
     wid = unique("agchild")
-    agent: Spec = {"id": "ag", "kind": "agent", "role": "main", "prompt": "go"}
+    agent: Spec = {"id": "ag", "kind": "agent", "role": PI_ROLE, "prompt": SHORT, "thinking": "off"}
     publish(api, draft([trigger(), agent], [edge("start", "ag")]), wid)
     return wid
 
@@ -41,53 +44,54 @@ def test_map_over_queued_nodes_does_not_deadlock_the_queue(api: Api) -> None:
     assert dig(detail, "output", "output", "fan", "count") == ITEMS
 
 
-def test_nested_subworkflow_with_agent_nodes_does_not_deadlock(host_api: Api) -> None:
+def test_nested_subworkflow_with_agent_nodes_does_not_deadlock(
+    live_host_api: Api, worker: WorkerHandle
+) -> None:
     middle = unique("mid")
     publish(
-        host_api,
-        draft([trigger(), _sub_node(_agent_child(host_api))], [edge("start", "inner")]),
+        live_host_api,
+        draft([trigger(), _sub_node(_agent_child(live_host_api))], [edge("start", "inner")]),
         middle,
     )
     parent = unique("top")
-    publish(host_api, draft([trigger(), _map_node(middle)], [edge("start", "fan")]), parent)
-    detail = run_to_end(host_api, parent, {"items": list(range(ITEMS))})
+    publish(live_host_api, draft([trigger(), _map_node(middle)], [edge("start", "fan")]), parent)
+    with worker_with(worker, {"SOSHO_TEST_HOST_SLOTS": "1"}):
+        detail = run_to_end(live_host_api, parent, {"items": list(range(HOST_ITEMS))})
     assert _status(detail) == "succeeded"
-    assert dig(detail, "output", "output", "fan", "count") == ITEMS
+    assert dig(detail, "output", "output", "fan", "count") == HOST_ITEMS
 
 
-def _llm_chain(api: Api, prefix: str, **policy: JsonValue) -> tuple[str, list[str]]:
+def _llm_chain(api: Api, **policy: JsonValue) -> str:
     wid = unique("chain")
-    prompts = [f"{prefix}-{index}" for index in range(3)]
-    nodes: list[JsonValue] = [trigger(), *[llm(f"l{i}", text) for i, text in enumerate(prompts)]]
+    nodes: list[JsonValue] = [trigger(), *[llm(f"l{i}", SHORT) for i in range(3)]]
     edges: list[JsonValue] = [edge("start", "l0"), edge("l0", "l1"), edge("l1", "l2")]
     publish(api, draft(nodes, edges, policy=policy), wid)
-    return wid, prompts
+    return wid
 
 
-def _calls(prompts: list[str]) -> int:
-    return sum(CALLS[f"llm:{text}"] for text in prompts)
-
-
-def test_child_run_inherits_the_remaining_llm_budget(api: Api) -> None:
-    child, prompts = _llm_chain(api, unique("inh"))
+def test_child_run_inherits_the_remaining_llm_budget(live_api: Api) -> None:
+    child = _llm_chain(live_api)
     parent = unique("budget")
     publish(
-        api,
+        live_api,
         draft([trigger(), _sub_node(child)], [edge("start", "inner")], policy={"max_llm_calls": 2}),
         parent,
     )
-    detail = run_to_end(api, parent)
+    with routed() as proxy:
+        detail = run_to_end(live_api, parent)
     assert _status(detail) == "failed"
-    assert _calls(prompts) == 2
+    assert proxy.requests == 2
 
 
-def test_parent_counts_the_llm_calls_of_its_child_runs(api: Api) -> None:
-    child, _ = _llm_chain(api, unique("cnt"))
+def test_parent_counts_the_llm_calls_of_its_child_runs(live_api: Api) -> None:
+    child = _llm_chain(live_api)
     parent = unique("count")
-    publish(api, draft([trigger(), _sub_node(child)], [edge("start", "inner")]), parent)
-    detail = run_to_end(api, parent)
+    publish(live_api, draft([trigger(), _sub_node(child)], [edge("start", "inner")]), parent)
+    with routed() as proxy:
+        detail = run_to_end(live_api, parent)
     assert _status(detail) == "succeeded"
     assert dig(detail, "output", "llm_calls") == 3
+    assert proxy.requests == 3
 
 
 def _tool_child(api: Api, tool_name: str, **policy: JsonValue) -> str:

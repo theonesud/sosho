@@ -3,6 +3,11 @@ from itertools import count
 from pydantic import JsonValue
 
 Spec = dict[str, JsonValue]
+PI_ROLE = "local-uncensored"
+DIRECT_ROLE = "decision"
+MISSING_ROLE = "no-such-role"
+SHORT = "Reply with the single word ok."
+LONG = "Write the whole numbers from 1 to 5000, one per line, with no other text."
 _ids = count(1)
 
 
@@ -18,7 +23,7 @@ def tool(node_id: str, name: str, **args: JsonValue) -> Spec:
     return {"id": node_id, "kind": "tool", "tool": name, "args": args}
 
 
-def llm(node_id: str, prompt: str, role: str = "fast", **extra: JsonValue) -> Spec:
+def llm(node_id: str, prompt: str, role: str = DIRECT_ROLE, **extra: JsonValue) -> Spec:
     return {"id": node_id, "kind": "llm", "role": role, "prompt": prompt, **extra}
 
 

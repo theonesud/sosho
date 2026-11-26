@@ -39,6 +39,7 @@ class PiRun:
     timeout_seconds: float
     max_turns: int
     stdout_cap_bytes: int
+    line_cap_bytes: int
     poll_seconds: float
     cancelled: Callable[[], Awaitable[bool]]
 
@@ -123,7 +124,7 @@ async def run_pi(run: PiRun) -> PiTrace:
             stdout=asyncio.subprocess.PIPE,
             stderr=errors,
             start_new_session=True,
-            limit=run.stdout_cap_bytes,
+            limit=run.line_cap_bytes,
         )
         ACTIVE.add(proc)
         if proc.stdout is None:

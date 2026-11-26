@@ -1,7 +1,5 @@
-from pathlib import Path
-
 from engine_support import CALLS, Api, dig, publish, run_to_end
-from flows import Spec, draft, edge, llm, tool, trigger, unique
+from flows import SHORT, Spec, draft, edge, llm, tool, trigger, unique
 from pydantic import JsonValue
 
 
@@ -9,25 +7,27 @@ def _status(detail: JsonValue) -> JsonValue:
     return dig(detail, "summary", "status")
 
 
-def test_linear_flow_templates_outputs_between_nodes(api: Api) -> None:
+def test_linear_flow_templates_outputs_between_nodes(live_api: Api) -> None:
     wid = unique("linear")
     nodes: list[JsonValue] = [
         trigger(),
         tool("a", "echo", value="{{input.msg}}"),
-        llm("b", "say {{nodes.a.value}}"),
+        llm("b", "Reply with exactly this word and nothing else: {{nodes.a.value}}"),
     ]
-    publish(api, draft(nodes, [edge("start", "a"), edge("a", "b")]), wid)
-    detail = run_to_end(api, wid, {"msg": "hello"})
+    publish(live_api, draft(nodes, [edge("start", "a"), edge("a", "b")]), wid)
+    detail = run_to_end(live_api, wid, {"msg": "hello"})
     assert _status(detail) == "succeeded"
-    assert dig(detail, "output", "output", "b", "text") == "echo:say hello"
+    assert "hello" in str(dig(detail, "output", "output", "b", "text")).lower()
     assert dig(detail, "summary", "version") == 1
 
 
-def test_llm_json_output_is_parsed(api: Api) -> None:
+def test_llm_json_output_is_parsed(live_api: Api) -> None:
     wid = unique("json")
-    nodes: list[JsonValue] = [trigger(), llm("a", "json:go", json_output=True)]
-    publish(api, draft(nodes, [edge("start", "a")]), wid)
-    detail = run_to_end(api, wid)
+    prompt = 'Reply with only this JSON and no other text: {"answer": 42, "label": "big"}'
+    nodes: list[JsonValue] = [trigger(), llm("a", prompt, json_output=True)]
+    publish(live_api, draft(nodes, [edge("start", "a")]), wid)
+    detail = run_to_end(live_api, wid)
+    assert _status(detail) == "succeeded"
     assert dig(detail, "output", "output", "a", "data") == {"answer": 42, "label": "big"}
 
 
@@ -125,27 +125,11 @@ def test_continue_on_error_lets_the_flow_go_on(api: Api) -> None:
     assert "tool failed" in str(dig(detail, "output", "output", "after", "value"))
 
 
-def test_agent_node_runs_a_pi_session_and_reports_its_work(host_api: Api) -> None:
-    wid = unique("agent")
-    agent: Spec = {"id": "ag", "kind": "agent", "role": "main", "prompt": "tool:{{input.x}}"}
-    publish(host_api, draft([trigger(), agent], [edge("start", "ag")]), wid)
-    detail = run_to_end(host_api, wid, {"x": "work"})
-    assert _status(detail) == "succeeded"
-    node = dig(detail, "output", "output", "ag")
-    assert dig(node, "text") == "fake done:tool:work"
-    assert dig(node, "role") == "main"
-    assert dig(node, "skills") == []
-    assert dig(node, "usage", "turns") == 2
-    assert dig(node, "tool_calls") == [{"name": "write", "ok": True}, {"name": "bash", "ok": False}]
-    assert (Path(str(dig(node, "workdir"))) / "out.txt").read_text() == "written"
-    assert dig(detail, "output", "llm_calls") == 2
-
-
-def test_queued_llm_node_runs_as_child_workflow(api: Api) -> None:
+def test_queued_llm_node_runs_as_child_workflow(live_api: Api) -> None:
     wid = unique("queue")
-    nodes: list[JsonValue] = [trigger(), llm("a", "hello", queue="local-gpu")]
-    publish(api, draft(nodes, [edge("start", "a")]), wid)
-    detail = run_to_end(api, wid)
+    nodes: list[JsonValue] = [trigger(), llm("a", SHORT, queue="cloud-io")]
+    publish(live_api, draft(nodes, [edge("start", "a")]), wid)
+    detail = run_to_end(live_api, wid)
     run_id = dig(detail, "summary", "run_id")
     steps = dig(detail, "steps")
     assert _status(detail) == "succeeded"

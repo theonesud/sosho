@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from engine_support import Api, make_runtime
 from fastapi.testclient import TestClient
+from live_support import PATIENCE_ATTEMPTS, require_live
 from sosho_engine.api_app import create_app
 from worker_support import WorkerEnv, WorkerHandle, make_worker_env, wait_alive
 
@@ -34,12 +35,35 @@ def worker(client: TestClient, db_path: Path, worker_env: WorkerEnv) -> Iterator
     handle.stop()
 
 
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    for item in items:
+        if "live_stack" in getattr(item, "fixturenames", ()):
+            item.add_marker(pytest.mark.integration)
+
+
+@pytest.fixture(scope="session")
+def live_stack() -> None:
+    require_live()
+
+
 @pytest.fixture(scope="session")
 def api(client: TestClient) -> Api:
     return Api(client)
+
+
+@pytest.fixture(scope="session")
+def live_api(client: TestClient, live_stack: None) -> Api:
+    del live_stack
+    return Api(client, PATIENCE_ATTEMPTS)
 
 
 @pytest.fixture(scope="module")
 def host_api(client: TestClient, worker: WorkerHandle) -> Api:
     del worker
     return Api(client)
+
+
+@pytest.fixture(scope="module")
+def live_host_api(live_stack: None, client: TestClient, worker: WorkerHandle) -> Api:
+    del worker, live_stack
+    return Api(client, PATIENCE_ATTEMPTS)

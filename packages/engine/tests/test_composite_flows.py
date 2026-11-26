@@ -1,5 +1,5 @@
 from engine_support import Api, dig, publish, run_to_end
-from flows import Spec, draft, edge, llm, tool, trigger, unique
+from flows import SHORT, Spec, draft, edge, llm, tool, trigger, unique
 from pydantic import JsonValue
 
 
@@ -124,12 +124,12 @@ def test_max_steps_policy_stops_the_run(api: Api) -> None:
     assert "passed 1 node executions" in str(dig(detail, "error"))
 
 
-def test_llm_budget_policy_stops_the_run(api: Api) -> None:
+def test_llm_budget_policy_stops_the_run(live_api: Api) -> None:
     wid = unique("budget")
-    nodes: list[JsonValue] = [trigger(), llm("a", "one"), llm("b", "two")]
+    nodes: list[JsonValue] = [trigger(), llm("a", SHORT), llm("b", SHORT)]
     edges: list[JsonValue] = [edge("start", "a"), edge("a", "b")]
-    publish(api, draft(nodes, edges, policy={"max_llm_calls": 1}), wid)
-    detail = run_to_end(api, wid)
+    publish(live_api, draft(nodes, edges, policy={"max_llm_calls": 1}), wid)
+    detail = run_to_end(live_api, wid)
     assert _status(detail) == "failed"
     assert "budget" in str(dig(detail, "error"))
 

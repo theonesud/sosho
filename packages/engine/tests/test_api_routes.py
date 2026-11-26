@@ -46,7 +46,10 @@ def test_nodes_catalog_lists_every_kind_tool_and_queue(api: Api) -> None:
     assert {str(dig(item, "kind")) for item in kinds} == KINDS
     assert all(dig(item, "json_schema", "properties") for item in kinds)
     assert {"echo", "count", "effect"} <= {str(dig(item, "name")) for item in tools}
-    assert dig(body, "queues", "local-gpu", "global_concurrency") == 1
+    queues = dig(body, "queues")
+    assert isinstance(queues, dict)
+    assert "local-gpu" not in queues
+    assert dig(body, "queues", "host", "global_concurrency") == 4
     assert dig(body, "queues", "cloud-io", "global_concurrency") == 8
     assert dig(body, "queues", "host-browser", "global_concurrency") == 2
 

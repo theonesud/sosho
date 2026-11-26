@@ -1,13 +1,13 @@
 import re
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
 
 IDENTIFIER = r"^[A-Za-z][A-Za-z0-9_-]{0,63}$"
 ID_PATTERN = re.compile(IDENTIFIER)
 SKILL_NAME = r"^[a-z0-9][a-z0-9-]{0,63}$"
-QueueName = Literal["local-gpu", "cloud-io", "host-browser", "host"]
-HOST_KINDS = frozenset({"agent", "skill"})
+QueueName = Literal["cloud-io", "host-browser", "host"]
+QUEUE_NAMES = ("cloud-io", "host-browser", "host")
 HumanAction = Literal["approve", "reject", "input", "edit"]
 NodeKind = Literal[
     "trigger",
@@ -22,6 +22,7 @@ NodeKind = Literal[
     "subworkflow",
     "wait",
 ]
+ThinkingLevel = Literal["off", "minimal", "low", "medium", "high", "xhigh", "max"]
 MAX_TIMEOUT_SECONDS = 3600.0
 MAX_WAIT_SECONDS = 7 * 24 * 3600.0
 MAX_HUMAN_SECONDS = 30 * 24 * 3600.0
@@ -45,6 +46,16 @@ class NodeBase(Strict):
     retry: RetryPolicy = RetryPolicy()
     timeout_seconds: float | None = Field(default=None, gt=0.0, le=MAX_TIMEOUT_SECONDS)
     continue_on_error: bool = False
+
+    @field_validator("queue", mode="before")
+    @classmethod
+    def _check_queue(cls, value: object) -> object:
+        if value == "local-gpu":
+            raise ValueError(
+                "queue local-gpu does not exist; an llm node runs on queue host, "
+                f"and the valid queues are {', '.join(QUEUE_NAMES)}"
+            )
+        return value
 
 
 class TriggerNode(NodeBase):
@@ -72,6 +83,7 @@ class LlmNode(NodeBase):
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     max_tokens: int | None = Field(default=None, ge=1)
     json_output: bool = False
+    thinking: ThinkingLevel | None = None
 
 
 class AgentNode(NodeBase):
@@ -81,6 +93,7 @@ class AgentNode(NodeBase):
     instructions: str | None = None
     skills: list[Annotated[str, Field(pattern=SKILL_NAME)]] = []
     max_turns: int = Field(default=20, ge=1, le=200)
+    thinking: ThinkingLevel | None = None
 
 
 class SkillNode(NodeBase):
@@ -89,6 +102,7 @@ class SkillNode(NodeBase):
     task: str
     role: str
     max_turns: int = Field(default=20, ge=1, le=200)
+    thinking: ThinkingLevel | None = None
 
 
 class ToolNode(NodeBase):

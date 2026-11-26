@@ -1,12 +1,13 @@
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 
 from sosho_engine.graph import adjacency, has_cycle, incoming_edges, reachable
 from sosho_engine.issues import Issue
+from sosho_engine.placement import DEFAULT_DIRECT_ROLES, is_host_node
 from sosho_engine.spec import Workflow
 from sosho_engine.spec_nodes import (
-    HOST_KINDS,
     AgentNode,
     HumanNode,
+    LlmNode,
     MapNode,
     Node,
     RouterNode,
@@ -131,20 +132,37 @@ def _check_joins(spec: Workflow) -> list[Issue]:
     return issues
 
 
-def _check_node_options(spec: Workflow) -> list[Issue]:
+def _check_queues(spec: Workflow, direct_roles: Collection[str]) -> list[Issue]:
     issues: list[Issue] = []
     for node in spec.nodes:
+        on_host = is_host_node(node, direct_roles)
         if node.queue is not None and node.kind not in QUEUE_KINDS:
             issues.append(Issue("queue_kind", f"a {node.kind} node has no queue", node.id))
-        if node.kind in HOST_KINDS and node.queue not in (None, "host"):
+        if on_host and node.queue not in (None, "host"):
             issues.append(
                 Issue("host_queue", f"a {node.kind} node runs only on queue host", node.id)
             )
-        if node.kind not in HOST_KINDS and node.queue == "host":
+        if not on_host and node.queue == "host":
             issues.append(Issue("host_queue", f"a {node.kind} node cannot use queue host", node.id))
-        if node.timeout_seconds is not None and node.kind not in QUEUE_KINDS:
-            issues.append(Issue("timeout_kind", f"a {node.kind} node has no timeout", node.id))
     return issues
+
+
+def _check_thinking(spec: Workflow, direct_roles: Collection[str]) -> list[Issue]:
+    return [
+        Issue("thinking_direct", "a direct llm node has no thinking level", node.id)
+        for node in spec.nodes
+        if isinstance(node, LlmNode)
+        and node.thinking is not None
+        and not is_host_node(node, direct_roles)
+    ]
+
+
+def _check_timeouts(spec: Workflow) -> list[Issue]:
+    return [
+        Issue("timeout_kind", f"a {node.kind} node has no timeout", node.id)
+        for node in spec.nodes
+        if node.timeout_seconds is not None and node.kind not in QUEUE_KINDS
+    ]
 
 
 def _node_tools(node: Node) -> list[str]:
@@ -224,7 +242,7 @@ CHECKS: tuple[Check, ...] = (
     _check_ids,
     _check_edges,
     _check_branches,
-    _check_node_options,
+    _check_timeouts,
     check_policy,
     _check_roles,
     _check_refs,
@@ -237,9 +255,14 @@ GRAPH_CHECKS: tuple[Check, ...] = (_check_cycles, _check_reachable, _check_joins
 
 
 def validate_workflow(
-    spec: Workflow, known_tools: set[str] | None = None, known_skills: set[str] | None = None
+    spec: Workflow,
+    known_tools: set[str] | None = None,
+    known_skills: set[str] | None = None,
+    direct_roles: Collection[str] = DEFAULT_DIRECT_ROLES,
 ) -> list[Issue]:
     issues = [issue for check in CHECKS for issue in check(spec)]
+    issues.extend(_check_queues(spec, direct_roles))
+    issues.extend(_check_thinking(spec, direct_roles))
     if not any(issue.code in ("dangling_edge", "duplicate_node") for issue in issues):
         issues.extend(issue for check in GRAPH_CHECKS for issue in check(spec))
     if known_tools is not None:

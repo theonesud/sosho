@@ -77,6 +77,6 @@ async def validate_draft(workflow_id: str, draft: WorkflowDraft, version: int) -
     spec = draft_to_workflow(draft, workflow_id, version)
     active = runtime.current()
     skills = set(await asyncio.to_thread(active.store.list_skills))
-    issues = validate_workflow(spec, active.tools.names(), skills)
+    issues = validate_workflow(spec, active.tools.names(), skills, active.settings.direct_roles)
     issues.extend(await asyncio.to_thread(check_references, spec))
     return issues

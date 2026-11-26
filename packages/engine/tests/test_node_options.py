@@ -1,7 +1,8 @@
 import pytest
 from engine_support import Api, dig, publish, run_to_end, start, wait_pending, wait_terminal
-from flows import Spec, draft, edge, llm, tool, trigger, unique
+from flows import DIRECT_ROLE, LONG, PI_ROLE, Spec, draft, edge, llm, tool, trigger, unique
 from pydantic import JsonValue
+from worker_support import wait_pi
 
 Nodes = list[JsonValue]
 
@@ -71,36 +72,25 @@ def test_human_show_text_is_rendered_into_the_pending_request(api: Api) -> None:
 
 def _timed_node(kind: str) -> Spec:
     if kind == "llm":
-        return llm("n", "slow:x", timeout_seconds=1)
+        return llm("n", LONG, role=DIRECT_ROLE, timeout_seconds=1)
     if kind == "tool":
         return {**tool("n", "slow", value=1), "timeout_seconds": 1}
     return {
         "id": "n",
         "kind": "agent",
-        "role": "main",
-        "prompt": "sleep:{{input.tag}}",
+        "role": PI_ROLE,
+        "thinking": "off",
+        "prompt": f"{LONG} {{{{input.tag}}}}",
         "timeout_seconds": 1,
     }
 
 
 @pytest.mark.parametrize("kind", ["llm", "tool", "agent"])
-def test_timeout_seconds_stops_a_slow_node_at_run_time(host_api: Api, kind: str) -> None:
+def test_timeout_seconds_stops_a_slow_node_at_run_time(live_host_api: Api, kind: str) -> None:
     wid = unique(f"tm{kind}")
-    publish(host_api, draft([trigger(), _timed_node(kind)], [edge("start", "n")]), wid)
-    detail = run_to_end(host_api, wid, {"tag": wid})
+    publish(live_host_api, draft([trigger(), _timed_node(kind)], [edge("start", "n")]), wid)
+    detail = run_to_end(live_host_api, wid, {"tag": wid})
     assert dig(detail, "summary", "status") == "failed"
     assert dig(detail, "output", "output") is None
-
-
-def test_agent_instructions_are_rendered_and_sent_to_the_model(host_api: Api) -> None:
-    wid = unique("agentins")
-    node: Spec = {
-        "id": "n",
-        "kind": "agent",
-        "role": "main",
-        "prompt": "ins:go",
-        "instructions": "Be {{input.tone}}",
-    }
-    publish(host_api, draft([trigger(), node], [edge("start", "n")]), wid)
-    detail = run_to_end(host_api, wid, {"tone": "calm"})
-    assert dig(detail, "output", "output", "n", "text") == "instructions:Be calm"
+    if kind == "agent":
+        assert wait_pi(wid, running=False)
