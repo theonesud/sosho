@@ -13,6 +13,7 @@ dependencies = [
   "pydantic==2.14.4",
   "pydantic-ai==2.74.0",
   "pydantic-settings==2.16.3",
+  "sosho-memory==0.1.0",
   "sqlalchemy==2.1.9",
   "uvicorn==0.54.0",
 ]

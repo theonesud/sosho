@@ -1,4 +1,4 @@
-.PHONY: setup test test-fast cov fix up down logs worker worker-install worker-uninstall worker-logs
+.PHONY: setup test test-fast cov fix up down logs worker worker-install worker-uninstall worker-logs memory-init memory-preload memory-audit memory-rollback memory-health
 
 MISE := $(shell command -v mise 2>/dev/null || echo $(HOME)/.local/bin/mise)
 
@@ -174,3 +174,18 @@ worker-uninstall:
 
 worker-logs:
 	./bin/worker-service.sh logs
+
+memory-init:
+	$(RUN) uv run python -m sosho_memory.cli init $(if $(P),--project $(P))
+
+memory-preload:
+	$(RUN) uv run python -m sosho_memory.cli preload-conceptnet --input $(INPUT) $(if $(P),--project $(P))
+
+memory-audit:
+	$(RUN) uv run python -m sosho_memory.cli audit $(if $(P),--project $(P)) $(if $(S),--session-id $(S)) $(if $(TX),--transaction-id $(TX))
+
+memory-rollback:
+	$(RUN) uv run python -m sosho_memory.cli rollback $(if $(P),--project $(P)) $(if $(S),--session-id $(S)) $(if $(TX),--transaction-id $(TX))
+
+memory-health:
+	$(RUN) uv run python -m sosho_memory.cli health $(if $(P),--project $(P))

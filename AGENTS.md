@@ -104,6 +104,7 @@ CAUTION: Destructive and outward-facing actions are hard to undo.
 | You edit a `.py` file | [docs/standards/python.md](docs/standards/python.md) |
 | You write or change a test | [docs/standards/testing.md](docs/standards/testing.md) |
 | You commit | [docs/standards/git.md](docs/standards/git.md) |
+| You edit packages/memory-graph or memory bridge code | [docs/memory.md](docs/memory.md) |
 
 NOTE: Later stages add rows for documentation, architecture, and structure.
 
