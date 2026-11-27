@@ -6,7 +6,7 @@ requires-python = ">=3.13,<3.14"
 dependencies = []
 
 [tool.uv.workspace]
-members = ["packages/engine"]
+members = ["packages/engine", "packages/memory-graph"]
 
 [dependency-groups]
 dev = [
@@ -17,11 +17,14 @@ dev = [
   "pyyaml==6.0.4",
   "ruff==0.17.6",
   "sosho-engine==0.1.0",
+  "sosho-memory==0.1.0",
   "tree-sitter-language-pack==1.9.1",
+  "types-networkx==3.6.1.20261126",
 ]
 
 [tool.uv.sources]
 sosho-engine = { workspace = true }
+sosho-memory = { workspace = true }
 
 [tool.uv]
 package = false
@@ -117,6 +120,10 @@ norecursedirs = [
 
 [tool.coverage.run]
 data_file = ".cache/coverage/.coverage"
-source = ["packages/engine/src/sosho_engine", "bin"]
+source = [
+  "packages/engine/src/sosho_engine",
+  "packages/memory-graph/src/sosho_memory",
+  "bin",
+]
 patch = ["subprocess"]
 disable_warnings = ["no-data-collected"]
