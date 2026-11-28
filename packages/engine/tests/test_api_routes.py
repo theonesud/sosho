@@ -86,6 +86,7 @@ def test_saved_versions_are_immutable_and_numbered(api: Api) -> None:
     other = draft(other_nodes, [edge("start", "b")])
     second = api.post(f"/workflows/{wid}/versions", other).body
     assert (dig(first, "version"), dig(second, "version")) == (1, 2)
+    assert isinstance(first, dict)
     assert api.get(f"/workflows/{wid}/versions/1").body == first
     versions = api.get(f"/workflows/{wid}/versions").body
     assert isinstance(versions, list)

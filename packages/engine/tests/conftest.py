@@ -21,6 +21,10 @@ def worker_env(tmp_path_factory: pytest.TempPathFactory) -> WorkerEnv:
 
 @pytest.fixture(scope="session")
 def client(db_path: Path) -> Iterator[TestClient]:
+    dist = db_path.parent / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<html>sosho</html>")
+    (dist / "assets" / "app.js").write_text("console.log(1)")
     app = create_app(make_runtime(db_path))
     with TestClient(app) as test_client:
         yield test_client

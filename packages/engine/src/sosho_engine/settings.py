@@ -35,7 +35,10 @@ class Settings(BaseSettings):
     worker_alive_seconds: float = Field(default=30.0, gt=0.0)
     host: str = "127.0.0.1"
     port: int = 8123
+    public_url: str = "http://127.0.0.1:8123"
     max_body_bytes: int = 1_048_576
+    web_dist: Path = Field(default_factory=lambda: REPO_ROOT / "packages" / "web" / "dist")
+    session_client_hosts: list[str] = ["127.0.0.1", "::1", "localhost"]
     webhook_rate_per_minute: int = Field(default=60, ge=1)
     litellm_base_url: str = "http://127.0.0.1:4000/v1"
     litellm_api_key: SecretStr | None = Field(

@@ -6,7 +6,7 @@ Read this file first. Then read `AGENTS.md` and the standards it lists. This fil
 
 Sosho is an AI workbench that runs on one GPU workstation. One human owner and agents use it. `docs/usecases.md` lists the use cases.
 
-The workflow backend is `packages/engine`, module `sosho_engine`. It is a JSON graph interpreter on DBOS Transact 3.7.0, written in Python. Workflows are versioned JSON. Agents write them now. The owner writes them on a canvas later. Build the backend first. Build the UI after the backend.
+The workflow backend is `packages/engine`, module `sosho_engine`. It is a JSON graph interpreter on DBOS Transact 3.7.0, written in Python. Workflows are versioned JSON. Agents write them now. The owner writes them on a canvas later. The backend and the web UI are built. The memory layer and self-improvement stay deferred. For the web UI, read docs/handoff-ui.md.
 
 Every model call goes through the LiteLLM proxy. Do not add direct provider, llama.cpp, or RustingStrata access. Claude Code is the exception. It calls Anthropic directly. The llama.cpp and `strata` ports have no host port.
 
@@ -16,18 +16,17 @@ Work method: Claude Code acts as coordinator only. Sonnet subagents write code. 
 
 ## 2 State
 
-- Date of this state: 2026-11-26, evening. Branch `refactor`. Everything is committed and pushed to `origin/refactor`. The owner asked for those pushes.
+- Date of this state: 2026-11-26, evening. Branch `refactor`. Check `git status` for the current state. The web UI work is not committed. See docs/handoff-ui.md.
 - The work of 2026-11-25 and 2026-11-26 is in commits `b197c69` to `0a72d29`. Commit `728fcdc` holds the unfinished prompt order change (section 4, item 0). Commit `0a72d29` moves `local-uncensored` to the `strata` service. Commit `990873f` makes the agent docs checker skip git-ignored files. Commit `960dc5d` adds the skill `.agents/skills/local-inference-tuning/`. Ask the owner before the next commit or a push.
 - Last full run: `make test COV=1` exit code 2, in 10 minutes 35 seconds. Pytest result: 501 passed, 1 failed. Coverage: 96 percent.
 - The failure: `test_limits_stop_the_node_and_count_calls_on_both_paths`. The per-line cap tripped before the total cap.
 - A fix is in commit `728fcdc`. It sets `SOSHO_ENGINE_PI_LINE_CAP_BYTES` high in that test. It also adds a separate line-cap case. The fix is not run yet.
 - `make test-fast` exited 0 in 77 seconds. This run came before the latest changes. It is not rerun after them.
 - The previous full run, before the test reduction, took 18 minutes 45 seconds. It had 493 tests and 88 percent coverage.
-- `compose.yaml` services: `model-download`, `llama-cpp`, `strata`, `litellm`, and `engine`. The `music` profile adds the `yue2-*` services. The services `postgres`, `phoenix-db-init`, and `phoenix` are in the same file. The volume `sosho_postgres` holds the data of `postgres`. It is a copy of the old volume `sosho_langfuse_postgres`. The old volume stays until the owner deletes it.
-- The engine listens on `127.0.0.1:8123`. Every route needs the bearer token `SOSHO_ENGINE_API_TOKEN`, except `GET /health` and the webhook route.
+- `compose.yaml` services: `model-download`, `llama-cpp`, `strata`, `litellm`, and `engine`. The `music` profile adds the `yue2-*` services. The services `postgres`, `phoenix-db-init`, and `phoenix` are in the same file. The volume `sosho_postgres` holds the data of `postgres`. - The engine listens on `127.0.0.1:8123`. Every route needs the bearer token `SOSHO_ENGINE_API_TOKEN`, except `GET /health` and the webhook route.
 - The DBOS system database `sosho_engine` lives on the `postgres` service. The host worker reaches it on `127.0.0.1:${SOSHO_POSTGRES_PORT:-5432}`.
 - The host worker runs as the systemd user service `sosho-worker`.
-- The DBOS executor id of the engine is `engine`. The id of the worker is `host-worker`. Source: `packages/engine/src/sosho_engine/settings.py:9`.
+- The DBOS executor id of the engine is `engine`. The id of the worker is `host-worker`. Source: `packages/engine/src/sosho_engine/settings.py:10` and `settings.py:11`.
 - Each process needs its own executor id. With a shared id, one process can take over the pending runs of the other.
 - Phoenix at `http://127.0.0.1:6006` receives the traces. The pi extension sends the headers `traceparent` and `x-litellm-session-id` on each LiteLLM request. The LiteLLM span is a child of the pi span. A live run on 2026-11-27 verified the link. The LiteLLM `chat` span has the same trace id as the pi `LLM Call` span. It has `session.id` equal to the pi session id. The Phoenix sessions view groups the trace under that id. The local models have `model_info` with zero cost. The `chat` span has `litellm.cost.total` 0.0.
 
@@ -68,7 +67,7 @@ a) Prompt order change is half done.
    - Fix the failures. Then run `make test` once.
 b) Checkpoint experiment. No gain. Cause not found.
    - Old llama.cpp result. The Qwen3.6 preset had `checkpoint-min-step = 1024` and `ctx-checkpoints = 32`. The preset is removed. `strata` now serves `local-uncensored`. The result below does not apply to `strata`. Not verified on `strata`.
-   - Measurements. Logs `/tmp/llama_step2.log`, `/tmp/llama_step3.log`, and `/tmp/llama_step4.log` may be gone after a reboot.
+   - Measurements.
    - The first request of each new pi session still evaluates the full prompt.
    - Baseline, no checkpoints: 35 to 44 seconds for 8656 to 8772 tokens. The prefix match is 0.80 to 0.87.
    - With checkpoints: 34 to 36 seconds.
@@ -86,9 +85,8 @@ c) Facts found about the Qwen3.6 model.
    - Prefill speed: about 200 to 250 tokens per second.
    - First request of an engine agent session: about 8700 to 9400 tokens.
    - First request of a pi `llm` node: about 750 tokens.
-   - The old figure of 11400 tokens is wrong.
 d) Review the 155 tests outside the coverage set.
-   - These tests take 494 seconds in total. The list is in `/tmp/full_cov_summary2.txt`. The file may be gone after a reboot.
+   - These tests take 494 seconds in total.
    - The coverage set does not see work in child processes. 221 tests have no per-test data.
    - Check each test before you delete it.
    - The owner wants maximum coverage in minimum time.
@@ -138,15 +136,15 @@ The owner must start host Chrome with the Dokobot extension first. The file `~/.
 
 f) Local inference work of 2026-11-26. State and open items.
    - Record: `.agents/skills/local-inference-tuning/`. Read `SKILL.md` first. The campaign `PLAN.md` holds every measurement. The skill folder came from `~/local-inference-tuning`. It is in commit `960dc5d`. The ignored campaign data stays only on this machine.
-   - The skill `.gitignore` keeps out the campaign data: the replays hold real recorded pi requests from the old Langfuse stack. Never commit them.
+   - The skill `.gitignore` keeps out the campaign data: the replays hold real recorded pi requests. Never commit them.
    - Two checks failed after the move: the agent-docs checker read the git-ignored replay files, and `tests/unit/test_direct_hosts.py` flagged the harness scripts. Fixes in commits `990873f` and `960dc5d`: `files_under()` in `bin/agent_docs/common.py` skips git-ignored files, with a test in `tests/unit/test_check_agent_docs.py`. `LLAMA_ALLOWED` in `tests/unit/test_direct_hosts.py` lists the skill `scripts/run.py`, the campaign `PLAN.md`, and `step-gates.sh`.
    - `make test-fast` exit code 0 on 2026-11-26 evening, with all of the above in the work tree: 452 passed, 0 lint errors.
    - Result: the `strata` config replays the recorded agent sessions 12.5% faster than RustingStrata defaults, and 11.9% faster with one extra busy CPU core. Gates: greedy agreement with the defaults at the noise floor, needle 3 of 3 at 32K and 64K, llama.cpp cross-check partial pass.
    - Not done: the `base` load test with the owner's real apps, the token-by-token parity tool, a KL divergence measure of q8 KV, and a speed comparison against llama.cpp on this machine. The llama.cpp yardstick container exited at start with an empty log. The owner chose RustingStrata without that comparison.
    - YuE2 music jobs can wait up to 15 minutes for the `strata` unload. Fix idea: add an unload endpoint to the fork. Ask the owner.
    - The fork: `~/rustingstrata`, branch `lit/c12-cpu-prefill`, remote `fork` = `git@github.com:theonesud/RustingStrata.git`. It has the CPU-split patch, the chunk limit, and `MODIFICATIONS.md`, which the license requires. `NOTICE.md` holds the license credit for this repository.
-   - Disk: about 27 GB free. The removed Langfuse ClickHouse container used about one CPU core all the time. On 2026-11-26 the disk ran full during a benchmark batch. Check `df -h /` before a build or a batch.
-   - Cleanup candidates, ask the owner first: the local images `rustingstrata:v1.3.7`, `rustingstrata:c12`, and `rustingstrata:c12b` (461 MB each), the old folder `~/rustingstrata-bench`, the Rust toolchain in `~/.rustup` and `~/.cargo`, and the empty root-owned folder `/tmp/lit-cpu-cache`.
+   - Disk: about 27 GB free. On 2026-11-26 the disk ran full during a benchmark batch. Check `df -h /` before a build or a batch.
+   - Cleanup candidates, ask the owner first: the local images `rustingstrata:v1.3.7`, `rustingstrata:c12`, and `rustingstrata:c12b` (461 MB each), the old folder `~/rustingstrata-bench`, and the Rust toolchain in `~/.rustup` and `~/.cargo`.
    - The `pi-sandbox:latest` image is missing. `test_container_mode_reports_the_version_and_answers_through_litellm` fails until `make up` builds it.
 
 ## 5 Decisions that wait for the owner
@@ -155,7 +153,7 @@ Do not start these without the owner:
 
 - The memory layer: run state, workflow memory, and global memory. Start it after the basics are verified.
 - Self-improvement. Reflection proposes a new version as a diff. The owner approves it.
-- The UI. The stack is Vite, React, React Flow 13, Tailwind, Radix with shadcn, TanStack Query, and ELK. The screens are Workflows, Editor, Run view, Inbox for human input, Triggers, and Versions. The UI talks only to the engine API.
+- The UI is built. See docs/handoff-ui.md, docs/webapp-plan.md, and packages/web/DESIGN.md.
 
 Decisions made by the owner on 2026-11-25 and 2026-11-26. Most rules are now in `AGENTS.md` section 8:
 
@@ -233,7 +231,7 @@ When the list changes, edit every file that names these paths. See `Makefile`, `
 - Run every pi probe with `</dev/null`. `pi -p` reads stdin when stdin is a pipe that stays open. It prints nothing until stdin closes. This is the probable cause of the two hung probes from 2026-11-25. Not verified for those runs. The engine uses `DEVNULL`.
 - The worker can take any workflow from the DBOS internal queue. This happens after a recovery, a resume, a fork, or a cron start. The worker is not only for host work.
 - Saved versions with the old `agent` fields `tools` and `max_requests` do not load. The node models reject extra fields.
-- In pi JSON mode, a model error exits 0 with `stopReason` `error`. The worker fails the node. See `packages/engine/src/sosho_engine/host_node.py:101`.
+- In pi JSON mode, a model error exits 0 with `stopReason` `error`. The worker fails the node. See `packages/engine/src/sosho_engine/host_node.py:127`.
 - `decision` is a direct role set by `SOSHO_ENGINE_DIRECT_ROLES`. The engine and the worker must read the same value of `SOSHO_ENGINE_DIRECT_ROLES`. Its model Qwen3-1.7B runs with `ctx-size` 16384 and `parallel` 4. Each slot has 4096 tokens.
 - The worker sets `SOSHO_PI_STATE=root` in the pi environment. The launcher then uses the root `.pi` state and the root npm cache for a work folder outside the repository. Without it, each work folder gets its own `.pi/.cache/npm`. The pi docs path in the system prompt then differs for each session, and the llama.cpp prompt prefix does not match.
 - The memory and scratchpad extensions still create `.pi/memory` and `.pi/scratchpad` in the session folder.

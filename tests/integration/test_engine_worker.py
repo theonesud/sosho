@@ -13,7 +13,7 @@ import httpx
 import pytest
 from pydantic import BaseModel, JsonValue
 
-from tests.conftest import ENGINE_URL, require_service
+from tests.conftest import ENGINE_URL, remove_workflow, require_service
 
 pytestmark = pytest.mark.integration
 
@@ -46,12 +46,14 @@ class RunView(BaseModel):
 class Engine:
     def __init__(self, client: httpx.Client) -> None:
         self.client = client
+        self.created: list[str] = []
 
     def health(self) -> Health:
         return Health.model_validate(self.client.get("/health").json())
 
     def publish(self, node: dict[str, JsonValue]) -> str:
         workflow_id = f"wk{uuid.uuid4().hex[:12]}"
+        self.created.append(workflow_id)
         assert (
             self.client.post("/workflows", json={"id": workflow_id, "name": "w"}).status_code == 201
         )
@@ -145,7 +147,12 @@ def engine(engine_token: str) -> Iterator[Engine]:
     _require_postgres()
     headers = {"Authorization": f"Bearer {engine_token}"}
     with httpx.Client(base_url=ENGINE_URL, headers=headers, timeout=20.0) as client:
-        yield Engine(client)
+        live = Engine(client)
+        try:
+            yield live
+        finally:
+            for workflow_id in live.created:
+                remove_workflow(client, workflow_id)
 
 
 @pytest.fixture

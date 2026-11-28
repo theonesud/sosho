@@ -1,0 +1,226 @@
+@layer controls {
+  [data-slot="button"],
+  [data-slot="toggle"],
+  [data-slot="toolbar-button"] {
+    height: var(--control-height);
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius-1);
+    background: var(--surface-2);
+    color: var(--text-1);
+    font-weight: var(--weight-medium);
+    &:hover:not([data-disabled]) {
+      background: var(--surface-3);
+      border-color: var(--line-3);
+    }
+
+    &:active:not([data-disabled]) {
+      background: var(--surface-1);
+    }
+
+    &[data-disabled] {
+      color: var(--text-disabled);
+      border-color: var(--line-1);
+    }
+  }
+
+  [data-slot="button"][data-variant="primary"] {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--on-primary);
+
+    &:hover:not([data-disabled]) {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
+    &[data-disabled] {
+      background: var(--surface-2);
+      border-color: var(--line-1);
+      color: var(--text-disabled);
+    }
+  }
+
+  :is([data-slot="button"], [data-slot="toggle"])[data-variant="ghost"] {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-2);
+
+    &:hover:not([data-disabled]) {
+      background: var(--surface-2);
+      border-color: transparent;
+      color: var(--text-1);
+    }
+  }
+
+  [data-slot="button"]:has(> .icon-swap:only-child) {
+    width: 2rem;
+    padding: 0;
+  }
+
+  [data-slot="button"][data-variant="danger"] {
+    background: transparent;
+    border-color: color-mix(in oklch, var(--status-failed) 55%, transparent);
+    color: var(--status-failed);
+
+    &:hover:not([data-disabled]) {
+      background: color-mix(in oklch, var(--status-failed) 14%, transparent);
+      border-color: var(--status-failed);
+    }
+  }
+
+  [data-slot="button"][data-pending] { cursor: progress; }
+  [data-slot="button"] .spinner { display: none; }
+  [data-slot="button"][data-pending] .spinner { display: inline-block; }
+
+  [data-slot="toggle"][data-pressed],
+  [data-slot="toolbar-button"][data-pressed] {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+
+  [data-slot="toolbar"] {
+    padding: var(--space-1);
+    border: 1px solid var(--line-1);
+    border-radius: var(--radius-2);
+    background: var(--surface-1);
+  }
+
+  [data-slot="toolbar"] :is([data-slot="toolbar-button"], [data-slot="toggle"]) {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  [data-slot="toolbar"] :is([data-slot="toolbar-button"], [data-slot="toggle"]):hover:not([data-disabled]) {
+    background: var(--surface-3);
+  }
+
+  [data-slot="segmented-control"] {
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius-2);
+    background: var(--surface-1);
+  }
+
+  [data-slot="segmented-control-indicator"] {
+    background: var(--surface-3);
+    border-radius: calc(var(--radius-2) - 2px);
+  }
+
+  [data-slot="segmented-control-item"] {
+    color: var(--text-2);
+
+    &[data-checked] { color: var(--text-1); }
+  }
+}
+
+@layer controls {
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="select-trigger"],
+  [data-slot="select-input"],
+  [data-slot="combobox-input"],
+  [data-slot="number-input-control"],
+  [data-slot="token-input-host"],
+  [data-slot="command-input"] {
+    background: var(--bg);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius-1);
+    color: var(--text-1);
+
+    &:hover:not([data-disabled]) { border-color: var(--text-3); }
+
+    &:focus-within,
+    &:focus-visible,
+    &[data-focused] {
+      border-color: var(--focus-ring);
+      outline: 2px solid var(--accent-soft);
+      outline-offset: 0;
+    }
+
+    &[data-invalid],
+    &[data-invalid]:hover:not([data-disabled]) { border-color: var(--status-failed); }
+    &::placeholder { color: var(--text-3); }
+  }
+
+  [data-slot="number-input-decrement"],
+  [data-slot="number-input-increment"] {
+    background: var(--surface-2);
+    border-color: var(--edge);
+    color: var(--text-1);
+  }
+
+  [data-slot="field-label"],
+  [data-slot="label"] {
+    color: var(--text-1);
+    font-weight: var(--weight-medium);
+  }
+
+  [data-slot="field-description"] { color: var(--text-3); }
+  [data-slot="field-error"] { color: var(--status-failed); }
+
+  [data-slot="checkbox"],
+  [data-slot="radio"] {
+    border-color: var(--edge);
+    background: var(--bg);
+
+    &[data-checked],
+    &[data-indeterminate] {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: var(--on-primary);
+    }
+  }
+
+  [data-slot="switch"] {
+    border: 1px solid var(--edge);
+    background: var(--bg);
+
+    &[data-checked] {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+  }
+
+  [data-slot="switch-thumb"] { background: var(--text-2); }
+  [data-slot="switch"][data-checked] [data-slot="switch-thumb"] { background: var(--on-primary); }
+
+  [data-slot="slider-track"],
+  [data-slot="progress-track"],
+  [data-slot="meter-track"] {
+    background: var(--surface-3);
+    border-radius: var(--radius-round);
+  }
+
+  [data-slot="slider-indicator"],
+  [data-slot="progress-indicator"],
+  [data-slot="meter-indicator"] {
+    background: var(--primary);
+    border-radius: var(--radius-round);
+  }
+
+  [data-slot="slider-thumb"] {
+    background: var(--primary);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--edge);
+  }
+
+  [data-slot="token-input-token"] {
+    background: var(--accent-soft);
+    border: 1px solid transparent;
+    border-radius: var(--radius-1);
+    color: var(--accent-text);
+  }
+
+  [data-slot="progress-value"],
+  [data-slot="meter-value"],
+  [data-slot="slider-value"] {
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  [data-slot="progress-label"],
+  [data-slot="meter-label"] { color: var(--text-1); }
+
+  [data-slot="progress"],
+  [data-slot="meter"] { width: 100%; }
+}

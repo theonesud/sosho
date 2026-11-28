@@ -24,8 +24,8 @@ def _webhook_spec() -> Spec:
     return draft(nodes, [edge("start", "a")])
 
 
-def _activate(api: Api, workflow_id: str) -> JsonValue:
-    response = api.post(f"/workflows/{workflow_id}/activate", {})
+def _triggers(api: Api, workflow_id: str) -> JsonValue:
+    response = api.get(f"/workflows/{workflow_id}/triggers")
     assert response.status == 200, response.text
     return response.body
 
@@ -43,7 +43,7 @@ def _hook(token: str) -> dict[str, str]:
 def test_activation_creates_a_cron_schedule_and_runs_it_on_trigger(api: Api) -> None:
     wid = unique("cron")
     publish(api, _cron_spec(), wid)
-    name = str(dig(_activate(api, wid), "schedules", 0))
+    name = str(dig(_triggers(api, wid), "schedules", 0, "name"))
     listed = _schedule_names(api)[name]
     assert dig(listed, "schedule") == "0 0 0 1 1 *"
     assert dig(listed, "status") == "ACTIVE"
@@ -56,7 +56,7 @@ def test_activation_creates_a_cron_schedule_and_runs_it_on_trigger(api: Api) -> 
 def test_schedule_can_pause_resume_and_delete(api: Api) -> None:
     wid = unique("sched")
     publish(api, _cron_spec(), wid)
-    name = str(dig(_activate(api, wid), "schedules", 0))
+    name = str(dig(_triggers(api, wid), "schedules", 0, "name"))
     assert api.post(f"/schedules/{name}/pause").status == 202
     assert dig(_schedule_names(api)[name], "status") == "PAUSED"
     assert api.post(f"/schedules/{name}/resume").status == 202
@@ -70,18 +70,10 @@ def test_schedule_routes_need_the_bearer_token(api: Api) -> None:
     assert api.send("DELETE", "/schedules/wf.x.y", headers={}).status == 401
 
 
-def test_deactivation_removes_the_schedule(api: Api) -> None:
-    wid = unique("deact")
-    publish(api, _cron_spec(), wid)
-    name = str(dig(_activate(api, wid), "schedules", 0))
-    assert api.delete(f"/workflows/{wid}/activate").status == 204
-    assert name not in _schedule_names(api)
-
-
 def test_webhook_with_the_right_token_starts_a_run(api: Api) -> None:
     wid = unique("hook")
     publish(api, _webhook_spec(), wid)
-    token = str(dig(_activate(api, wid), "webhook_tokens", "start"))
+    token = str(dig(_triggers(api, wid), "webhooks", 0, "token"))
     response = api.post_as(f"/webhooks/{wid}/start", {"msg": "from hook"}, _hook(token))
     assert response.status == 202, response.text
     run_id = str(dig(response.body, "run_id"))
@@ -93,7 +85,7 @@ def test_webhook_with_the_right_token_starts_a_run(api: Api) -> None:
 def test_webhook_rejects_a_wrong_or_missing_token(api: Api) -> None:
     wid = unique("hookbad")
     publish(api, _webhook_spec(), wid)
-    _activate(api, wid)
+    _triggers(api, wid)
     wrong = api.post_as(f"/webhooks/{wid}/start", {}, _hook("nope"))
     missing = api.post_as(f"/webhooks/{wid}/start", {}, {})
     assert wrong.status == 404
@@ -107,15 +99,6 @@ def test_webhook_for_an_inactive_workflow_is_not_found(api: Api) -> None:
     assert api.post_as(f"/webhooks/{wid}/start", {}, _hook("x")).status == 404
 
 
-def test_new_activation_replaces_the_old_webhook_token(api: Api) -> None:
-    wid = unique("rotate")
-    publish(api, _webhook_spec(), wid)
-    first = str(dig(_activate(api, wid), "webhook_tokens", "start"))
-    second = str(dig(_activate(api, wid), "webhook_tokens", "start"))
-    assert first != second
-    assert api.post_as(f"/webhooks/{wid}/start", {}, _hook(first)).status == 404
-
-
 def test_workflow_finished_trigger_starts_a_follow_up_run(api: Api) -> None:
     source = unique("src")
     follower = unique("fol")
@@ -124,7 +107,7 @@ def test_workflow_finished_trigger_starts_a_follow_up_run(api: Api) -> None:
     watcher = trigger(mode="workflow_finished", source_workflow_id=source)
     nodes: list[JsonValue] = [watcher, tool("b", "echo", value="{{input.status}}")]
     publish(api, draft(nodes, [edge("start", "b")]), follower)
-    _activate(api, follower)
+    _triggers(api, follower)
     source_run = dig(api.post(f"/workflows/{source}/runs", {}).body, "run_id")
     runs = _runs_of(api, follower)
     follow_id = str(dig(runs, 0, "run_id"))

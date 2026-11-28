@@ -43,7 +43,7 @@ Rules for a graph:
 - A node that runs on the host worker accepts only the queue `host`. These are `agent` nodes, `skill` nodes, and `llm` nodes with a role that is not direct. No other node accepts `host`. The issue is `host_queue`.
 - The queue `local-gpu` does not exist. A node with `queue` set to `local-gpu` is refused with the message `queue local-gpu does not exist`. The save returns status 422.
 - Only `llm`, `agent`, `skill`, `tool`, `router`, and `join` nodes accept `retry`. The other kinds give the issue `retry_kind`.
-- The `role` of an `agent` node or a `skill` node must be `main`, `subagent`, `subagent-code`, `local-uncensored`, or `cloud-uncensored`. The `decision` role cannot run pi. Its context is 4096 tokens and the pi prompt has about 11400 tokens. The issue is `role_unsupported`.
+- The `role` of an `agent` node or a `skill` node must be `main`, `subagent`, `subagent-code`, `local-uncensored`, or `cloud-uncensored`. The `decision` role cannot run pi. Its context is 4096 tokens. The issue is `role_unsupported`.
 - Each skill name must be in the skill catalog. The issue is `unknown_skill`. See section 4.1.
 
 A template reads earlier outputs with `{{nodes.<id>.<field>}}`. It reads the run input with `{{input.<field>}}`. It reads the execution count with `{{loop.iteration}}`.
@@ -138,7 +138,7 @@ The unit holds no secret. It has `EnvironmentFile=` that points to the repositor
 - The optional field `thinking` takes `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. When it is set, the worker passes `--thinking <level>` to pi. When it is not set, the worker passes no flag. A direct `llm` node with `thinking` fails validation with the code `thinking_direct`.
 - The node output has the same keys on both paths: `text`, `role`, and `data` when `json_output` is set. The pi path gives the full text. The pi path ignores `temperature` and `max_tokens`.
 - An `llm` node counts one request for each attempt on both paths. A session that needs more than one turn is stopped.
-- The roles in `SOSHO_ENGINE_DIRECT_ROLES` skip pi. The default is `decision`. Its model has 4096 tokens in each slot and the pi system prompt has about 11400 tokens. An `llm` node with such a role calls LiteLLM in the engine. It needs no queue. It can use the queue `cloud-io`.
+- The roles in `SOSHO_ENGINE_DIRECT_ROLES` skip pi. The default is `decision`. Its model has 4096 tokens in each slot. An `llm` node with such a role calls LiteLLM in the engine. It needs no queue. It can use the queue `cloud-io`.
 - Embedding calls are direct LiteLLM calls. They do not use pi.
 - Set `SOSHO_ENGINE_DIRECT_ROLES` the same way for the engine and the worker.
 
@@ -174,12 +174,13 @@ Rules for chained runs:
 - A run that a `workflow_finished` trigger starts has the depth of the source run plus one.
 - The engine does not start a run when its depth is above its `max_depth`.
 - A workflow cannot use its own end as a trigger. The save of the version fails with `finished_self`.
-- Activation fails with status 409 when the new trigger makes a cycle between active workflows.
+- A save fails with status 422 and the issue `trigger_cycle` when its triggers make a cycle between bound workflows.
 
 Control a run:
 
 - Cancel stops the run and its child workflows.
 - Resume starts a cancelled run again. The steps that finished keep their results.
+- Delete removes a finished run and all its data. The engine uses `DBOS.delete_workflows_async` with `delete_children` set. It then removes the rows of the run index and of the human replies. The code is in `run_delete.py`. The engine does not cancel a run for you. It refuses to delete an active run, so the owner decides.
 - Fork starts a new run from an execution of a node. Set `occurrence` to choose the execution. The run replays the earlier steps from the record.
 - For a `map` node, set `item` to fork from the child run of that item index. Items before it keep their results. `occurrence` counts executions of the node.
 
@@ -194,41 +195,63 @@ Each route needs the header `Authorization: Bearer <SOSHO_ENGINE_API_TOKEN>`. Tw
 | `GET /health` | Report the state of the engine. |
 | `GET /nodes` | List node kinds, tools, and queues. |
 | `GET, POST /workflows` | List or create workflows. |
-| `GET, PATCH, DELETE /workflows/{id}` | Read, rename, or delete one workflow. Delete first removes the triggers and schedules. |
-| `GET, POST /workflows/{id}/versions` | List versions or save a new immutable version. |
+| `GET, PATCH, DELETE /workflows/{id}` | Read, rename, or delete one workflow. Delete first removes all runs of the workflow and their child runs. Then it removes the triggers and schedules. If one of these runs is not finished, delete returns 409 and changes nothing. |
+| `GET, POST /workflows/{id}/versions` | List versions or save a new immutable version. The save binds the triggers of the new version. A bad cron, a bad time zone, or a cycle returns 422 with `issues`, and the engine stores nothing. |
 | `GET /workflows/{id}/versions/{n}` | Read one version. |
 | `POST /validate` | Return the issues of a draft. |
-| `POST /workflows/{id}/runs` | Start a run from a `manual` trigger. A trigger of another mode returns 409. |
+| `POST /workflows/{id}/runs` | Start a run from any trigger, whatever its mode. Use it to test a `cron`, `webhook`, or `workflow_finished` trigger. The run uses the given `input`. |
 | `GET /runs` | List runs. Filters: `status`, `workflow_id`, `limit`, `offset`. The engine keeps an index of runs for the `workflow_id` filter. |
 | `GET /runs/{id}` | Read a run, its progress, pending human requests, and steps. |
 | `GET /runs/{id}/events` | Stream run events as server-sent events. |
 | `POST /runs/{id}/input` | Answer a `human` node. A second answer to the same request returns 409. |
+| `DELETE /runs/{id}` | Delete one finished run, its child runs, steps, events, and streams. A run that is `pending`, `running`, or `waiting` returns 409. Cancel it first. An unknown run returns 404. |
 | `POST /runs/{id}/cancel` | Cancel a run. |
 | `POST /runs/{id}/resume` | Resume a cancelled run. |
 | `POST /runs/{id}/fork` | Fork a run from a node. |
-| `POST, DELETE /workflows/{id}/activate` | Bind or remove the triggers of a version. `POST` needs a JSON object body. Use `{}` for the latest version. |
+| `GET /workflows/{id}/triggers` | Show the bound triggers of the latest version: `version` (or `null` when there is none), `schedules` (`name`, `cron`, `timezone`, `next_fire`), `webhooks` (`node_id`, `url`, `token`), and `followers` (`source_workflow_id`, `on_status`). An unknown workflow returns 404. |
+| `POST /workflows/{id}/webhooks/{node_id}/token` | Make a new token for a bound webhook. The old token stops at once. The response has `node_id`, `url`, and `token`. An unknown or unbound webhook returns 404. |
 | `GET /schedules` | List cron schedules. |
 | `POST /schedules/{name}/{pause, resume, trigger, delete}` | Manage a schedule. Another action returns 404. |
 | `DELETE /schedules/{name}` | Delete a schedule. |
 | `POST /webhooks/{workflow_id}/{node_id}` | Start a run from a `webhook` trigger. The header `X-Sosho-Token` is required. |
 
-Activation reads the trigger nodes of one version:
+Triggers are always live. A workflow has no on or off switch. The engine binds the trigger nodes of the latest saved version:
 
-- A `cron` trigger creates a DBOS schedule. The name is `wf.<workflow_id>.<node_id>`. A cron run starts only from its schedule.
-- A `webhook` trigger gets a new token. The response shows the token one time. The engine stores only its hash.
+- A `cron` trigger creates a DBOS schedule. The name is `wf.<workflow_id>.<node_id>`. A cron run starts only from its schedule. `next_fire` is computed from the cron string and the time zone.
+- A `webhook` trigger has one token for each workflow and node. The engine makes the token at the first save that has the webhook node. The token stays the same after each later save. The engine stores the token in plain text, so `GET /workflows/{id}/triggers` can show it. It compares tokens with `hmac.compare_digest`. A save that removes the webhook node drops its token. Use the regenerate route to replace a token.
+- The `url` of a webhook is `SOSHO_ENGINE_PUBLIC_URL` plus `/webhooks/{workflow_id}/{node_id}`.
 - A `workflow_finished` trigger starts a run when the source workflow ends and its `on_status` matches. The run input is `source_run_id`, `status`, and `output`. These runs start only from the chain.
-- Activation checks the cron strings and the time zones first. A bad value changes nothing.
-- Activation replaces a schedule that has the same name. It removes the schedules of dropped trigger nodes after it saves the new bindings.
+- A workflow whose latest version has only `manual` triggers has no bindings.
+
+Save and bind:
+
+- The save checks the cron strings, the time zones, and the cycles before it stores the version. A failed check returns 422 with `{"error", "issues": [{code, message, node}]}`. The codes are `bad_cron`, `bad_timezone`, and `trigger_cycle`. The engine stores nothing.
+- After the version is stored, the engine binds it. A bind replaces a schedule that has the same name. It saves the trigger rows and the tokens in one database transaction. Then it removes the schedules of dropped trigger nodes.
+- DBOS schedules are outside the database transaction. If the bind fails after the version is stored, the engine deletes the new version and binds the previous latest version again. The save then returns the error. If the second bind also fails, the engine logs it and the startup reconcile repairs it.
+- A workflow delete removes the bindings and the tokens first.
+
+Startup reconcile:
+
+- When the engine starts, `reconcile.py` compares each workflow with its bindings. Each latest version must be bound. Nothing else may be bound.
+- It binds a workflow that is not in sync. It removes the bindings and the schedules of a workflow that does not exist. It unbinds a workflow whose latest version cannot bind, and it logs a warning.
+- A workflow that is in sync is not changed. A second run changes nothing.
+- It logs one line for each fix. The line has no token.
+- The table `engine_live` of older versions is not used. The engine does not create it. The engine drops it at startup with `DROP TABLE IF EXISTS`.
 
 A webhook run starts only from the webhook route. A webhook request without the header `X-Sosho-Token` returns 422. A webhook request for an unknown trigger and a request with a wrong token both return 404. A body that is not valid JSON returns 400. Each trigger accepts `SOSHO_ENGINE_WEBHOOK_RATE_PER_MINUTE` requests in one minute. More requests return 429.
 
 The API limits the body size. CORS allows only loopback origins.
+
+### 6.1 Session cookie
+
+The engine sets the cookie `sosho_session` on a page request only when the client host is in `SOSHO_ENGINE_SESSION_CLIENT_HOSTS`. In compose, a request through the published port `127.0.0.1:8123` shows the gateway `172.19.0.1` of the network `sosho-net` as the client, so `compose.yaml` lists that address. Other containers on the network reach the engine through its container address and not through the gateway, so they get no cookie. If Docker gives the network a new gateway, change the address in `compose.yaml`.
 
 ## 7 Settings
 
 | Variable | Meaning |
 | :--- | :--- |
 | `SOSHO_ENGINE_API_TOKEN` | Bearer token for all routes except health and webhook. Required. It needs at least 16 characters. `make setup` creates it. |
+| `SOSHO_ENGINE_PUBLIC_URL` | Base URL in the webhook `url`. The default is `http://127.0.0.1:8123`. |
 | `SOSHO_ENGINE_DB_URL` | System database URL. SQLite and Postgres work. |
 | `SOSHO_ENGINE_APP_VERSION` | DBOS application version. A run recovers only on the same version. The default is a hash of the package source. |
 | `SOSHO_ENGINE_EXECUTOR_ID` | DBOS executor id. The default is `engine`. The worker uses `host-worker`. |

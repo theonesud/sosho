@@ -10,7 +10,7 @@ def _hook_spec() -> Spec:
 
 
 def _token(api: Api, wid: str) -> str:
-    return str(dig(api.post(f"/workflows/{wid}/activate", {}).body, "webhook_tokens", "start"))
+    return str(dig(api.get(f"/workflows/{wid}/triggers").body, "webhooks", 0, "token"))
 
 
 def test_unknown_webhook_and_wrong_token_give_the_same_status(api: Api) -> None:

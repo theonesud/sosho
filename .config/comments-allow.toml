@@ -37,3 +37,13 @@ reason = "Printing the compose config output on failure leaks secret values into
 path = "docker/Dockerfile.strata"
 text = "# target-cpu=native builds the image for the CPU of the build host (i5-12400F, AVX2). Do not run it on another CPU."
 reason = "The flag makes the binary fail with an illegal instruction on another CPU. The name does not show this."
+
+[[comment]]
+path = "run.sh"
+text = "# Usage: ./run.sh [start|stop|status|logs|build]"
+reason = "The script has no help flag. This line is the only place that lists the commands."
+
+[[comment]]
+path = "run.sh"
+text = "# Never print the token."
+reason = "A debug echo in load_token would leak the API token into the terminal and logs."

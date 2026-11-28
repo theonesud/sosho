@@ -91,7 +91,7 @@ WARNING: A secret in source code can leak to other people.
 11.6 Update outdated dependencies in a separate change. `make test` lists them as warnings.
 11.7 Commit each lockfile.
 11.8 The package managers write exact versions: `saveExact` in `pnpm-workspace.yaml`, `save-exact` in each `.npmrc`, `add-bounds = "exact"` for uv, and `pin` for mise. Do not change these settings.
-11.9 Use the newest version that the pnpm release-age policy allows. Do not add an entry to `minimumReleaseAgeExclude`.
+11.9 Use the newest version that the pnpm release-age policy allows. Do not add an entry to `minimumReleaseAgeExclude`. Exception by owner decision: `@ui-sdk/*` is excluded.
 NOTE: `peerDependencies` can use a range, because they state compatibility with the host. An image that this repository builds can use the `latest` tag.
 
 ## 12 Security

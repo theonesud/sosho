@@ -77,4 +77,4 @@ CAUTION: A weak test hides a defect.
 8.7 Coverage measures `packages/engine/src/sosho_engine` and `bin`. The data file is `.cache/coverage/.coverage`. Git ignores it.
 8.8 Coverage also measures child processes of the tests. Their lines count in the file report. They do not count in the per-test cover, because the child process has no test context.
 8.9 Coverage makes a run slower. Tests that start many child processes are slower the most.
-8.10 Vitest has no test outside the legacy paths. Vitest coverage is not set up. Add `@vitest/coverage-v8` when the first test is added.
+8.10 Vitest tests live in packages/web/src. Vitest coverage is not set up. Add `@vitest/coverage-v8` when the first test is added.

@@ -11,7 +11,9 @@ from sosho_engine import lifecycle, routes_runs, routes_triggers, routes_workflo
 from sosho_engine.api_support import AUTH, install_error_handlers
 from sosho_engine.body_limit import BodyLimitMiddleware
 from sosho_engine.health import WorkerHealth, worker_health
+from sosho_engine.reconcile import reconcile_triggers
 from sosho_engine.runtime import Runtime
+from sosho_engine.web_ui import install_ui
 
 LOOPBACK_ORIGINS = r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$"
 
@@ -27,6 +29,7 @@ def create_app(active: Runtime) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         del app
         await lifecycle.launch(active, lifecycle.engine_queues())
+        await reconcile_triggers()
         try:
             yield
         finally:
@@ -54,4 +57,5 @@ def create_app(active: Runtime) -> FastAPI:
     for module in (routes_workflows, routes_runs, routes_triggers):
         app.include_router(module.router, dependencies=AUTH)
     app.include_router(routes_triggers.webhook_router)
+    install_ui(app, active.settings)
     return app

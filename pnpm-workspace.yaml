@@ -5,3 +5,5 @@ allowBuilds:
   esbuild: true
 saveExact: true
 savePrefix: ""
+minimumReleaseAgeExclude:
+  - "@ui-sdk/*"

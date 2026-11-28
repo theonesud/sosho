@@ -104,9 +104,14 @@ CAUTION: Destructive and outward-facing actions are hard to undo.
 | You edit a `.py` file | [docs/standards/python.md](docs/standards/python.md) |
 | You write or change a test | [docs/standards/testing.md](docs/standards/testing.md) |
 | You commit | [docs/standards/git.md](docs/standards/git.md) |
+| You edit code in `packages/web` | `docs/handoff-ui.md`, and `packages/web/node_modules/@ui-sdk/react/docs/llms.txt` |
 | You edit packages/memory-graph or memory bridge code | [docs/memory.md](docs/memory.md) |
 
 NOTE: Later stages add rows for documentation, architecture, and structure.
+
+6.1 Before you use ui-sdk, follow the `ui-sdk` skill if it is installed. Read `packages/web/node_modules/@ui-sdk/react/docs/llms.txt`.
+
+6.2 To build a new component, search `packages/web/node_modules/@ui-sdk/react/docs/core.md` by heading. Read `rendering.md` in the same folder.
 
 ## 7 Tool Adapters
 
@@ -127,7 +132,7 @@ NOTE: Later stages add rows for documentation, architecture, and structure.
 - Send every model call through the LiteLLM proxy. Do not add direct access to a provider or to llama.cpp. Claude Code is the only exception. It calls Anthropic directly.
 - Run every chat model call as a pi session. Do not add a second call path beside pi.
 - Exception: calls to the `decision` and `embed` roles go directly to LiteLLM. They do not run in pi.
-- Build the backend first. Do not start the UI, the memory layer, or self-improvement work until the owner approves it.
+- Build the backend first. Do not start the memory layer or self-improvement work until the owner approves it.
 
 8.2 Models and GPU:
 

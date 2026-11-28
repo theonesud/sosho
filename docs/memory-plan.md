@@ -2,7 +2,7 @@
 
 Purpose: Detailed implementation plan and test plan for the `sosho` memory layer.
 
-Status: Groups 1 through 8 code and Layer 1 tests complete. Live model tests and legacy `packages/memory` cutover remain open until live stack verification runs.
+Status: Groups 1 through 8 code and Layer 1 tests complete. The memory layer is deferred until the owner approves it. Live model tests and legacy `packages/memory` cutover remain open until live stack verification runs.
 
 ## 1 Architecture Summary
 
@@ -54,10 +54,10 @@ Collective tests for Layer 1 in `make test-fast`:
 Goal: Port `tree-of-life` ConceptNet filters and spine logic, then pre-load the filtered ontology into SurrealDB.
 
 Tasks:
-- [x] Port English `/c/en/` extraction and maximum-weight deduplication from `tree-of-life/.backup/scripts/filter_conceptnet.py` and `tree-of-life/scripts/prepare_neo4j_csvs.py`.
-- [x] Port noun filtering and clean-term rules from `tree-of-life/.backup/scripts/filter_nouns.py` and `tree-of-life/backend/process_concepts.py`.
-- [x] Port degree pruning and objective versus lateral split from `tree-of-life/scripts/compute_ontology.py`.
-- [x] Port abstractness scoring, strict Directed Acyclic Graph creation, `nx.transitive_reduction`, canonical parent selection, and root merge from `tree-of-life/.backup/scripts/create_spine_tree.py`.
+- [x] Port English `/c/en/` extraction and maximum-weight deduplication ported from the external tree-of-life project.
+- [x] Port noun filtering and clean-term rules ported from the external tree-of-life project.
+- [x] Port degree pruning and objective versus lateral split ported from the external tree-of-life project.
+- [x] Port abstractness scoring, strict Directed Acyclic Graph creation, `nx.transitive_reduction`, canonical parent selection, and root merge ported from the external tree-of-life project.
 - [x] Build an idempotent bulk loader that uploads the filtered ConceptNet spine and lateral edges directly into SurrealDB.
 - [x] Record dataset version and filter parameters in a graph metadata table so repeated loads skip unchanged data.
 
@@ -87,7 +87,7 @@ Goal: Connect real LiteLLM `embed` and `decision` roles and port middle-out auto
 
 Tasks:
 - [x] Implement a typed LiteLLM client for `embed` and `decision` roles with strict timeout and error handling.
-- [x] Port middle-out concept disambiguation and unknown-term parent attachment from `tree-of-life/.backup/middle-out-ontology-builder.py`, with Ollama replaced by LiteLLM.
+- [x] Port middle-out concept disambiguation and unknown-term parent attachment ported from the external tree-of-life project, with Ollama replaced by LiteLLM.
 - [x] Implement temporal contradiction resolution with the `decision` role: close `valid_to` on the superseded edge, add the new edge, and link them with `Supersedes`.
 - [x] Implement automatic post-task curation that extracts candidate facts, preferences, errors, and fixes from task outputs.
 - [x] Reject automatic creation of new edge types outside the approved ConceptNet and workflow relation lists.
@@ -104,7 +104,7 @@ Tasks:
 - [x] Merge `user_memory` and `project_<id>` query results with project-over-user precedence on conflicts.
 - [x] Rank active user preferences at highest priority so turn-start context always includes matched preferences.
 - [x] Query linked `error` and `FixedBy` nodes before tool execution or module edits to block repeated past errors.
-- [x] Port shortest-path subgraph decomposition from `tree-of-life/backend/graph_engine.py` and `tree-of-life/backend/agent.py`.
+- [x] Port shortest-path subgraph decomposition ported from the external tree-of-life project.
 - [x] Enforce a hard token budget per prompt block and render compact structured paths instead of raw transcripts.
 - [x] Provide an on-demand graph-expand query so `pi` fetches deeper hops only when needed.
 

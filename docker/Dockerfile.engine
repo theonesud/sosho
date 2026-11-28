@@ -13,6 +13,8 @@ ENV UV_PYTHON_DOWNLOADS=never \
     HOME=/tmp
 
 COPY pyproject.toml uv.lock ./
+COPY packages/memory-graph/pyproject.toml packages/memory-graph/pyproject.toml
+COPY packages/memory-graph/src packages/memory-graph/src
 COPY packages/engine/pyproject.toml packages/engine/pyproject.toml
 COPY packages/engine/src packages/engine/src
 RUN uv sync --frozen --no-dev --no-editable --package sosho-engine

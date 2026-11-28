@@ -1,18 +1,20 @@
 import asyncio
+import logging
 import re
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from sosho_engine import runtime, triggers
+from sosho_engine import run_delete, runtime, triggers
 from sosho_engine.api_support import validate_draft
 from sosho_engine.catalog import Catalog, build_catalog
 from sosho_engine.issues import Issue
-from sosho_engine.spec import Workflow, WorkflowDraft
+from sosho_engine.spec import Workflow, WorkflowDraft, draft_to_workflow
 from sosho_engine.spec_nodes import IDENTIFIER
 from sosho_engine.store_tables import VersionSummary, WorkflowSummary
 from sosho_engine.validation import SpecInvalidError
 
+log = logging.getLogger(__name__)
 ID_RE = re.compile(IDENTIFIER)
 
 
@@ -77,7 +79,9 @@ async def patch_workflow(workflow_id: str, body: WorkflowPatch) -> WorkflowSumma
 async def delete_workflow(workflow_id: str) -> None:
     store = runtime.current().store
     await asyncio.to_thread(store.get_workflow, workflow_id)
-    await triggers.deactivate(workflow_id)
+    run_ids = await run_delete.indexed_run_ids(workflow_id)
+    await run_delete.delete_workflow_runs(run_ids)
+    await triggers.unbind(workflow_id)
     await asyncio.to_thread(store.delete_workflow, workflow_id)
 
 
@@ -99,7 +103,25 @@ async def add_version(workflow_id: str, draft: WorkflowDraft) -> Workflow:
     issues = await validate_draft(workflow_id, draft, (summary.latest_version or 0) + 1)
     if issues:
         raise SpecInvalidError(issues)
-    return await asyncio.to_thread(store.add_version, workflow_id, draft)
+    spec = draft_to_workflow(draft, workflow_id, (summary.latest_version or 0) + 1)
+    issues = await triggers.bind_issues(spec)
+    if issues:
+        raise SpecInvalidError(issues)
+    saved = await asyncio.to_thread(store.add_version, workflow_id, draft)
+    try:
+        await triggers.bind_latest(workflow_id)
+    except Exception:
+        await _roll_back(workflow_id, saved.version)
+        raise
+    return saved
+
+
+async def _roll_back(workflow_id: str, version: int) -> None:
+    await asyncio.to_thread(runtime.current().store.delete_version, workflow_id, version)
+    try:
+        await triggers.bind_latest(workflow_id)
+    except Exception:
+        log.exception("save rollback: could not restore the bindings of %s", workflow_id)
 
 
 @router.get("/workflows/{workflow_id}/versions/{version}")

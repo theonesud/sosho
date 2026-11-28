@@ -1,4 +1,4 @@
-.PHONY: setup test test-fast cov fix up down logs worker worker-install worker-uninstall worker-logs memory-init memory-preload memory-audit memory-rollback memory-health
+.PHONY: setup test test-fast cov fix web-build up down logs worker worker-install worker-uninstall worker-logs memory-init memory-preload memory-audit memory-rollback memory-health
 
 MISE := $(shell command -v mise 2>/dev/null || echo $(HOME)/.local/bin/mise)
 
@@ -28,7 +28,7 @@ SHFMT := $(RUN) shfmt -i 2 -ci
 
 .DEFAULT_GOAL := _usage
 _usage:
-	@echo "Sosho targets: setup, test, test-fast, cov, fix, up, down, logs, worker, worker-install, worker-uninstall, worker-logs."
+	@echo "Sosho targets: setup, test, test-fast, cov, fix, up, down, logs, worker, worker-install, worker-uninstall, worker-logs, web-build."
 	@echo "make setup: install mise, the pinned tools, and dependencies. Link the pi and yue2-music launchers."
 	@echo "make test: run every non-mutating check and test. Vale prints warnings only."
 	@echo "  Integration tests skip a service that does not answer. Run make up first."
@@ -37,6 +37,7 @@ _usage:
 	@echo "  The pre-push hook runs it. Skip the outdated dependency report."
 	@echo "make cov: run only the pytest tests with coverage. make test COV=1 adds coverage to the full run."
 	@echo "make fix: apply safe auto-fixes (format and lint fixes)."
+	@echo "make web-build: build packages/web into packages/web/dist. The engine serves that folder."
 	@echo "make up: start the Docker services. Print the service URLs."
 	@echo "make down: stop all Docker services, music profile included."
 	@echo "make logs: follow Docker logs for all services. Use S=<service> for one service."
@@ -156,6 +157,9 @@ fix:
 	$(RUN) uv run ruff check --fix .
 	@if [ -n "$(SH_FILES)" ]; then $(SHFMT) -w $(SH_FILES); fi
 	@if [ -n "$(TOML_FILES)" ]; then $(RUN) taplo fmt $(TOML_FILES); fi
+
+web-build:
+	PATH="$(NODE_BIN):$$PATH" $(RUN) pnpm --filter @sosho/web build
 
 up:
 	$(RUN) $(COMPOSE) up -d

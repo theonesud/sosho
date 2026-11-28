@@ -32,20 +32,19 @@ def _stopped(api: Api, run_id: str) -> bool:
 def test_scheduled_run_stops_at_the_run_time_limit(api: Api) -> None:
     wid = unique("tmsched")
     publish(api, _slow({"mode": "cron", "cron": "0 0 0 1 1 *"}), wid)
-    name = str(dig(api.post(f"/workflows/{wid}/activate", {}).body, "schedules", 0))
+    name = str(dig(api.get(f"/workflows/{wid}/triggers").body, "schedules", 0, "name"))
     assert api.post(f"/schedules/{name}/trigger").status == 202
     assert _stopped(api, _first_run(api, wid))
-    api.delete(f"/workflows/{wid}/activate")
+    api.delete(f"/workflows/{wid}")
 
 
 def test_workflow_finished_run_stops_at_the_run_time_limit(api: Api) -> None:
     source, follower = unique("tmsrc"), unique("tmfol")
     publish(api, draft([trigger(), tool("a", "echo", value=1)], [edge("start", "a")]), source)
     publish(api, _slow({"mode": "workflow_finished", "source_workflow_id": source}), follower)
-    assert api.post(f"/workflows/{follower}/activate", {}).status == 200
     start(api, source)
     assert _stopped(api, _first_run(api, follower))
-    api.delete(f"/workflows/{follower}/activate")
+    api.delete(f"/workflows/{follower}")
 
 
 def _parent_of(api: Api, child: str, limit: int) -> str:

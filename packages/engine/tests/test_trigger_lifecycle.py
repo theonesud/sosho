@@ -2,7 +2,6 @@ from engine_support import Api, dig, publish
 from flows import Spec, draft, edge, tool, trigger, unique
 from pydantic import JsonValue
 from sosho_engine import runtime
-from sosho_engine.spec import WorkflowDraft
 
 
 def _cron(expression: str = "0 0 0 1 1 *", zone: str | None = None) -> Spec:
@@ -19,18 +18,9 @@ def _names(api: Api, wid: str) -> list[str]:
     return [str(dig(item, "name")) for item in listed if f".{wid}." in str(dig(item, "name"))]
 
 
-def _store_unchecked(wid: str, spec: Spec) -> None:
-    runtime.current().store.add_version(wid, WorkflowDraft.model_validate(spec))
-
-
-def _activate(api: Api, wid: str) -> int:
-    return api.post(f"/workflows/{wid}/activate", {}).status
-
-
 def test_deleting_a_workflow_removes_its_schedules(api: Api) -> None:
     wid = unique("delsched")
     publish(api, _cron(), wid)
-    assert _activate(api, wid) == 200
     assert len(_names(api, wid)) == 1
     assert api.delete(f"/workflows/{wid}").status == 204
     assert _names(api, wid) == []
@@ -40,46 +30,40 @@ def test_deleting_an_unknown_workflow_is_not_found(api: Api) -> None:
     assert api.delete("/workflows/nothere").status == 404
 
 
-def test_a_bad_cron_keeps_the_triggers_of_the_active_version(api: Api) -> None:
+def test_a_bad_cron_save_keeps_the_triggers_of_the_bound_version(api: Api) -> None:
     wid = unique("badcron")
     publish(api, _cron(), wid)
-    assert _activate(api, wid) == 200
     before = _names(api, wid)
-    _store_unchecked(wid, _cron("99 99 99 99 99 99"))
-    refused = api.post(f"/workflows/{wid}/activate", {"version": 2})
+    refused = api.post(f"/workflows/{wid}/versions", _cron("99 99 99 99 99 99"))
     assert refused.status == 422
     assert _names(api, wid) == before
-    assert len(runtime.current().store.list_triggers(wid)) == 1
+    assert [r.version for r in runtime.current().store.list_triggers(wid)] == [1]
 
 
-def test_a_bad_timezone_keeps_the_triggers_of_the_active_version(api: Api) -> None:
+def test_a_bad_timezone_save_keeps_the_triggers_of_the_bound_version(api: Api) -> None:
     wid = unique("badzone")
     publish(api, _cron(), wid)
-    assert _activate(api, wid) == 200
     before = _names(api, wid)
-    _store_unchecked(wid, _cron(zone="Mars/Olympus"))
-    assert api.post(f"/workflows/{wid}/activate", {"version": 2}).status == 422
+    assert api.post(f"/workflows/{wid}/versions", _cron(zone="Mars/Olympus")).status == 422
     assert _names(api, wid) == before
 
 
-def test_activation_replaces_an_untracked_schedule_of_the_same_name(api: Api) -> None:
+def test_a_save_replaces_an_untracked_schedule_of_the_same_name(api: Api) -> None:
     wid = unique("untracked")
     publish(api, _cron(), wid)
-    assert _activate(api, wid) == 200
     runtime.current().store.replace_triggers(wid, [])
-    assert _activate(api, wid) == 200
+    assert api.post(f"/workflows/{wid}/versions", _cron()).status == 201
     assert len(_names(api, wid)) == 1
     assert len(runtime.current().store.list_triggers(wid)) == 1
 
 
-def test_activation_removes_the_schedule_of_a_dropped_cron_node(api: Api) -> None:
+def test_a_save_removes_the_schedule_of_a_dropped_cron_node(api: Api) -> None:
     wid = unique("dropped")
     publish(api, _cron(), wid)
-    assert _activate(api, wid) == 200
     plain: Spec = draft([trigger(), tool("a", "echo", value=1)], [edge("start", "a")])
     assert api.post(f"/workflows/{wid}/versions", plain).status == 201
-    assert _activate(api, wid) == 200
     assert _names(api, wid) == []
+    assert runtime.current().store.list_triggers(wid) == []
 
 
 def test_save_refuses_a_bad_cron_text_or_time_zone(api: Api) -> None:

@@ -81,6 +81,7 @@ def base_settings(db_path: Path) -> Settings:
             "db_url": f"sqlite:///{db_path}",
             "api_token": TOKEN,
             "app_version": "test",
+            "web_dist": db_path.parent / "dist",
             "direct_roles": DIRECT_ROLES,
         }
     )
@@ -161,6 +162,9 @@ class Api:
 
     def patch(self, path: str, body: JsonValue) -> Reply:
         return self.send("PATCH", path, body)
+
+    def put(self, path: str, body: JsonValue = None) -> Reply:
+        return self.send("PUT", path, body)
 
     def delete(self, path: str) -> Reply:
         return self.send("DELETE", path)

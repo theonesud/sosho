@@ -54,13 +54,13 @@ def summarize(status: WorkflowStatus, waiting: bool = False) -> RunSummary:
     )
 
 
-async def start_run(params: RunParams, mode: str) -> str:
+async def start_run(params: RunParams, mode: str | None = None) -> str:
     store = runtime.current().store
     spec = await asyncio.to_thread(store.get_version, params.workflow_id, params.version)
     trigger = spec.node_map().get(params.trigger_node or spec.entry)
     if not isinstance(trigger, TriggerNode):
         raise NotFoundError(f"trigger node {params.trigger_node} not found")
-    if trigger.mode != mode:
+    if mode is not None and trigger.mode != mode:
         raise ConflictError(
             f"trigger node {trigger.id} has mode {trigger.mode} but this route needs {mode}"
         )

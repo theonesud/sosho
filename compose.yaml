@@ -246,10 +246,14 @@ services:
     ports:
       - "127.0.0.1:${SOSHO_ENGINE_PORT:-8123}:8123"
     networks: [sosho-net]
+    volumes:
+      - ./packages/web/dist:/web-dist:ro
     environment:
       SOSHO_ENGINE_DB_URL: postgresql://${SOSHO_PG_USER:-postgres}:${SOSHO_PG_PASSWORD:?Run make setup to create it}@postgres:5432/sosho_engine
       SOSHO_ENGINE_API_TOKEN: ${SOSHO_ENGINE_API_TOKEN:?Run make setup to create it}
       SOSHO_ENGINE_HOST: 0.0.0.0
+      SOSHO_ENGINE_WEB_DIST: /web-dist
+      SOSHO_ENGINE_SESSION_CLIENT_HOSTS: '["127.0.0.1", "::1", "localhost", "172.19.0.1"]'
       SOSHO_ENGINE_LITELLM_BASE_URL: http://litellm:4000/v1
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?Run make setup to create it}
     healthcheck:

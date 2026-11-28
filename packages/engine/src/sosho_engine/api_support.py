@@ -1,10 +1,12 @@
 import asyncio
+import hashlib
 import hmac
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.params import Depends as DependsParam
 from fastapi.responses import JSONResponse
 
@@ -22,13 +24,39 @@ from sosho_engine.spec import Workflow, WorkflowDraft, draft_to_workflow
 from sosho_engine.spec_nodes import MapNode, SubworkflowNode
 from sosho_engine.validation import SpecInvalidError, validate_workflow
 
+SESSION_COOKIE = "sosho_session"
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+LOOPBACK_URL = re.compile(r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(/|$)")
 
-async def require_token(authorization: Annotated[str | None, Header()] = None) -> None:
-    token = runtime.current().settings.api_token.get_secret_value()
+
+def session_value(token: str) -> str:
+    return hmac.new(token.encode(), b"sosho-session-v1", hashlib.sha256).hexdigest()
+
+
+def _bearer_valid(authorization: str | None, token: str) -> bool:
     scheme, _, supplied = (authorization or "").partition(" ")
-    valid = scheme == "Bearer" and hmac.compare_digest(supplied.encode(), token.encode())
-    if not valid:
+    return scheme == "Bearer" and hmac.compare_digest(supplied.encode(), token.encode())
+
+
+def _cookie_valid(cookie: str | None, token: str) -> bool:
+    expected = session_value(token)
+    return cookie is not None and hmac.compare_digest(cookie.encode(), expected.encode())
+
+
+async def require_token(
+    request: Request,
+    authorization: Annotated[str | None, Header()] = None,
+    sosho_session: Annotated[str | None, Cookie()] = None,
+) -> None:
+    token = runtime.current().settings.api_token.get_secret_value()
+    if _bearer_valid(authorization, token):
+        return
+    if not _cookie_valid(sosho_session, token):
         raise HTTPException(status_code=401, detail="a valid bearer token is required")
+    if request.method not in SAFE_METHODS:
+        source = request.headers.get("origin") or request.headers.get("referer") or ""
+        if not LOOPBACK_URL.match(source):
+            raise HTTPException(status_code=403, detail="a loopback origin is required")
 
 
 AUTH: list[DependsParam] = [Depends(require_token)]

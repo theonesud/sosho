@@ -7,7 +7,7 @@ import httpx
 import pytest
 from pydantic import BaseModel, JsonValue
 
-from tests.conftest import ENGINE_URL, require_service
+from tests.conftest import ENGINE_URL, remove_workflow, require_service
 
 pytestmark = pytest.mark.integration
 
@@ -51,6 +51,7 @@ class RunView(BaseModel):
 class EngineClient:
     def __init__(self, client: httpx.Client) -> None:
         self.client = client
+        self.created: list[str] = []
 
     def run(self, run_id: str) -> RunView:
         response = self.client.get(f"/runs/{run_id}")
@@ -78,6 +79,7 @@ class EngineClient:
     def publish(self, spec: dict[str, JsonValue]) -> str:
         workflow_id = f"itest{uuid.uuid4().hex[:12]}"
         created = self.client.post("/workflows", json={"id": workflow_id, "name": "integration"})
+        self.created.append(workflow_id)
         assert created.status_code == 201, created.text
         version = self.client.post(f"/workflows/{workflow_id}/versions", json=spec)
         assert version.status_code == 201, version.text
@@ -100,7 +102,12 @@ def engine(engine_token: str) -> Iterator[EngineClient]:
             if os.environ.get("LIVE_STRICT") == "1":
                 pytest.fail(message)
             pytest.skip(message)
-        yield EngineClient(client)
+        live = EngineClient(client)
+        try:
+            yield live
+        finally:
+            for workflow_id in live.created:
+                remove_workflow(client, workflow_id)
 
 
 def _human_spec() -> dict[str, JsonValue]:

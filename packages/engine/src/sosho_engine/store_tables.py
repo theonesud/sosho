@@ -1,5 +1,15 @@
 from pydantic import BaseModel
-from sqlalchemy import BigInteger, Column, ForeignKey, Index, Integer, MetaData, String, Table, Text
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    ForeignKey,
+    Index,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    Text,
+)
 
 METADATA = MetaData()
 WORKFLOWS = Table(
@@ -26,7 +36,13 @@ TRIGGERS = Table(
     Column("version", Integer, nullable=False),
     Column("mode", String(32), nullable=False),
     Column("ref", String(300)),
-    Column("secret_hash", String(128)),
+)
+HOOK_TOKENS = Table(
+    "engine_webhook_tokens",
+    METADATA,
+    Column("workflow_id", String(64), primary_key=True),
+    Column("node_id", String(64), primary_key=True),
+    Column("token", String(100), nullable=False),
 )
 REPLIES = Table(
     "engine_replies",
@@ -81,4 +97,3 @@ class TriggerRow(BaseModel):
     version: int
     mode: str
     ref: str | None
-    secret_hash: str | None

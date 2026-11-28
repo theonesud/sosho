@@ -1,20 +1,16 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Header, Request
-from pydantic import BaseModel, JsonValue, TypeAdapter, ValidationError
+from pydantic import JsonValue, TypeAdapter, ValidationError
 
 from sosho_engine import runs, triggers
 from sosho_engine.errors import BadRequestError
 from sosho_engine.jobs import RunParams
 from sosho_engine.routes_runs import RunRef
 from sosho_engine.tools import JsonDict
-from sosho_engine.triggers import Activation, ScheduleInfo
+from sosho_engine.triggers import ScheduleInfo, TriggerState, WebhookState
 
 BODY_ADAPTER: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
-
-
-class ActivateRequest(BaseModel):
-    version: int | None = None
 
 
 async def _body_dict(request: Request) -> JsonDict:
@@ -32,14 +28,14 @@ router = APIRouter()
 webhook_router = APIRouter()
 
 
-@router.post("/workflows/{workflow_id}/activate")
-async def activate(workflow_id: str, body: ActivateRequest) -> Activation:
-    return await triggers.activate(workflow_id, body.version)
+@router.get("/workflows/{workflow_id}/triggers")
+async def get_triggers(workflow_id: str) -> TriggerState:
+    return await triggers.trigger_state(workflow_id)
 
 
-@router.delete("/workflows/{workflow_id}/activate", status_code=204)
-async def deactivate(workflow_id: str) -> None:
-    await triggers.deactivate(workflow_id)
+@router.post("/workflows/{workflow_id}/webhooks/{node_id}/token")
+async def regenerate_token(workflow_id: str, node_id: str) -> WebhookState:
+    return await triggers.regenerate_token(workflow_id, node_id)
 
 
 @router.get("/schedules")

@@ -1,14 +1,17 @@
 import asyncio
-import hashlib
 import hmac
 import secrets
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
+from croniter import croniter
 from dbos import DBOS
 from pydantic import BaseModel, JsonValue, TypeAdapter
 
 from sosho_engine import runtime
 from sosho_engine.chain import has_finished_cycle
-from sosho_engine.errors import ConflictError, NotFoundError, RateLimitError
+from sosho_engine.errors import NotFoundError, RateLimitError
+from sosho_engine.issues import Issue
 from sosho_engine.jobs import RunParams
 from sosho_engine.runflow import scheduled_run
 from sosho_engine.spec import Workflow
@@ -21,12 +24,29 @@ SCHEDULE_PREFIX = "wf."
 _JSON: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
 
 
-class Activation(BaseModel):
-    workflow_id: str
-    version: int
-    schedules: list[str]
-    webhook_tokens: dict[str, str]
-    finished_sources: list[str]
+class ScheduleState(BaseModel):
+    name: str
+    cron: str
+    timezone: str | None
+    next_fire: str | None
+
+
+class WebhookState(BaseModel):
+    node_id: str
+    url: str
+    token: str
+
+
+class FollowerState(BaseModel):
+    source_workflow_id: str
+    on_status: str
+
+
+class TriggerState(BaseModel):
+    version: int | None
+    schedules: list[ScheduleState]
+    webhooks: list[WebhookState]
+    followers: list[FollowerState]
 
 
 class ScheduleInfo(BaseModel):
@@ -38,10 +58,6 @@ class ScheduleInfo(BaseModel):
 
 def schedule_name(workflow_id: str, node_id: str) -> str:
     return f"{SCHEDULE_PREFIX}{workflow_id}.{node_id}"
-
-
-def hash_token(token: str) -> str:
-    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def _prefix(workflow_id: str) -> str:
@@ -56,30 +72,26 @@ async def _drop_schedules(workflow_id: str, keep: set[str]) -> None:
             await DBOS.delete_schedule_async(name)
 
 
-async def _refuse_cycle(workflow_id: str, nodes: list[TriggerNode]) -> None:
+async def cycle_issues(workflow_id: str, nodes: list[TriggerNode]) -> list[Issue]:
     rows = await asyncio.to_thread(runtime.current().store.list_triggers)
     links = [
         (row.ref, row.workflow_id)
         for row in rows
         if row.mode == "workflow_finished" and row.ref and row.workflow_id != workflow_id
     ]
-    links.extend(
-        (node.source_workflow_id, workflow_id)
-        for node in nodes
-        if node.mode == "workflow_finished" and node.source_workflow_id
-    )
-    if has_finished_cycle(links, workflow_id):
-        raise ConflictError(f"workflow {workflow_id} would start a cycle of workflow_finished runs")
+    own = [n for n in nodes if n.mode == "workflow_finished" and n.source_workflow_id]
+    links.extend((node.source_workflow_id or "", workflow_id) for node in own)
+    if not has_finished_cycle(links, workflow_id):
+        return []
+    message = f"workflow {workflow_id} would start a cycle of workflow_finished runs"
+    return [Issue("trigger_cycle", message, node.id) for node in own]
 
 
-async def _bind(spec: Workflow, node: TriggerNode, result: Activation) -> TriggerRow:
+async def _bind(
+    spec: Workflow, node: TriggerNode, tokens: dict[str, str], known: dict[str, str]
+) -> TriggerRow:
     row = TriggerRow(
-        workflow_id=spec.id,
-        node_id=node.id,
-        version=spec.version,
-        mode=node.mode,
-        ref=None,
-        secret_hash=None,
+        workflow_id=spec.id, node_id=node.id, version=spec.version, mode=node.mode, ref=None
     )
     if node.mode == "cron" and node.cron:
         name = schedule_name(spec.id, node.id)
@@ -93,53 +105,118 @@ async def _bind(spec: Workflow, node: TriggerNode, result: Activation) -> Trigge
             context=context.model_dump(mode="json"),
             cron_timezone=node.cron_timezone,
         )
-        result.schedules.append(name)
         return row.model_copy(update={"ref": name})
     if node.mode == "webhook":
-        token = secrets.token_urlsafe(32)
-        result.webhook_tokens[node.id] = token
-        return row.model_copy(update={"secret_hash": hash_token(token)})
+        tokens[node.id] = known.get(node.id) or secrets.token_urlsafe(32)
     if node.mode == "workflow_finished":
-        result.finished_sources.append(node.source_workflow_id or "")
         return row.model_copy(update={"ref": node.source_workflow_id})
     return row
 
 
-async def activate(workflow_id: str, version: int | None) -> Activation:
-    store = runtime.current().store
-    spec = await asyncio.to_thread(store.get_version, workflow_id, version)
-    nodes = [n for n in spec.nodes if isinstance(n, TriggerNode) and n.mode != "manual"]
+def bindable(spec: Workflow) -> list[TriggerNode]:
+    return [n for n in spec.nodes if isinstance(n, TriggerNode) and n.mode != "manual"]
+
+
+async def bind_issues(spec: Workflow) -> list[Issue]:
+    nodes = bindable(spec)
     issues = [issue for node in nodes if node.mode == "cron" for issue in check_cron(node)]
-    if issues:
-        raise SpecInvalidError(issues)
-    await _refuse_cycle(workflow_id, nodes)
-    result = Activation(
-        workflow_id=workflow_id,
-        version=spec.version,
-        schedules=[],
-        webhook_tokens={},
-        finished_sources=[],
-    )
-    rows = [await _bind(spec, node, result) for node in nodes]
-    await asyncio.to_thread(store.replace_triggers, workflow_id, rows)
-    await _drop_schedules(workflow_id, set(result.schedules))
-    return result
+    issues.extend(await cycle_issues(spec.id, nodes))
+    return issues
 
 
-async def deactivate(workflow_id: str) -> None:
+async def bind_spec(workflow_id: str, spec: Workflow | None) -> None:
+    store = runtime.current().store
+    nodes = bindable(spec) if spec else []
+    if spec:
+        issues = await bind_issues(spec)
+        if issues:
+            raise SpecInvalidError(issues)
+    known = await asyncio.to_thread(store.get_tokens, workflow_id)
+    tokens: dict[str, str] = {}
+    rows = [await _bind(spec, node, tokens, known) for node in nodes] if spec else []
+    await asyncio.to_thread(store.save_binding, workflow_id, rows, tokens)
+    keep = {row.ref for row in rows if row.mode == "cron" and row.ref}
+    await _drop_schedules(workflow_id, {name for name in keep if name})
+
+
+async def bind_latest(workflow_id: str) -> None:
+    store = runtime.current().store
+    summary = await asyncio.to_thread(store.get_workflow, workflow_id)
+    spec = None
+    if summary.latest_version:
+        spec = await asyncio.to_thread(store.get_version, workflow_id, summary.latest_version)
+    await bind_spec(workflow_id, spec)
+
+
+async def unbind(workflow_id: str) -> None:
     await _drop_schedules(workflow_id, set())
-    await asyncio.to_thread(runtime.current().store.replace_triggers, workflow_id, [])
+    await asyncio.to_thread(runtime.current().store.clear_binding, workflow_id)
+
+
+def webhook_url(workflow_id: str, node_id: str) -> str:
+    base = runtime.current().settings.public_url.rstrip("/")
+    return f"{base}/webhooks/{workflow_id}/{node_id}"
+
+
+def _next_fire(node: TriggerNode) -> str | None:
+    zone = ZoneInfo(node.cron_timezone) if node.cron_timezone else UTC
+    try:
+        moment = croniter(node.cron or "", datetime.now(zone), second_at_beginning=True)
+        return moment.get_next(datetime).isoformat()
+    except ValueError:
+        return None
+
+
+async def trigger_state(workflow_id: str) -> TriggerState:
+    store = runtime.current().store
+    summary = await asyncio.to_thread(store.get_workflow, workflow_id)
+    state = TriggerState(version=summary.latest_version, schedules=[], webhooks=[], followers=[])
+    if summary.latest_version is None:
+        return state
+    spec = await asyncio.to_thread(store.get_version, workflow_id, summary.latest_version)
+    tokens = await asyncio.to_thread(store.get_tokens, workflow_id)
+    for node in bindable(spec):
+        if node.mode == "cron":
+            name = schedule_name(workflow_id, node.id)
+            state.schedules.append(
+                ScheduleState(
+                    name=name,
+                    cron=node.cron or "",
+                    timezone=node.cron_timezone,
+                    next_fire=_next_fire(node),
+                )
+            )
+        elif node.mode == "webhook" and node.id in tokens:
+            url = webhook_url(workflow_id, node.id)
+            state.webhooks.append(WebhookState(node_id=node.id, url=url, token=tokens[node.id]))
+        elif node.mode == "workflow_finished":
+            source = node.source_workflow_id or ""
+            state.followers.append(
+                FollowerState(source_workflow_id=source, on_status=node.on_status)
+            )
+    return state
+
+
+async def regenerate_token(workflow_id: str, node_id: str) -> WebhookState:
+    store = runtime.current().store
+    rows = await asyncio.to_thread(store.list_triggers, workflow_id)
+    if not any(row.node_id == node_id and row.mode == "webhook" for row in rows):
+        raise NotFoundError("webhook not found")
+    token = secrets.token_urlsafe(32)
+    await asyncio.to_thread(store.set_token, workflow_id, node_id, token)
+    return WebhookState(node_id=node_id, url=webhook_url(workflow_id, node_id), token=token)
 
 
 async def verify_webhook(workflow_id: str, node_id: str, token: str) -> TriggerRow:
     if not runtime.current().webhook_limiter.allow(f"{workflow_id}/{node_id}"):
         raise RateLimitError("too many webhook requests for this trigger")
-    rows = await asyncio.to_thread(runtime.current().store.list_triggers, workflow_id)
+    store = runtime.current().store
+    rows = await asyncio.to_thread(store.list_triggers, workflow_id)
     row = next((item for item in rows if item.node_id == node_id and item.mode == "webhook"), None)
-    candidate = hash_token(token)
-    expected = row.secret_hash if row is not None and row.secret_hash is not None else candidate
-    matches = hmac.compare_digest(candidate, expected)
-    if row is None or row.secret_hash is None or not matches:
+    stored = (await asyncio.to_thread(store.get_tokens, workflow_id)).get(node_id)
+    expected = stored if stored is not None else token
+    matches = hmac.compare_digest(token.encode(), expected.encode())
+    if row is None or stored is None or not matches:
         raise NotFoundError("webhook not found")
     return row
 

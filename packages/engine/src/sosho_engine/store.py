@@ -2,12 +2,13 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from sqlalchemy import Engine, create_engine, delete, func, insert, select, update
+from sqlalchemy import Engine, create_engine, delete, func, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
 
 from sosho_engine.errors import ConflictError, NotFoundError
 from sosho_engine.spec import Workflow, WorkflowDraft, draft_to_workflow
 from sosho_engine.store_tables import (
+    HOOK_TOKENS,
     METADATA,
     REPLIES,
     RUNS,
@@ -35,6 +36,8 @@ class Store:
 
     def create_tables(self) -> None:
         METADATA.create_all(self._engine)
+        with self._engine.begin() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS engine_live"))
 
     def close(self) -> None:
         self._engine.dispose()
@@ -88,7 +91,8 @@ class Store:
     def delete_workflow(self, workflow_id: str) -> None:
         self.get_workflow(workflow_id)
         with self._engine.begin() as conn:
-            conn.execute(delete(TRIGGERS).where(TRIGGERS.c.workflow_id == workflow_id))
+            for table in (TRIGGERS, HOOK_TOKENS):
+                conn.execute(delete(table).where(table.c.workflow_id == workflow_id))
             conn.execute(delete(VERSIONS).where(VERSIONS.c.workflow_id == workflow_id))
             conn.execute(delete(WORKFLOWS).where(WORKFLOWS.c.id == workflow_id))
 
@@ -147,6 +151,55 @@ class Store:
             for row in rows:
                 conn.execute(insert(TRIGGERS).values(**row.model_dump()))
 
+    def save_binding(
+        self, workflow_id: str, rows: list[TriggerRow], tokens: dict[str, str]
+    ) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(delete(TRIGGERS).where(TRIGGERS.c.workflow_id == workflow_id))
+            for row in rows:
+                conn.execute(insert(TRIGGERS).values(**row.model_dump()))
+            conn.execute(delete(HOOK_TOKENS).where(HOOK_TOKENS.c.workflow_id == workflow_id))
+            for node_id, token in tokens.items():
+                conn.execute(
+                    insert(HOOK_TOKENS).values(
+                        workflow_id=workflow_id, node_id=node_id, token=token
+                    )
+                )
+
+    def clear_binding(self, workflow_id: str) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(delete(TRIGGERS).where(TRIGGERS.c.workflow_id == workflow_id))
+            conn.execute(delete(HOOK_TOKENS).where(HOOK_TOKENS.c.workflow_id == workflow_id))
+
+    def token_pairs(self) -> list[tuple[str, str]]:
+        with self._engine.connect() as conn:
+            query = select(HOOK_TOKENS.c.workflow_id, HOOK_TOKENS.c.node_id)
+            return [(row.workflow_id, row.node_id) for row in conn.execute(query)]
+
+    def delete_version(self, workflow_id: str, version: int) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(
+                delete(VERSIONS).where(
+                    VERSIONS.c.workflow_id == workflow_id, VERSIONS.c.version == version
+                )
+            )
+
+    def get_tokens(self, workflow_id: str) -> dict[str, str]:
+        query = select(HOOK_TOKENS).where(HOOK_TOKENS.c.workflow_id == workflow_id)
+        with self._engine.connect() as conn:
+            return {row.node_id: row.token for row in conn.execute(query)}
+
+    def set_token(self, workflow_id: str, node_id: str, token: str) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(
+                delete(HOOK_TOKENS).where(
+                    HOOK_TOKENS.c.workflow_id == workflow_id, HOOK_TOKENS.c.node_id == node_id
+                )
+            )
+            conn.execute(
+                insert(HOOK_TOKENS).values(workflow_id=workflow_id, node_id=node_id, token=token)
+            )
+
     def list_triggers(self, workflow_id: str | None = None) -> list[TriggerRow]:
         query = select(TRIGGERS)
         if workflow_id is not None:
@@ -159,7 +212,6 @@ class Store:
                     version=row.version,
                     mode=row.mode,
                     ref=row.ref,
-                    secret_hash=row.secret_hash,
                 )
                 for row in conn.execute(query)
             ]
@@ -194,6 +246,13 @@ class Store:
                 conn.execute(insert(RUNS).values(**values))
         except IntegrityError:
             return
+
+    def forget_runs(self, run_ids: list[str]) -> None:
+        with self._engine.begin() as conn:
+            for start in range(0, len(run_ids), 500):
+                chunk = run_ids[start : start + 500]
+                conn.execute(delete(REPLIES).where(REPLIES.c.run_id.in_(chunk)))
+                conn.execute(delete(RUNS).where(RUNS.c.run_id.in_(chunk)))
 
     def run_ids(self, workflow_id: str, limit: int, offset: int) -> list[str]:
         query = (

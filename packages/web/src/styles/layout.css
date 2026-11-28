@@ -1,0 +1,251 @@
+@layer layout {
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--line-1);
+    border-radius: var(--radius-2);
+  }
+
+  .panel { padding: var(--space-4); }
+
+  .panel-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+
+  .muted { color: var(--text-3); }
+  .mono { font-family: var(--font-mono); }
+  .num { text-align: right; }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .stack { display: flex; flex-direction: column; gap: var(--space-4); }
+  .stack-tight { display: flex; flex-direction: column; align-items: flex-start; gap: 0.125rem; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+  .row.end { justify-content: flex-end; margin-top: var(--space-5); }
+  .badge-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .inline-label { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+  .grid-2, .grid-3, .form-grid {
+    display: grid;
+    gap: var(--space-3);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  }
+
+  .grid-2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); }
+  .form-grid { align-items: start; gap: var(--space-4) var(--space-5); }
+  .span-2 { grid-column: 1 / -1; }
+}
+
+@layer layout {
+  .shell {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    min-height: 100dvh;
+  }
+
+  .shell-sidebar {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100dvh;
+    padding: var(--space-3);
+    border-right: 1px solid var(--line-1);
+    background: var(--bg);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-2) var(--space-4);
+    color: var(--text-1);
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--tracking-tight);
+    text-decoration: none;
+  }
+
+  .brand-mark {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: var(--radius-1);
+    background: var(--text-1);
+  }
+
+  .nav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    height: var(--control-height);
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-1);
+    color: var(--text-2);
+    text-decoration: none;
+
+    &:hover {
+      background: var(--surface-2);
+      color: var(--text-1);
+    }
+
+    &:target,
+    &[aria-current="true"] {
+      background: var(--surface-2);
+      color: var(--text-1);
+    }
+  }
+
+  .shell-main { min-width: 0; }
+
+  .shell-topbar {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    height: var(--topbar-height);
+    padding: 0 var(--space-5);
+    border-bottom: 1px solid var(--line-1);
+    background: color-mix(in oklch, var(--bg) 92%, transparent);
+  }
+
+  .engine-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-3);
+  }
+
+  .engine-status::before {
+    content: "";
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: var(--radius-round);
+    background: var(--status-succeeded);
+  }
+
+  .shell-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    max-width: 82rem;
+    margin: 0 auto;
+    padding: var(--space-6) var(--space-5) var(--space-7);
+  }
+
+  .page-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .showcase-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    scroll-margin-top: calc(var(--topbar-height) + var(--space-5));
+  }
+
+  .section-head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .section-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  [data-slot="dialog-trigger"].palette-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: min(22rem, 60vw);
+    height: var(--control-height);
+    padding: 0 var(--space-2) 0 var(--space-3);
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius-1);
+    background: var(--surface-1);
+    color: var(--text-3);
+    cursor: pointer;
+
+    &:hover { border-color: var(--line-3); }
+    kbd { margin-left: auto; }
+  }
+
+  .palette-content {
+    width: min(34rem, calc(100vw - 2rem));
+    padding: var(--space-2);
+  }
+
+  @media (max-width: 52rem) {
+    .shell { grid-template-columns: minmax(0, 1fr); }
+
+    .shell-sidebar {
+      position: static;
+      height: auto;
+      border-right: 0;
+      border-bottom: 1px solid var(--line-1);
+      padding: var(--space-2) var(--space-3);
+    }
+
+    .shell-sidebar { min-width: 0; }
+    .shell-sidebar .brand { padding-bottom: var(--space-2); }
+
+    .nav-list {
+      flex-direction: row;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .nav-link { white-space: nowrap; }
+    .shell-topbar { padding: 0 var(--space-3); }
+    .engine-status { display: none; }
+    [data-slot="dialog-trigger"].palette-trigger { flex: 1; }
+    .shell-content { padding: var(--space-5) var(--space-3) var(--space-6); gap: var(--space-6); }
+  }
+}
+
+@layer layout {
+  .field-stack { display: flex; flex-direction: column; gap: var(--space-2); }
+  .field-title { color: var(--text-1); font-weight: var(--weight-medium); }
+  .row.between { justify-content: space-between; }
+
+  [data-slot="accordion-trigger"] { padding-inline: var(--space-4); }
+  [data-slot="accordion-panel"] {
+    padding: 0 var(--space-4);
+
+    &::after {
+      content: "";
+      display: block;
+      height: var(--space-3);
+    }
+  }
+  [data-slot="tabs-panel"] { padding-top: var(--space-3); }
+}
+
+@layer layout {
+  .grid-2 > *, .grid-3 > *, .stack > *, .section-body > * { min-width: 0; }
+}

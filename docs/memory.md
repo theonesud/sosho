@@ -52,7 +52,7 @@ Run `python -m sosho_memory.mcp_server` over standard input and output to expose
 
 ## 5 Local Operations Commands
 
-Group 8 adds these targets to `Makefile` for macOS and Linux x86_64 hosts.
+These targets exist in the Makefile for macOS and Linux x86_64 hosts.
 
 | Command | Purpose |
 | :--- | :--- |

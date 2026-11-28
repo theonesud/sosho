@@ -27,7 +27,6 @@ def _follower(api: Api, source: str, on_status: str | None) -> str:
     }
     nodes: list[JsonValue] = [watcher, tool("b", "echo", value="{{input.status}}")]
     publish(api, draft(nodes, [edge("start", "b")]), wid)
-    assert api.post(f"/workflows/{wid}/activate", {}).status == 200
     return wid
 
 
@@ -78,7 +77,6 @@ def test_chained_run_input_holds_the_source_run_id(api: Api) -> None:
     watcher = trigger(mode="workflow_finished", source_workflow_id=source)
     nodes: list[JsonValue] = [watcher, tool("b", "echo", value="{{input.source_run_id}}")]
     publish(api, draft(nodes, [edge("start", "b")]), wid)
-    assert api.post(f"/workflows/{wid}/activate", {}).status == 200
     source_run = start(api, source)
     follow_id = str(dig(_runs(api, wid), 0, "run_id"))
     wait_terminal(api, follow_id)

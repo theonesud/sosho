@@ -23,6 +23,18 @@ def require_service(name: str, url: str) -> None:
         pytest.skip(msg)
 
 
+LIVE_RUN_DONE = {"succeeded", "failed", "cancelled"}
+
+
+def remove_workflow(client: httpx.Client, workflow_id: str) -> None:
+    runs = client.get("/runs", params={"workflow_id": workflow_id, "limit": 200})
+    if runs.status_code == 200:
+        for run in runs.json():
+            if run["status"] not in LIVE_RUN_DONE:
+                client.post(f"/runs/{run['run_id']}/cancel")
+    client.delete(f"/workflows/{workflow_id}")
+
+
 def container_env(container: str, name: str) -> str:
     docker = shutil.which("docker")
     if docker is None:

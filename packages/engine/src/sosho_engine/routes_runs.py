@@ -6,7 +6,7 @@ from fastapi import APIRouter, Header, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from sosho_engine import runs
+from sosho_engine import run_delete, runs
 from sosho_engine.jobs import RunParams
 from sosho_engine.run_models import ForkRequest, InputRequest, RunDetail, RunSummary
 from sosho_engine.tools import JsonDict
@@ -44,7 +44,7 @@ async def start(workflow_id: str, body: StartRequest) -> RunRef:
         input=body.input,
         trigger_node=body.trigger_node,
     )
-    return RunRef(run_id=await runs.start_run(params, "manual"))
+    return RunRef(run_id=await runs.start_run(params))
 
 
 @router.get("/runs")
@@ -60,6 +60,11 @@ async def list_runs(
 @router.get("/runs/{run_id}")
 async def detail(run_id: str) -> RunDetail:
     return await runs.run_detail(run_id)
+
+
+@router.delete("/runs/{run_id}", status_code=204)
+async def delete(run_id: str) -> None:
+    await run_delete.delete_run(run_id)
 
 
 @router.get("/runs/{run_id}/events")
