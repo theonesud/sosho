@@ -104,10 +104,9 @@ CAUTION: Destructive and outward-facing actions are hard to undo.
 | You edit a `.py` file | [docs/standards/python.md](docs/standards/python.md) |
 | You write or change a test | [docs/standards/testing.md](docs/standards/testing.md) |
 | You commit | [docs/standards/git.md](docs/standards/git.md) |
-| You edit code in `packages/web` | `docs/handoff-ui.md`, and `packages/web/node_modules/@ui-sdk/react/docs/llms.txt` |
-| You edit packages/memory-graph or memory bridge code | [docs/memory.md](docs/memory.md) |
-
-NOTE: Later stages add rows for documentation, architecture, and structure.
+| You edit code in `packages/engine` | [packages/engine/README.md](packages/engine/README.md) |
+| You edit code in `packages/web` | [docs/web.md](docs/web.md), and `packages/web/node_modules/@ui-sdk/react/docs/llms.txt` |
+| You edit `packages/memory-graph` or memory bridge code | [docs/memory.md](docs/memory.md) |
 
 6.1 Before you use ui-sdk, follow the `ui-sdk` skill if it is installed. Read `packages/web/node_modules/@ui-sdk/react/docs/llms.txt`.
 

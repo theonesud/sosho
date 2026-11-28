@@ -6,7 +6,7 @@ Read this file first. Then read `AGENTS.md` and the standards it lists. This fil
 
 Sosho is an AI workbench that runs on one GPU workstation. One human owner and agents use it. `docs/usecases.md` lists the use cases.
 
-The workflow backend is `packages/engine`, module `sosho_engine`. It is a JSON graph interpreter on DBOS Transact 3.7.0, written in Python. Workflows are versioned JSON. Agents write them now. The owner writes them on a canvas later. The backend and the web UI are built. The memory layer and self-improvement stay deferred. For the web UI, read docs/handoff-ui.md.
+The workflow backend is `packages/engine`, module `sosho_engine`. It is a JSON graph interpreter on DBOS Transact 3.7.0, written in Python. Workflows are versioned JSON. The backend, the web user interface (UI) in `packages/web`, and the graph memory package in `packages/memory-graph` are built. Self-improvement stays deferred. For the web UI, read [docs/web.md](web.md). For the memory system, read [docs/memory.md](memory.md). For the workflow engine and web condensation and defect repair plan, read [docs/workflow-refactor-plan.md](workflow-refactor-plan.md).
 
 Every model call goes through the LiteLLM proxy. Do not add direct provider, llama.cpp, or RustingStrata access. Claude Code is the exception. It calls Anthropic directly. The llama.cpp and `strata` ports have no host port.
 
@@ -16,13 +16,11 @@ Work method: Claude Code acts as coordinator only. Sonnet subagents write code. 
 
 ## 2 State
 
-- Date of this state: 2026-11-26, evening. Branch `refactor`. Check `git status` for the current state. The web UI work is not committed. See docs/handoff-ui.md.
-- The work of 2026-11-25 and 2026-11-26 is in commits `b197c69` to `0a72d29`. Commit `728fcdc` holds the unfinished prompt order change (section 4, item 0). Commit `0a72d29` moves `local-uncensored` to the `strata` service. Commit `990873f` makes the agent docs checker skip git-ignored files. Commit `960dc5d` adds the skill `.agents/skills/local-inference-tuning/`. Ask the owner before the next commit or a push.
-- Last full run: `make test COV=1` exit code 2, in 10 minutes 35 seconds. Pytest result: 501 passed, 1 failed. Coverage: 96 percent.
-- The failure: `test_limits_stop_the_node_and_count_calls_on_both_paths`. The per-line cap tripped before the total cap.
-- A fix is in commit `728fcdc`. It sets `SOSHO_ENGINE_PI_LINE_CAP_BYTES` high in that test. It also adds a separate line-cap case. The fix is not run yet.
-- `make test-fast` exited 0 in 77 seconds. This run came before the latest changes. It is not rerun after them.
-- The previous full run, before the test reduction, took 18 minutes 45 seconds. It had 493 tests and 88 percent coverage.
+- Date of this state: 2026-11-28, evening. Branch `refactor`.
+- Commit `68e3a4b` (`229cd7e`) adds `packages/memory-graph` (`sosho-memory==0.1.0`) and `packages/engine/src/sosho_engine/memory_bridge.py`.
+- Commit `ca6a7aa` adds `packages/web` and the engine UI support (`web_ui.py`, `reconcile.py`, `run_delete.py`, always-live triggers).
+- `make test-fast` exits 0 with 107 Vitest tests, 493 engine and unit pytest tests, and 20 memory-graph unit tests.
+- Integration tests in `tests/integration/` (including the 7 live memory integration tests) wait for a live stack run with owner approval. Ask the owner before you run `make test`, commit, or push.
 - `compose.yaml` services: `model-download`, `llama-cpp`, `strata`, `litellm`, and `engine`. The `music` profile adds the `yue2-*` services. The services `postgres`, `phoenix-db-init`, and `phoenix` are in the same file. The volume `sosho_postgres` holds the data of `postgres`. - The engine listens on `127.0.0.1:8123`. Every route needs the bearer token `SOSHO_ENGINE_API_TOKEN`, except `GET /health` and the webhook route.
 - The DBOS system database `sosho_engine` lives on the `postgres` service. The host worker reaches it on `127.0.0.1:${SOSHO_POSTGRES_PORT:-5432}`.
 - The host worker runs as the systemd user service `sosho-worker`.
@@ -54,46 +52,31 @@ Read `packages/engine/README.md` for the API and the run rules. This section lis
 
 ## 4 Open Work
 
-### 0 Unfinished work from 2026-11-26
+### 0 Workflow Engine and Web Condensation and Defect Repair
 
-Do these first.
+Execute [docs/workflow-refactor-plan.md](workflow-refactor-plan.md) first. It covers:
 
-a) Prompt order change is half done.
-   - `packages/engine/src/sosho_engine/host_node.py` sends node instructions in the first user message. The heading is `Instructions:`, from the constant `INSTRUCTIONS_HEADING` at `host_node.py:25`.
-   - Before this change, the instructions went in `--append-system-prompt`.
-   - These files may not match the change: `packages/engine/tests/test_pi_command.py`, `packages/engine/tests/pi_support.py`, the merged normal-run test, and `packages/engine/README.md`. Not verified.
-   - Run `make up`.
-   - Run `uv run pytest packages/engine/tests/test_pi_command.py packages/engine/tests/test_host_nodes.py -q`.
-   - Fix the failures. Then run `make test` once.
-b) Checkpoint experiment. No gain. Cause not found.
-   - Old llama.cpp result. The Qwen3.6 preset had `checkpoint-min-step = 1024` and `ctx-checkpoints = 32`. The preset is removed. `strata` now serves `local-uncensored`. The result below does not apply to `strata`. Not verified on `strata`.
-   - Measurements.
-   - The first request of each new pi session still evaluates the full prompt.
-   - Baseline, no checkpoints: 35 to 44 seconds for 8656 to 8772 tokens. The prefix match is 0.80 to 0.87.
-   - With checkpoints: 34 to 36 seconds.
-   - With the new prompt order: 35 to 40 seconds for 9170 to 9370 tokens.
-   - No checkpoint lines appear in the log.
-   - Within one session, later turns reuse the cache. About 90 tokens are evaluated.
-   - Ask the owner whether to keep or remove these: the two keys and the prompt order change.
-   - Next ideas. Not verified:
-     - Raise the llama.cpp log verbosity to see checkpoint events.
-     - Check the llama.cpp issues for prefix reuse on the hybrid `qwen35moe` model.
-     - Test `--swa-full`.
-     - Test `--cache-reuse`.
-c) Facts found about the Qwen3.6 model.
+- Condensing `packages/engine/src/sosho_engine` and `packages/web/src` into domain modules.
+- Removing the `/design-ref` showcase demo.
+- Fixing the 14 defects in `packages/engine` and `packages/web` from first principles.
+
+### 1 Notes from 2026-11-26
+
+a) Prompt order change:
+   - `packages/engine/src/sosho_engine/host_node.py` sends node instructions in the first user message under `Instructions:`.
+   - `packages/engine/tests/test_pi_command.py`, `packages/engine/tests/pi_support.py`, `packages/engine/tests/test_host_nodes.py`, and `packages/engine/README.md` match this format.
+b) Checkpoint experiment on old llama.cpp Qwen3.6 preset:
+   - `strata` now serves `local-uncensored`. Prefix cache behavior on `strata` is per conversation.
+c) Facts found about the Qwen3.6 model:
    - GGUF architecture `qwen35moe`. 40 layers. `full_attention_interval = 4`. SSM keys are present. The model is hybrid. The count of 10 attention layers is an inference. Not verified.
    - Prefill speed: about 200 to 250 tokens per second.
    - First request of an engine agent session: about 8700 to 9400 tokens.
    - First request of a pi `llm` node: about 750 tokens.
-d) Review the 155 tests outside the coverage set.
+d) Review the 155 tests outside the coverage set:
    - These tests take 494 seconds in total.
    - The coverage set does not see work in child processes. 221 tests have no per-test data.
    - Check each test before you delete it.
    - The owner wants maximum coverage in minimum time.
-e) Owner question, still open. No answer yet.
-   - The agent docs checker limits were raised to 1000 lines. This applies to `.claude/CLAUDE.md`, which was 25 non-empty lines, and to each `.agents/rules/*.md`, which was 15 lines. The change follows the decision "all files 1000 lines".
-   - The coordinator suggests restoring 25 and 15.
-   - Ask the owner which limit to use.
 
 ### 1 Daily research digest workflow
 
@@ -151,9 +134,9 @@ f) Local inference work of 2026-11-26. State and open items.
 
 Do not start these without the owner:
 
-- The memory layer: run state, workflow memory, and global memory. Start it after the basics are verified.
+- Live stack verification and legacy `packages/memory` cutover for `packages/memory-graph`. See [docs/memory.md](memory.md).
 - Self-improvement. Reflection proposes a new version as a diff. The owner approves it.
-- The UI is built. See docs/handoff-ui.md, docs/webapp-plan.md, and packages/web/DESIGN.md.
+- The UI is built. See [docs/web.md](web.md) and `packages/web/DESIGN.md`.
 
 Decisions made by the owner on 2026-11-25 and 2026-11-26. Most rules are now in `AGENTS.md` section 8:
 

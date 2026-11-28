@@ -44,7 +44,7 @@ WARNING: A committed secret stays in the history.
 | :--- | :--- |
 | pre-commit | Fix and re-stage staged files, scan them with `gitleaks`, and warn on prose |
 | commit-msg | Conventional Commits check |
-| pre-push | `make test`, which runs all checks and tests |
+| pre-push | `make test-fast`, which runs all checks and the fast tests |
 
 ## 4 Branches
 

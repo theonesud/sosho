@@ -130,15 +130,13 @@ Color strategy: restrained. Neutrals have a cool tint (hue 260, chroma 0.004 to 
 ## Layout
 
 - Spacing steps: 4, 8, 12, 16, 24, 40, 64 px. Use tight steps inside a group and 24 to 40 px between groups.
-- The sidebar is 13.5 rem wide and flat, with a right hairline. The /design-ref showcase only. The workspace left panel is 15 rem wide (`--panel-width`). It collapses to a 3 rem rail (`--panel-rail-width`). The width change uses `--duration-expand` and `--ease-out`, and it does not move for reduced motion. The top bar is 3 rem high. The /design-ref showcase only.
-- The content column is at most 82 rem wide. Sections have 40 px between them.
+- The workspace left panel is 15 rem wide (`--panel-width`). It collapses to a 3 rem rail (`--panel-rail-width`). The width change uses `--duration-expand` and `--ease-out`, and it does not move for reduced motion.
 - Control height is 2 rem.
-- Below 52 rem the sidebar becomes a top strip of links that scrolls sideways. The /design-ref showcase only.
 
 ## Elevation & Depth
 
 - Declare depth once. A card has a fill and a hairline border. It has no shadow.
-- Floating layers use `--float`: a 78 percent surface, a 20 px blur, a hairline, and one soft shadow. Floating layers are popovers, menus, dialogs, and the graph controls. The /design-ref showcase only: the drawer and toasts. The product does not use them.
+- Floating layers use `--float`: a 78 percent surface, a 20 px blur, a hairline, and one soft shadow. Floating layers are popovers, menus, dialogs, and the graph controls.
 - Do not place one glass layer inside another.
 - Under `prefers-reduced-transparency` the float fill becomes solid and the blur is off.
 
@@ -182,7 +180,7 @@ Rules:
 - An enter uses `--ease-out`. An exit uses `--ease-in`. A move between two places uses `--ease-in-out`.
 - No motion bounces or overshoots.
 - Animate only `transform`, `translate`, `scale`, `rotate`, `opacity`, color, `box-shadow`, `clip-path`, and filters.
-- Exception: the height of an accordion, a collapsible, and a tree group. The ui-sdk measures the height. The /design-ref showcase only: the inbox card.
+- Exception: the height of an accordion, a collapsible, and a tree group. The ui-sdk measures the height.
 - Do not animate the padding of a panel. The ui-sdk measures the height at the start state. Put the bottom space of a panel in a `::after` spacer.
 - Exception: the segmented control indicator. The ui-sdk sets its box.
 - Exception: the slider thumb and the slider fill. The ui-sdk sets `inset-inline` and `width`. They move only when the user does not drag. A drag stays direct.
@@ -195,13 +193,11 @@ Tokens:
 | :--- | :--- | :--- |
 | `--duration-fast` | 110 ms | Hover, press, focus, icon swap |
 | `--duration-base` | 180 ms | Color of a badge, rotation of a chevron, switch thumb |
-| `--duration-enter` | 200 ms | Enter of a popup, dialog, toast, tab panel, and list item |
+| `--duration-enter` | 200 ms | Enter of a popup, dialog, tab panel, and list item |
 | `--duration-exit` | 140 ms | Exit of the same layers |
 | `--duration-expand` | 220 ms | Open of an accordion, a collapsible, and a tree group |
-| `--duration-collapse` | 160 ms | Close of the same parts and the inbox card |
-| `--duration-tween` | 240 ms | Graph viewport tween and stat count tween. The scripts read this token |
-| `--stagger` | 40 ms | Delay between timeline items |
-| `--delay-resolve` | 700 ms | Time the inbox card stays before it collapses |
+| `--duration-collapse` | 160 ms | Close of the same parts |
+| `--duration-tween` | 240 ms | Graph viewport tween. The scripts read this token |
 | `--duration-spin` | 700 ms | One turn of the spinner |
 | `--duration-flow` | 900 ms | One cycle of the moving dashes on a running edge |
 | `--duration-shimmer` | 1400 ms | One cycle of the skeleton shimmer |
@@ -214,11 +210,8 @@ Tokens:
 | `--shift-popup` | 6 px | Offset of a popup from its side |
 | `--shift-dialog` | 8 px | Offset of a dialog |
 | `--shift-item` | 8 px | Offset of a list item that enters |
-| `--shift-sheet` | 100 percent | Offset of a toast that enters or leaves. The ui-sdk slides the drawer |
 | `--grow-scale` | 1.12 | Scale of a slider thumb that the user presses |
 | `--dot-scale` | 0.4 | Start scale of a radio dot |
-| `--stack-scale-step` | 0.05 | Scale step for each older toast in the stack |
-| `--glow-blur` | 6 px | Blur of the glow on a selected graph node |
 | `--transition-interactive` | color set | Color, border, shadow, and focus ring in 110 ms |
 | `--transition-press` | color set and scale | The same set plus the press scale |
 
@@ -228,23 +221,17 @@ What moves:
 - Form parts: the switch thumb slides. A check mark is drawn with a clip. A radio dot grows. A slider thumb grows on hover and press. A slider thumb and fill slide to a new value from the keyboard. Progress and meter fills move with a clip.
 - Validation: an error message fades in and rises 8 px.
 - Popups: a menu, select, combobox, popover, hover card, and tooltip fade and move 6 px from the side they open from. The origin of the scale is the trigger.
-- Dialogs: the dialog and the alert dialog fade and scale. The backdrop fades. The ui-sdk slides the drawer. The /design-ref showcase only. The command palette is a dialog.
-- Toast: it slides in from the right edge. Older toasts move up and scale down. It slides out to the right. The /design-ref showcase only.
+- Dialogs: the dialog and the alert dialog fade and scale. The backdrop fades.
 - Disclosure: an accordion, a collapsible, and a tree group change height and fade. A chevron turns. The tab indicator slides. The tab panels cross-fade.
-- State: a status badge changes color. The label fades in. The running dot pulses. A timeline item rises in order on the first render. A new timeline event rises at once. A skeleton shimmers. The copy icon swaps to a check and back. The sort arrow turns.
-- Numbers: a stat value counts to its new value in 240 ms when it changes. It does not count on the first render. The digits are tabular. A screen reader gets only the final value. The /design-ref showcase only.
-- Table: a sort or a page change fades the rows in.
-- Resolve: an inbox card shows its decision, waits, and then collapses. An empty state fades in after it. The /design-ref showcase only.
-- Graph: a node fades its border and glow. A status change fades the border color. An edge to the selected node turns to the accent. The edge into a running node keeps its moving dashes.
+- State: a status badge changes color. The label fades in. The running dot pulses. A skeleton shimmers. The copy icon swaps to a check and back.
+- Graph: a node fades its border. A status change fades the border color. An edge to the selected node turns to the accent. The edge into a running node keeps its moving dashes.
 - Graph viewport: the zoom buttons and fit run a tween in a script. The wheel and the drag are direct.
-- Page: the nav indicator slides to the section in view. A jump to an anchor scrolls smoothly. The /design-ref showcase only.
 
 Reduced motion (`prefers-reduced-motion: reduce`):
 - Distance and scale tokens become zero. A layer only fades.
 - The pulse, the shimmer, and the moving dashes stop. The state stays visible.
-- Height changes become a fade. The graph tween and the stat count take 0 ms. Anchor scroll is direct.
+- Height changes become a fade. The graph tween takes 0 ms.
 - Indicators, the switch thumb, the slider, and chevrons move at once. Their color still fades.
-- A toast fades in and out. It does not slide. The /design-ref showcase only.
 - The spinner keeps turning, because it shows that work is in progress.
 
 ## Do's and Don'ts
